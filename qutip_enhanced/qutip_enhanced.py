@@ -111,7 +111,7 @@ def get_sub_matrix(op, levels):
         line and column 0 are removed, i.e. the returned operator has dim = [2,2]
     """
     matrix = op.data.todense()
-    levels = numpy.sort(levels)
+    levels = np.sort(levels)
     for i in range(len(matrix) - 1, -1, -1):
         if not i in levels:
             for j in range(2):
@@ -127,7 +127,7 @@ def get_expanded_matrix(op, levels, value=0, make_eye='no'):
     example: insert matrix = np.zeros([3,3]), levels = [0,3], value = 5
     """
     matrix = op.data.todense()
-    levels = numpy.sort(levels)
+    levels = np.sort(levels)
     for i in range(len(levels)):
         k = levels[i]
         for j in range(2):

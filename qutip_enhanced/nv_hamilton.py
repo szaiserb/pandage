@@ -1,19 +1,10 @@
-from numpy import *
-import pylab
+import numpy as np
 from scipy.constants import *
-set_printoptions(suppress=True, linewidth=500)
+np.set_printoptions(suppress=True, linewidth=500)
 
-from pylab import *
-from qutip import *
-import numpy
+from qutip_enhanced import *
 
-import qutip_enhanced
-
-reload(qutip_enhanced)
 import coordinates as co
-
-qte = qutip_enhanced.QutipEnhanced()
-
 
 class NVHam():
     """
@@ -98,7 +89,7 @@ class NVHam():
             total spin quantum number, i.e. 1/2, 1, 3/2, ..
         :return: zeeman splitting. However be careful with gyromagnetic ratios of electron spin. Use their negative
         """
-        return - qte.qsum([gamma * self.magnet_field_cart[axis] * jmat(j, axis) for axis in co.Coord().cart_coord])
+        return - qsum([gamma * self.magnet_field_cart[axis] * jmat(j, axis) for axis in co.Coord().cart_coord])
 
     def h_electron(self):
         """
@@ -156,12 +147,12 @@ class NVHam():
         'nsq' is the spin that is added, i.e. nsq = 1/2.0 for a 13c
         'nslvl_l' nuclear_spin_lvl_list (i guess that's what this variable name means)
         """
-        h_hf = qte.qzero(dims=np.append(self.h_nv.dims[0], len(nslvl_l)))
-        eye_mat = qte.qeye(dims=self.h_nv.dims[0][1:])  # unity matrix for spinsnot involved in HF
+        h_hf = 0*qeye(np.append(self.h_nv.dims[0], len(nslvl_l)))
+        eye_mat = qeye(dims=self.h_nv.dims[0][1:])  # unity matrix for spinsnot involved in HF
         for i in range(3):
-            electron = qte.get_sub_matrix(jmat(self.spins[0], co.Coord().cart_coord[i]), self.spin_levels[0])
+            electron = get_sub_matrix(jmat(self.spins[0], co.Coord().cart_coord[i]), self.spin_levels[0])
             for j in range(3):
-                new = qte.get_sub_matrix(jmat(qte.dim2spin(nsd), co.Coord().cart_coord[j]), nslvl_l)
+                new = get_sub_matrix(jmat(dim2spin(nsd), co.Coord().cart_coord[j]), nslvl_l)
                 tmp = tensor(electron, eye_mat, new) if eye_mat is not None else tensor(electron, new)
                 h_hf = h_hf + hft[i, j] * tmp
         return h_hf
@@ -172,7 +163,7 @@ class NVHam():
         """
         self.spins = np.array([1])
         self.spin_levels = [self.electron_levels]
-        self.h_nv = qte.get_sub_matrix(self.h_electron(), self.electron_levels)
+        self.h_nv = get_sub_matrix(self.h_electron(), self.electron_levels)
         if self.n_type is not None:
             self.get_nitrogen_params()
             self.add_spin(hft=self.hft_nitrogen(), h_ns=self.h_nitrogen(), nslvl_l=self.nitrogen_levels)

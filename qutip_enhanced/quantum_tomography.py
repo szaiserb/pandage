@@ -1,11 +1,8 @@
+from qutip_enhanced import *
 import numpy as np
-from qutip import *
-sys.path.append('D:\Dropbox\Dokumente\PI3\Code\Python\quantum-tools')
-import itertools, os, qutip_enhanced, pickle, time
-from scipy.optimize import minimize, brute
-from scipy import optimize
+import itertools
+import os
 import datetime
-qte = qutip_enhanced.QutipEnhanced()
 
 
 """
@@ -186,7 +183,7 @@ class TomoToDM():
         ---------
         UNFINISHED
         """
-        self.rho = 1./(2**self.num_qubits)*qte.qsum([self.ob[key]*self.ev[key] for key in self.ob])
+        self.rho = 1./(2**self.num_qubits)*qsum([self.ob[key]*self.ev[key] for key in self.ob])
               
     def add_pd(self, param_names, param_string):
         """
@@ -252,7 +249,7 @@ def aqpsi(**kwargs):
     nq = int(np.round(np.log2(len(c)),0))
     bl = list(itertools.product(*[[0,1] for i in range(nq)]))
     b = [tensor([basis(2,bwi) for bwi in bwi_tuple]) for bwi_tuple in bl]
-    psi = qte.qsum([c[i]*b[i] for i in range(len(c))])
+    psi = qsum([c[i]*b[i] for i in range(len(c))])
     return psi
         
 def aqrho(**kwargs):
