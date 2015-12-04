@@ -1,0 +1,15 @@
+# use glob syntax.
+syntax: glob
+
+.ropeproject/**
+*.pyc
+*.orig
+**/.idea/**
+
+
+
+# switch to regexp syntax.
+syntax: regexp
+spyder
+one_qubit_tomo
+interaction_entangle

@@ -1,0 +1,4 @@
+1. go to (Canopy) command prompt
+2. cd to this folder
+3. type python setup.py install
+4. type python setup.py develop
