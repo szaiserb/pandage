@@ -1,10 +1,11 @@
 import numpy as np
 from scipy.constants import *
-np.set_printoptions(suppress=True, linewidth=500)
+np.set_printoptions(suppress=True, linewidth=500, threshold=np.nan)
 
+from qutip import *
+
+import coordinates
 from qutip_enhanced import *
-
-import coordinates as co
 
 class NVHam():
     """
@@ -36,7 +37,7 @@ class NVHam():
         :param D: float
             Zero field splitting, default 2870 MHz.
         """
-        self.magnet_field_cart = co.Coord().coord(magnet_field, 'cart')  # magnet field in cartesian coordinates
+        self.magnet_field_cart = coordinates.Coord().coord(magnet_field, 'cart')  # magnet field in cartesian coordinates
         self.nitrogen_levels = nitrogen_levels
         self.n_type = n_type
         self.electron_levels = [0, 1, 2] if electron_levels is None else electron_levels
@@ -89,7 +90,7 @@ class NVHam():
             total spin quantum number, i.e. 1/2, 1, 3/2, ..
         :return: zeeman splitting. However be careful with gyromagnetic ratios of electron spin. Use their negative
         """
-        return - qsum([gamma * self.magnet_field_cart[axis] * jmat(j, axis) for axis in co.Coord().cart_coord])
+        return - qsum([gamma * self.magnet_field_cart[axis] * jmat(j, axis) for axis in coordinates.Coord().cart_coord])
 
     def h_electron(self):
         """
@@ -130,8 +131,8 @@ class NVHam():
         location must be inserted according to module coordinates. 
         For very close nuclei this gets wrong as contact interaction then plays a role.
         """
-        loc_cart = co.Coord().coord_unit(location, 'cart')
-        rho = co.Coord().coord(location, 'sph')['rho']
+        loc_cart = coordinates.Coord().coord_unit(location, 'cart')
+        rho = coordinates.Coord().coord(location, 'sph')['rho']
         x, y, z = [loc_cart[i] for i in ['x', 'y', 'z']]
         prefactor = mu_0 / (4.0 * pi) * h * self.gamma_e * 1e6 * self.gamma_13c * 1e6 / rho ** 3  # given in Hertz
         prefactor_mhz = prefactor * 1e-6  # given in MHz
@@ -147,12 +148,12 @@ class NVHam():
         'nsq' is the spin that is added, i.e. nsq = 1/2.0 for a 13c
         'nslvl_l' nuclear_spin_lvl_list (i guess that's what this variable name means)
         """
-        h_hf = 0*qeye(np.append(self.h_nv.dims[0], len(nslvl_l)))
-        eye_mat = qeye(dims=self.h_nv.dims[0][1:])  # unity matrix for spinsnot involved in HF
+        h_hf = 0*qeye(list(np.append(self.h_nv.dims[0], len(nslvl_l))))
+        eye_mat = None if self.h_nv.dims[0][1:] == [] else qeye(self.h_nv.dims[0][1:])  # unity matrix for spinsnot involved in HF
         for i in range(3):
-            electron = get_sub_matrix(jmat(self.spins[0], co.Coord().cart_coord[i]), self.spin_levels[0])
+            electron = get_sub_matrix(jmat(self.spins[0], coordinates.Coord().cart_coord[i]), self.spin_levels[0])
             for j in range(3):
-                new = get_sub_matrix(jmat(dim2spin(nsd), co.Coord().cart_coord[j]), nslvl_l)
+                new = get_sub_matrix(jmat(dim2spin(nsd), coordinates.Coord().cart_coord[j]), nslvl_l)
                 tmp = tensor(electron, eye_mat, new) if eye_mat is not None else tensor(electron, new)
                 h_hf = h_hf + hft[i, j] * tmp
         return h_hf
@@ -183,21 +184,35 @@ class NVHam():
         """
 
         nsd = h_ns.shape[0]  # multiplicity of new spin
-        nsq = qte.dim2spin(nsd)  # quantum number of new spin
+        nsq = dim2spin(nsd)  # quantum number of new spin
         h_nv_ext = tensor(self.h_nv,
                           qeye(len(nslvl_l)))  # nv hamilton operator extended with qeye of dimension of new spin
-        h_ns_ext = tensor(qte.qeye(dims=self.h_nv.dims[0]),
-                          qte.get_sub_matrix(h_ns, nslvl_l))  # extended hamilton operator of the new spin
+        h_ns_ext = tensor(qeye(self.h_nv.dims[0]),
+                          get_sub_matrix(h_ns, nslvl_l))  # extended hamilton operator of the new spin
         h_hf = self.h_hf(hft, nsd, nslvl_l)  # new spin - electron hyperfine interaction tensor
         self.h_nv = h_nv_ext + h_ns_ext + h_hf
         self.spins = np.append(self.spins, nsq)
         self.spin_levels.append(nslvl_l)
         return self.h_nv
 
+
+
 if __name__ == '__main__':
     nvham = NVHam(magnet_field={'z': 0.55}, n_type='n14', nitrogen_levels=[0, 1, 2], electron_levels=[0, 1, 2])
-    C13_hyperfine_tensor = nvham.hft_13c_dd(location={'rho': 0.155e-9, 'elev': np.pi/2.})
-    print C13_hyperfine_tensor
+
+    # C13_hyperfine_tensor = nvham.hft_13c_dd(location={'rho': 0.155e-9, 'elev': np.pi/2.})
+    C1390_ht = np.matrix([[0, 0, 0],
+                             [0, 0, 0],
+                             [0, 0, 0.089]])
+    C13414_ht = np.matrix([[0, 0, 0],
+                              [0, 0, 0],
+                              [0, 0, 0.414]])
+    nvham.add_spin(C13414_ht, nvham.h_13c(), [0, 1])
+    nvham.add_spin(C1390_ht, nvham.h_13c(), [0, 1])
+    print nvham.h_nv
+    # nvham = NVHam(magnet_field={'z': 0.55}, n_type='n14', nitrogen_levels=[0, 1, 2], electron_levels=[0, 1, 2])
+    # C13_hyperfine_tensor = nvham.hft_13c_dd(location={'rho': 0.155e-9, 'elev': np.pi/2.})
+    # print C13_hyperfine_tensor
     # nvham.add_spin(C13_hyperfine_tensor, nvham.h_13c(), [0, 1])
     # print nvham.h_nv
     # a = nvham.h_hf(nvham.hft_nitrogen(), nvham.h_nitrogen().shape[0], nvham.nitrogen_levels)
@@ -222,7 +237,7 @@ if __name__ == '__main__':
     # ham.add_spin(ham.hft_13c_dd(location = {'x': 1e-9}), ham.h_13c())
     # evals, evecs = ham.h_nv.eigenstates()
     #     print evals
-    # ev = qutip_enhanced.Eigenvector(dims=np.array([4,3]))
+    # ev = Eigenvector(dims=np.array([4,3]))
     # mag_z_l = np.linspace(0, 0.1028, 30)
     # ham = NVHam(magnet_field = {'z':0.55}, n_type='14', electron_levels=[0,1,2])
     # print ham.h_nv

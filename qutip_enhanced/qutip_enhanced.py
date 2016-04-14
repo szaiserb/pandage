@@ -1,12 +1,11 @@
+from qutip import *
 import numpy as np
 np.set_printoptions(suppress=True, linewidth=500)
 import itertools
-import coordinates as co
-from qutip import *
+import coordinates
 import copy
 
 np.set_printoptions(linewidth=1e5)  # matrices are displayd much more clearly
-
 
 class Eigenvector():
     def __init__(self, dims):
@@ -171,13 +170,13 @@ def get_rot_matrix(dim, transition='all', rotation_axis={'x': 1, 'y': 1}):
         rot_mat : qutip operator
         """
 
-    rotation_axis = co.Coord().coord_unit(rotation_axis, 'cart')
+    rotation_axis = coordinates.Coord().coord_unit(rotation_axis, 'cart')
     if transition == 'all':
         dim_rot = dim
     else:
         dim_rot = 2
     rot_mat = 0*qeye(dim_rot)
-    for axis_name in co.Coord().cart_coord:
+    for axis_name in coordinates.Coord().cart_coord:
         rot_mat = rot_mat + rotation_axis[axis_name] * jmat((dim_rot - 1) / 2.0, axis_name)
     if transition != 'all':
         rot_mat = get_expanded_matrix(rot_mat, [x for x in range(dim) if x not in transition])
@@ -261,9 +260,11 @@ if __name__ == '__main__':
         rho = rotate(rho, rotation_axis={'y': 1}, rotated_spin=0, angle=-np.pi/2)
         return rho
     #
-    cphase = get_rot_operator_all_spins(dims = [2, 2], rotation_axis={'z': 1}, rotated_spin=0, angle=np.pi, selective_to={1:[1]})
-    # rotx = get_rot_operator_all_spins(dims = [2, 2], rotation_axis={'y': 1}, rotated_spin=1, angle=np.pi/2.)
-    # cphase = rotx*cphase*rotx.dag()
+    cphase0 = get_rot_operator_all_spins(dims = [2, 2], rotation_axis={'z': 1}, rotated_spin=0, angle=np.pi/2., selective_to={1:[0]})
+    cphase1 = get_rot_operator_all_spins(dims = [2, 2], rotation_axis={'z': 1}, rotated_spin=0, angle=- np.pi/2., selective_to={1:[1]})
+    rotx = get_rot_operator_all_spins(dims = [2, 2], rotation_axis={'y': 1}, rotated_spin=1, angle=np.pi/2.)
+    print rotx*cphase0*cphase1*rotx.dag()
+
     # x = (basis(2,0) + basis(2, 1)).unit()
     # xm = (basis(2,0) - basis(2, 1)).unit()
     # y = (basis(2,0) + 1j*basis(2, 1)).unit()
