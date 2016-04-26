@@ -75,7 +75,7 @@ class NVHam():
             self.hf_para_n = +3.03
             self.hf_perp_n = +3.65
             self.nitrogen_levels = [0,1] if self.nitrogen_levels is None else self.nitrogen_levels
-        else:
+        elif self.n_type is not None:
             raise Exception("Chosen 'n_type' is not allowed.")
         if self.n_type is not None and type(self.nitrogen_levels) != list:
             raise Exception("Chosen 'nitrogen_levels must be a list, e.g. nitrogen_levels = [1,2] for n_type='n14'.")
@@ -198,16 +198,16 @@ class NVHam():
 
 
 if __name__ == '__main__':
-    nvham = NVHam(magnet_field={'z': 0.55}, n_type='n14', nitrogen_levels=[0, 1, 2], electron_levels=[0, 1, 2])
+    nvham = NVHam(magnet_field={'z': 0.55}, n_type=None, nitrogen_levels=[], electron_levels=[1,2])
 
     # C13_hyperfine_tensor = nvham.hft_13c_dd(location={'rho': 0.155e-9, 'elev': np.pi/2.})
     C1390_ht = np.matrix([[0, 0, 0],
                              [0, 0, 0],
                              [0, 0, 0.089]])
-    C13414_ht = np.matrix([[0, 0, 0],
-                              [0, 0, 0],
-                              [0, 0, 0.414]])
-    nvham.add_spin(C13414_ht, nvham.h_13c(), [0, 1])
+    # C13414_ht = np.matrix([[0, 0, 0],
+    #                           [0, 0, 0],
+    #                           [0, 0, 0.414]])
+    # nvham.add_spin(C13414_ht, nvham.h_13c(), [0, 1])
     nvham.add_spin(C1390_ht, nvham.h_13c(), [0, 1])
     print nvham.h_nv
     # nvham = NVHam(magnet_field={'z': 0.55}, n_type='n14', nitrogen_levels=[0, 1, 2], electron_levels=[0, 1, 2])
