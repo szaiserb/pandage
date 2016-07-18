@@ -88,3 +88,7 @@ class Coord():
         elev = np.arctan2(cart['z'], np.sqrt(cart['x'] ** 2 + cart['y'] ** 2))
         sph = {'rho': rho, 'azim': azim, 'elev': elev}
         return sph
+
+
+if __name__ == '__main__':
+    a = Coord()

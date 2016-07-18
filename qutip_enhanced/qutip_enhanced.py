@@ -4,6 +4,7 @@ np.set_printoptions(suppress=True, linewidth=500)
 import itertools
 import coordinates
 import copy
+import scipy.linalg
 
 np.set_printoptions(linewidth=1e5)  # matrices are displayd much more clearly
 
@@ -182,6 +183,12 @@ def get_rot_matrix(dim, transition='all', rotation_axis={'x': 1, 'y': 1}):
         rot_mat = get_expanded_matrix(rot_mat, [x for x in range(dim) if x not in transition])
     return rot_mat
 
+
+def get_rot_matrix_all_spins(*args, **kwargs):
+    o = get_rot_operator_all_spins(*args, **kwargs)
+    dims = o.dims
+    return Qobj(scipy.linalg.logm(o.data.todense()), dims=dims)/np.pi*1.j
+
 def get_rot_operator(dim, rotation_axis={'x': 1, 'y': 1}, transition='all', angle=np.pi / 2.0):
     rot_mat = get_rot_matrix(dim, transition=transition, rotation_axis=rotation_axis)
     U = (-1j * angle * rot_mat).expm()
@@ -265,96 +272,7 @@ if __name__ == '__main__':
     rotx = get_rot_operator_all_spins(dims = [2, 2], rotation_axis={'y': 1}, rotated_spin=1, angle=np.pi/2.)
     print rotx*cphase0*cphase1*rotx.dag()
 
-    # x = (basis(2,0) + basis(2, 1)).unit()
-    # xm = (basis(2,0) - basis(2, 1)).unit()
-    # y = (basis(2,0) + 1j*basis(2, 1)).unit()
-    # ym = (basis(2,0) - 1j*basis(2, 1)).unit()
-    # z = basis(2,0)
-    # zm = basis(2,1)
-    # pl = np.linspace(0, 2*np.pi, 30)
-    # z0 = [expect(tensor(sigmaz(), qeye(2)), r(p)) for p in pl]
-    # z1 = [expect(tensor(qeye(2), sigmaz()), r(p)) for p in pl]
-    # #
-    # plt.plot(pl, z0)
-    # plt.plot(pl, z1)
-    # plt.show()
-    # b = ket2dm((basis(2,0) + basis(2,1)).unit())
-    # rho = tensor(ket2dm(basis(2,0)), b, b)
-    # print qte.get_rot_operator_all_spins([2], rotation_axis={'y':1}, angle=np.pi/2.)
-    # ctwopi = qte.get_rot_operator_all_spins([2, 2, 2], rotation_axis={'x':1}, rotated_spin=0, selective_to={1: [1],  2: [1]}, angle=np.pi)
-    # print ctwopi.ptrace([1, 2])
-    # ctwopi = ctwopi.ptrace([1, 2])
-
-    # class Args(object):
-    #     AO = 1
-    #     ALPHA = np.pi/2.
-    #
-    # args = Args()
-    #
-    # if args.AO == 1:
-    #     gate_0 = qte.get_rot_operator(2, rotation_axis={'y': 1}, angle=args.ALPHA).data.todense()
-    #     gate_1 = qte.get_rot_operator(2, rotation_axis={'y': 1}, angle=np.pi - args.ALPHA).data.todense()
-    # elif args.AO == 0:
-    #     gate_1 = qte.get_rot_operator(2, rotation_axis={'y': 1}, angle=args.ALPHA).data.todense()
-    #     gate_0 = qte.get_rot_operator(2, rotation_axis={'y': 1}, angle=np.pi - args.ALPHA).data.todense()
-    #
-    # print gate_0
-    # print gate_1
-    # a = ket2dm(tensor(basis(2, 0), basis(2, 1)))
-    #
-    #
-    # # o1 = qte.get_rot_operator_all_spins([2, 2], rotation_axis=dict(y=1),rotated_spin=0,selective_to={1: [1]})
-    # # o2 = qte.get_rot_operator_all_spins([2, 2], rotation_axis=dict(y=1),rotated_spin=0,selective_to={1: [0]})
-    #
-    # def evolve(rho, length_mus, H):
-    #     options = Odeoptions(nsteps=100000)
-    #     if length_mus != 0.0:
-    #         # rho = mesolve(h(**kwargs), rho, np.linspace(0, length_mus, 2), [], [], options=options).states[-1]
-    #         u = (-2*np.pi*1j * H * length_mus).expm()
-    #         rho = u * rho * u.dag()
-    #     return rho
-    #
-    #
-    # import qutip_nv_hamilton as nvh
-    #
-    # H = nvh.NVHam(magnet_field={'z': 0.53756}, electron_levels=[1, 2], nitrogen_levels=[0, 1], n_type='n14')
-    # h = H.h_nv
-    # tau = 1.* 2*np.pi/ H.hf_para_n
-    # a = qte.rotate(a, rotation_axis=dict(y=1), rotated_spin=1, selective_to={0: [0]}, angle=np.pi / 2.)
-    #
-    # a = qte.rotate(a, rotation_axis=dict(y=1), rotated_spin=0, selective_to={1: [1]}, angle=np.pi / 2.)
-    # a = qte.rotate(a, rotation_axis=dict(y=1), rotated_spin=0, selective_to={1: [0]}, angle=np.pi / 2.)
-    #
-    # a = qte.rotate(a, rotation_axis=dict(z=1), rotated_spin=0, angle=np.pi/2.)
-    #
-    # a = qte.rotate(a, rotation_axis=dict(y=1), rotated_spin=0, selective_to={1: [1]}, angle=np.pi / 2.)
-    # a = qte.rotate(a, rotation_axis=dict(y=1), rotated_spin=0, selective_to={1: [0]}, angle=np.pi / 2.)
-    #
-    # a = tensor(Qobj(np.diag(a.ptrace(0).diag())), a.ptrace(0))
-    #
-    # a = qte.rotate(a, rotation_axis=dict(y=1), rotated_spin=0, selective_to={1: [1]}, angle=np.pi / 2.)
-    # a = qte.rotate(a, rotation_axis=dict(y=1), rotated_spin=0, selective_to={1: [0]}, angle=np.pi / 2.)
-    #
-    # a = qte.rotate(a, rotation_axis=dict(z=1), rotated_spin=0, angle=np.pi)
-    #
-    # a = qte.rotate(a, rotation_axis=dict(y=1), rotated_spin=0, selective_to={1: [1]}, angle=np.pi / 2.)
-    # a = qte.rotate(a, rotation_axis=dict(y=1), rotated_spin=0, selective_to={1: [0]}, angle=np.pi / 2.)
-    #
-    # a = qte.rotate(a, rotation_axis=dict(y=1), rotated_spin=1, selective_to={0: [0]}, angle=np.pi / 2.)
-    # a = qte.rotate(a, rotation_axis=dict(y=-1), rotated_spin=1, selective_to={0: [1]}, angle=np.pi / 2.)
-    # print np.around(a.ptrace(1).data.todense(), 1)
-    #
-    #
-    # def y(tau):
-    #     a = ket2dm(tensor(basis(2, 0), basis(2, 1)))
-    #     a = qte.rotate(a, rotation_axis=dict(y=1), rotated_spin=1, selective_to={0: [0]}, angle=np.pi / 2.)
-    #     # a = qte.rotate(a, rotation_axis=dict(y=1), rotated_spin=0, selective_to={1: [1]}, angle=np.pi / 2.)
-    #     # a = qte.rotate(a, rotation_axis=dict(y=1), rotated_spin=0, selective_to={1: [0]}, angle=np.pi / 2.)
-    #     a = evolve(a, tau, h)
-    #     return expect(a.ptrace(1), sigmax())
-
-    # import matplotlib.pyplot as plt
-    # t = -1./ H.hf_para_n
-    # x = np.linspace(0, 1*t, 50)
-    # plt.plot(x, [y(i) for i in x])
-    # plt.show()
+a = np.array([[ 0.-1.j,  0.+0.j,  0.+0.j,  0.+0.j],
+              [ 0.+0.j,  0.-1.j,  0.+0.j , 0.+0.j],
+              [ 0.+0.j,  0.+0.j , 0.+1.j,  0.+0.j],
+              [ 0.+0.,  0.+0.j , 0.+0.j,  0.+1.j]])
