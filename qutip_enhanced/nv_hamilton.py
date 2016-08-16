@@ -60,7 +60,7 @@ class NVHam(object):
 
     j = {'14n': 1, '15n': .5, 'e': 1, '13c': .5}
     _gamma = {'e': -2.80249536e4, '13c': 10.705, '14n': +3.0766, '15n': -4.3156} # gyromagnetic ratios given in 1/2pi MHz/T, i.e. f = gamma*B
-    _Q = {'14n': -4.945745, '15n': 0.0, '13c': 0}
+    _qp = {'14n': -4.945745, '15n': 0.0, '13c': 0}
     _hf_para_n = {'14n': -2.165, '15n': +3.03}
     _hf_perp_n = {'14n': -2.7, '15n': +3.65}
     D = 2870.3
@@ -77,12 +77,12 @@ class NVHam(object):
             raise Exception('Error: {}'.format(val))
 
     @property
-    def Q(self):
-        return self._Q
-    @Q.setter
-    def Q(self, val):
+    def qp(self):
+        return self._qp
+    @qp.setter
+    def qp(self, val):
         if type(val) is dict:
-            self._Q.update(val)
+            self._qp.update(val)
         else:
             raise Exception('Error: {}'.format(val))
 
@@ -146,7 +146,7 @@ class NVHam(object):
         calculate nitrogen hamilton operator with quadrupol, hyperfine and zeeman. 
         Final size of h_nitrogen depends on self.nitrogen_levels
         """
-        self.h_nqp = self.Q[self.n_type] * jmat(self.j[self.n_type], 'z') ** 2
+        self.h_nqp = self.qp[self.n_type] * jmat(self.j[self.n_type], 'z') ** 2
         self.h_nze = self.calc_zeeman(self.gamma['14n'], self.j[self.n_type])
         self.h_n = self.h_nqp + self.h_nze
         return self.h_n
@@ -236,7 +236,7 @@ class NVHam(object):
 
 
 if __name__ == '__main__':
-    nvham = NVHam(magnet_field={'z': 0.6692909860231936}, n_type='14n', nitrogen_levels=[0, 1, 2], electron_levels=[0, 1, 2])
+    nvham = NVHam(magnet_field={'z': 0.6698}, n_type='14n', nitrogen_levels=[0, 1, 2], electron_levels=[0, 1, 2])
 
     # C13_hyperfine_tensor = nvham.hft_13c_dd(location={'rho': 0.155e-9, 'elev': np.pi/2.})
     C1390_ht = np.matrix([[0, 0, 0],
