@@ -59,7 +59,7 @@ class NVHam(object):
 
 
     j = {'14n': 1, '15n': .5, 'e': 1, '13c': .5}
-    _gamma = {'e': - 2.8025e4, '13c': 10.705, '14n': 3.0766, '15n': -4.3156} # gyromagnetic ratios given in 1/2pi MHz/T, i.e. f = gamma*B
+    _gamma = {'e': -2.80249536e4, '13c': 10.705, '14n': +3.0766, '15n': -4.3156} # gyromagnetic ratios given in 1/2pi MHz/T, i.e. f = gamma*B
     _Q = {'14n': -4.945745, '15n': 0.0, '13c': 0}
     _hf_para_n = {'14n': -2.165, '15n': +3.03}
     _hf_perp_n = {'14n': -2.7, '15n': +3.65}
@@ -236,7 +236,7 @@ class NVHam(object):
 
 
 if __name__ == '__main__':
-    nvham = NVHam(magnet_field={'z': 0.55}, n_type=None, nitrogen_levels=[], electron_levels=[1,2])
+    nvham = NVHam(magnet_field={'z': 0.6692909860231936}, n_type='14n', nitrogen_levels=[0, 1, 2], electron_levels=[0, 1, 2])
 
     # C13_hyperfine_tensor = nvham.hft_13c_dd(location={'rho': 0.155e-9, 'elev': np.pi/2.})
     C1390_ht = np.matrix([[0, 0, 0],
@@ -246,7 +246,9 @@ if __name__ == '__main__':
     #                           [0, 0, 0],
     #                           [0, 0, 0.414]])
     # nvham.add_spin(C13414_ht, nvham.h_13c(), [0, 1])
-    nvham.add_spin(C1390_ht, nvham.h_13c(), [0, 1])
+
+
+    # nvham.add_spin(C1390_ht, nvham.h_13c(), [0, 1])
     print nvham.h_nv
     # nvham = NVHam(magnet_field={'z': 0.55}, n_type='14n', nitrogen_levels=[0, 1, 2], electron_levels=[0, 1, 2])
     # C13_hyperfine_tensor = nvham.hft_13c_dd(location={'rho': 0.155e-9, 'elev': np.pi/2.})
