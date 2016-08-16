@@ -112,13 +112,14 @@ class NVHam(object):
 
     @nitrogen_levels.setter
     def nitrogen_levels(self, val):
-        fl = range(2*self.j[self.n_type] + 1)
-        if val is None:
-            self._nitrogen_levels = fl
-        elif set(fl).issuperset(set(val)):
-            self._nitrogen_levels = val
-        else:
-            raise Exception("Chosen 'nitrogen_levels must be a list, e.g. nitrogen_levels = [1,2] for n_type='14n'.")
+        if self.n_type is not None:
+            fl = range(2*self.j[self.n_type] + 1)
+            if val is None:
+                self._nitrogen_levels = fl
+            elif set(fl).issuperset(set(val)):
+                self._nitrogen_levels = val
+            else:
+                raise Exception("Chosen 'nitrogen_levels must be a list, e.g. nitrogen_levels = [1,2] for n_type='14n'.")
 
     def calc_zeeman(self, gamma, j):
         """
