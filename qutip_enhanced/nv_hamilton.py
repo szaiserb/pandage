@@ -7,7 +7,7 @@ from qutip import *
 import coordinates
 from qutip_enhanced import *
 
-class NVHam():
+class NVHam(object):
     """
     Hamiltonian describing a single NV + nuclear spins.
 
@@ -22,7 +22,7 @@ class NVHam():
     """
 
 
-    def __init__(self, magnet_field={'z': 0.1}, n_type=None, electron_levels=None, nitrogen_levels=None, D=2870):
+    def __init__(self, magnet_field={'z': 0.1}, n_type=None, electron_levels=None, nitrogen_levels=None, **kwargs):
         """
 
         :param magnet_field: dict
@@ -30,56 +30,95 @@ class NVHam():
         :param n_type: str
             The type of nitrogen atom : 'n14', 'n15', None
         :param electron_levels: list
+            Order of states is ms = +1, 0, -1
             The sublevels of the electron spins are chosen with electron_levels, which can be e.g. [1,2], [0,1,2]
             but not [0], [1] or [2].
         :param nitrogen_levels: list
+            Order of states is mn = +1, 0, -1
             Same as electron_levels but for the nitrogen spin.
         :param D: float
             Zero field splitting, default 2870 MHz.
         """
         self.magnet_field_cart = coordinates.Coord().coord(magnet_field, 'cart')  # magnet field in cartesian coordinates
-        self.nitrogen_levels = nitrogen_levels
         self.n_type = n_type
+        self.nitrogen_levels = nitrogen_levels
         self.electron_levels = [0, 1, 2] if electron_levels is None else electron_levels
-        self.D = D
+        for key in kwargs:
+            setattr(self, key, kwargs[key])
         self.set_h_nv()
 
-    # gyromagnetic ratios given in 1/2pi MHz/T, i.e. f = gamma*B
-    gamma_e = - 2.8025e4  # defenition on http://nmrwiki.org/wiki/index.php?title=Gyromagnetic_ratio is wrong
-    gamma_13c = 10.705
-
-    def get_nitrogen_params(self):
-        """
-        sets the parameters for the used nitrogen spin, i.e. for 14N or 15N. If n_type == None, nothing happens
-        
-        Usable Class Attributes
-        --------
-        
-        j_n : float
-            quantum number of current NVs nitrogen isotope
-        Q_n : float
-            
-            
-        """
-        if self.n_type == 'n14':
-            self.j_n = 1
-            self.Q_n = -4.945
-            self.gamma_n = 3.0766
-            self.hf_para_n = -2.165
-            self.hf_perp_n = -2.7
-            self.nitrogen_levels = [0, 1, 2] if self.nitrogen_levels is None else self.nitrogen_levels
-        elif self.n_type == 'n15':
-            self.j_n = 1 / 2.0
-            self.Q_n = 0
-            self.gamma_n = -4.3156
-            self.hf_para_n = +3.03
-            self.hf_perp_n = +3.65
-            self.nitrogen_levels = [0,1] if self.nitrogen_levels is None else self.nitrogen_levels
-        elif self.n_type is not None:
+    @property
+    def n_type(self):
+        return self._n_type
+    @n_type.setter
+    def n_type(self, val):
+        if val in ['n14', 'n15', None]:
+            self._n_type = val
+        else:
             raise Exception("Chosen 'n_type' is not allowed.")
-        if self.n_type is not None and type(self.nitrogen_levels) != list:
-            raise Exception("Chosen 'nitrogen_levels must be a list, e.g. nitrogen_levels = [1,2] for n_type='n14'.")
 
+
+    j = {'n14': 1, 'n15': .5, 'e': 1, 'c13': .5}
+    _gamma = {'e': - 2.8025e4, 'c13': 10.705, 'n14': 3.0766, 'n15': -4.3156} # gyromagnetic ratios given in 1/2pi MHz/T, i.e. f = gamma*B
+    _Q = {'n14': -4.945745, 'n15': 0.0, 'c13': 0}
+    _hf_para_n = {'n14': -2.165, 'n15': +3.03}
+    _hf_perp_n = {'n14': -2.7, 'n15': +3.65}
+    D = 2870.3
+
+
+    @property
+    def gamma(self):
+        return self._gamma
+    @gamma.setter
+    def gamma(self, val):
+        if type(val) is dict:
+            self._gamma.update(val)
+        else:
+            raise Exception('Error: {}'.format(val))
+
+    @property
+    def Q(self):
+        return self._Q
+    @Q.setter
+    def Q(self, val):
+        if type(val) is dict:
+            self._Q.update(val)
+        else:
+            raise Exception('Error: {}'.format(val))
+
+    @property
+    def hf_para_n(self):
+        return self._hf_para_n
+    @hf_para_n.setter
+    def hf_para_n(self, val):
+        if type(val) is dict:
+            self._hf_para_n.update(val)
+        else:
+            raise Exception('Error: {}'.format(val))
+
+    @property
+    def hf_perp_n(self):
+        return self._hf_perp_n
+    @hf_perp_n.setter
+    def hf_perp_n(self, val):
+        if type(val) is dict:
+            self._hf_perp_n.update(val)
+        else:
+            raise Exception('Error: {}'.format(val))
+
+    @property
+    def nitrogen_levels(self):
+        return self._nitrogen_levels
+
+    @nitrogen_levels.setter
+    def nitrogen_levels(self, val):
+        fl = range(2*self.j[self.n_type] + 1)
+        if val is None:
+            self._nitrogen_levels = fl
+        elif set(fl).issuperset(set(val)):
+            self._nitrogen_levels = val
+        else:
+            raise Exception("Chosen 'nitrogen_levels must be a list, e.g. nitrogen_levels = [1,2] for n_type='n14'.")
 
     def calc_zeeman(self, gamma, j):
         """
@@ -97,8 +136,8 @@ class NVHam():
         calculate electron hamilton matrix with zerofield and zeeman splitting. 
         Final size of h_electron depends on self.electron_levels. 
         """
-        self.h_ezfs = self.D * jmat(1, 'z') ** 2
-        self.h_eze = self.calc_zeeman(gamma=self.gamma_e, j=1)
+        self.h_ezfs = self.D * jmat(self.j['e'], 'z') ** 2
+        self.h_eze = self.calc_zeeman(gamma=self.gamma['e'], j=self.j['e'])
         self.h_e = self.h_ezfs + self.h_eze
         return self.h_e
 
@@ -107,8 +146,8 @@ class NVHam():
         calculate nitrogen hamilton operator with quadrupol, hyperfine and zeeman. 
         Final size of h_nitrogen depends on self.nitrogen_levels
         """
-        self.h_nqp = self.Q_n * jmat(self.j_n, 'z') ** 2
-        self.h_nze = self.calc_zeeman(self.gamma_n, self.j_n)
+        self.h_nqp = self.Q[self.n_type] * jmat(self.j[self.n_type], 'z') ** 2
+        self.h_nze = self.calc_zeeman(self.gamma['n14'], self.j[self.n_type])
         self.h_n = self.h_nqp + self.h_nze
         return self.h_n
 
@@ -116,14 +155,14 @@ class NVHam():
         """
         Gives the nitrogen hyperfine tensor according to self.get_nitrogen_params()
         """
-        return np.diag([self.hf_perp_n, self.hf_perp_n, self.hf_para_n])
+        return np.diag([self.hf_perp_n[self.n_type], self.hf_perp_n[self.n_type], self.hf_para_n[self.n_type]])
 
     def h_13c(self):
         """
         calculate 13C hamilton matrix with with zeeman splitting. This 
         Final size of h_electron depends on self.electron_levels. 
         """
-        return self.calc_zeeman(self.gamma_13c, 1 / 2.0)
+        return self.calc_zeeman(self.gamma['c13'], 1 / 2.0)
 
     def hft_13c_dd(self, location={'rho': 1e-9, 'elev': np.pi / 2, 'azim': 0}):
         """
@@ -133,8 +172,8 @@ class NVHam():
         """
         loc_cart = coordinates.Coord().coord_unit(location, 'cart')
         rho = coordinates.Coord().coord(location, 'sph')['rho']
-        x, y, z = [loc_cart[i] for i in ['x', 'y', 'z']]
-        prefactor = mu_0 / (4.0 * pi) * h * self.gamma_e * 1e6 * self.gamma_13c * 1e6 / rho ** 3  # given in Hertz
+        x, y, z = [loc_cart[fi] for i in ['x', 'y', 'z']]
+        prefactor = mu_0 / (4.0 * pi) * h * self.gamma['e'] * 1e6 * self.gamma['c13'] * 1e6 / rho ** 3  # given in Hertz
         prefactor_mhz = prefactor * 1e-6  # given in MHz
         mat = numpy.matrix([[1 - 3 * x * x, -3 * x * y, -3 * x * z],
                             [-3 * x * y, 1 - 3 * y * y, -3 * y * z],
@@ -166,7 +205,6 @@ class NVHam():
         self.spin_levels = [self.electron_levels]
         self.h_nv = get_sub_matrix(self.h_electron(), self.electron_levels)
         if self.n_type is not None:
-            self.get_nitrogen_params()
             self.add_spin(hft=self.hft_nitrogen(), h_ns=self.h_nitrogen(), nslvl_l=self.nitrogen_levels)
 
     def add_spin(self, hft, h_ns, nslvl_l):
@@ -202,8 +240,8 @@ if __name__ == '__main__':
 
     # C13_hyperfine_tensor = nvham.hft_13c_dd(location={'rho': 0.155e-9, 'elev': np.pi/2.})
     C1390_ht = np.matrix([[0, 0, 0],
-                             [0, 0, 0],
-                             [0, 0, 0.089]])
+                          [0, 0, 0],
+                          [0, 0, 0.089]])
     # C13414_ht = np.matrix([[0, 0, 0],
     #                           [0, 0, 0],
     #                           [0, 0, 0.414]])
