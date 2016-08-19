@@ -64,7 +64,14 @@ class NVHam(object):
     _hf_para_n = {'14n': -2.165, '15n': +3.03}
     _hf_perp_n = {'14n': -2.7, '15n': +3.65}
     D = 2870.3
+    dims = []
 
+    @property
+    def nitrogen_dim(self):
+        if self.n_type == '14n':
+            return 3
+        elif self.n_type == '15n':
+            return 2
 
     @property
     def gamma(self):
@@ -204,8 +211,10 @@ class NVHam(object):
         """
         self.spins = np.array([1])
         self.spin_levels = [self.electron_levels]
+        self.dims = [3]
         self.h_nv = get_sub_matrix(self.h_electron(), self.electron_levels)
         if self.n_type is not None:
+            self.dims.append(self.nitrogen_dim)
             self.add_spin(hft=self.hft_nitrogen(), h_ns=self.h_nitrogen(), nslvl_l=self.nitrogen_levels)
 
     def add_spin(self, hft, h_ns, nslvl_l):
@@ -224,6 +233,7 @@ class NVHam(object):
 
         nsd = h_ns.shape[0]  # multiplicity of new spin
         nsq = dim2spin(nsd)  # quantum number of new spin
+        self.dims.append(h_ns.shape[0])
         h_nv_ext = tensor(self.h_nv,
                           qeye(len(nslvl_l)))  # nv hamilton operator extended with qeye of dimension of new spin
         h_ns_ext = tensor(qeye(self.h_nv.dims[0]),
@@ -237,12 +247,19 @@ class NVHam(object):
 
 
 if __name__ == '__main__':
-    nvham = NVHam(magnet_field={'z': 0.6698}, n_type='14n', nitrogen_levels=[0, 1, 2], electron_levels=[0, 1, 2])
+    nvham = NVHam(magnet_field={'z': 0.6698}, n_type='14n', nitrogen_levels=[0, 1], electron_levels=[1, 2])
+
+    def h_nv_rotating_frame(self, rotation_operator):
+        U = (1j * rotation_operator * 2 * pi * t).expm()
+        Ht = (1j*rotation_operator)
+        return
+
+
 
     # C13_hyperfine_tensor = nvham.hft_13c_dd(location={'rho': 0.155e-9, 'elev': np.pi/2.})
-    C1390_ht = np.matrix([[0, 0, 0],
-                          [0, 0, 0],
-                          [0, 0, 0.089]])
+    # C1390_ht = np.matrix([[0, 0, 0],
+    #                       [0, 0, 0],
+    #                       [0, 0, 0.089]])
     # C13414_ht = np.matrix([[0, 0, 0],
     #                           [0, 0, 0],
     #                           [0, 0, 0.414]])
