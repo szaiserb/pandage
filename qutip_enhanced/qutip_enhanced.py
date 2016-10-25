@@ -96,6 +96,13 @@ def qsum(ql):
         sum_ql += qobj
     return sum_ql
 
+def do_zero(h):
+    dims = h.dims
+    h = h.data.todense()
+    d = np.diag(h) - h[0,0]
+    np.fill_diagonal(h, d)
+    return Qobj(h, dims=dims)
+
 def get_sub_matrix(op, levels):
     """
     :param op: Qobj operator
