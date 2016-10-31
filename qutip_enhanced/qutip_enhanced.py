@@ -103,6 +103,13 @@ def do_zero(h):
     np.fill_diagonal(h, d)
     return Qobj(h, dims=dims)
 
+def get_transition_frequency(h, s0, s1):
+    """energy required for transition from state s0 to state s1"""
+    dims = h.dims[0]
+    m_list = list(itertools.product(*[range(i) for i in dims]))
+    h_diag = h.diag()
+    return h_diag[m_list.index(s1)] - h_diag[m_list.index(s0)]
+
 def get_sub_matrix(op, levels):
     """
     :param op: Qobj operator
