@@ -274,4 +274,3 @@ def plot_state_old(dml, var=None, qubit_names=None, vertical_lines_at=None):
 #
 # def state_name2num(state, name_list):
 #     return tuple([name_list[i].index(val) for i, val in enumerate(state)])
-#
