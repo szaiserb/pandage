@@ -5,6 +5,10 @@ import itertools
 import coordinates
 import copy
 import scipy.linalg
+import numpy as np
+from numpy import *
+from matplotlib.patches import FancyArrowPatch
+from mpl_toolkits.mplot3d import proj3d
 
 np.set_printoptions(linewidth=1e5)  # matrices are displayd much more clearly
 
@@ -38,13 +42,50 @@ class Eigenvector():
                     self.idx_new[i] = j
                     break
                 elif j == self.dims.prod() - 1:
-                    raise Exception("No two orthonormal EV have been found. Try to make more steps.")
+                    raise Exception("No two orthonormal EV have been found. Try to make more steps. {}".format((self.evecs_old[i].trans() * evecs_new[j]).norm() ))
         self.evals_sorted = np.take(evals_new, self.idx_new)
         self.evecs_old = np.take(evecs_new, self.idx_new)
-        if self.evals_sorted_list == None:
+        if self.evals_sorted_list is None:
             self.evals_sorted_list = np.array([self.evals_sorted])
         else:
             self.evals_sorted_list = np.append(self.evals_sorted_list, np.array([self.evals_sorted]), axis=0)
+
+class Arrow3D(FancyArrowPatch):
+    def __init__(self, xs, ys, zs, *args, **kwargs):
+        FancyArrowPatch.__init__(self, (0, 0), (0, 0), *args, **kwargs)
+        self._verts3d = xs, ys, zs
+
+    def draw(self, renderer):
+        xs3d, ys3d, zs3d = self._verts3d
+        xs, ys, zs = proj3d.proj_transform(xs3d, ys3d, zs3d, renderer.M)
+        self.set_positions((xs[0], ys[0]), (xs[1], ys[1]))
+        FancyArrowPatch.draw(self, renderer)
+
+class Bloch(Bloch):
+
+    def draw_arrow(self, rho, elev, azim, length=0.1, shorten_line_factor=0.98, n=100, arrowstyle="-|>",  **kwargs):
+        if not self.axes:
+            raise Exception('For this functionality axes must be given to Bloch() upon instantiation')
+        x, y, z = coordinates.sph2cart(rho, elev, azim)
+        ahs = int(np.ceil(n*shorten_line_factor))
+        self.axes.plot(x[:ahs], y[:ahs], z[:ahs], label='parametric curve', **kwargs)
+        self.axes.add_artist(self.arrowhead(x, y, z, length=length, arrowstyle=arrowstyle, **kwargs))
+
+    def arrowhead(self, x, y, z, length=0.1, arrowstyle="-|>", **kwargs):
+        if not self.axes:
+            raise Exception('For this functionality axes must be given to Bloch() upon instantiation')
+        xyz = np.gradient(np.column_stack([x, y, z]))[0]
+        iii = -1
+        x1 = xyz[iii, 0]
+        y1 = xyz[iii, 1]
+        z1 = xyz[iii, 2]
+        l = length
+        a = Arrow3D([x[iii] - x1 * l, x[iii] + x1 * l], [y[iii] - y1 * l, y[iii] + y1 * l],
+                    [z[iii] - z1 * l, z[iii] + z1 * l],
+                    mutation_scale=20,
+                    lw=3, arrowstyle=arrowstyle, **kwargs)
+        return a
+
 
 def make_vector_basis(dims):
     """
@@ -61,7 +102,7 @@ def dim2spin(dims):
     """
     always returns numpy matrix
     """
-    if type(dims) == list:
+    if type(dims) is list:
         raise Exception("Insert numpy array, not list!")
     if isinstance(dims, np.ndarray):
         if dims.ndim > 0:
@@ -74,7 +115,7 @@ def spin2dim(spins):
     """
     always returns numpy matrix
     """
-    if type(spins) == list:
+    if type(spins) is list:
         raise Exception("Insert numpy array, not list!")
     if isinstance(spins, np.ndarray):
         if spins.ndim > 0:

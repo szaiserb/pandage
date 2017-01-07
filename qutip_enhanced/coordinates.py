@@ -66,29 +66,44 @@ class Coord():
                 if vec.has_key(axis):
                     vec_compl[axis] = vec[axis]
             self.cart = vec_compl
-            self.sph = self.cart2sph(vec_compl)
+            self.sph = cart2sph(vec_compl)
         else:
             vec_compl = {'rho': 1, 'azim': 0, 'elev': 0}
             for axis in self.sph_coord:
                 if vec.has_key(axis):
                     vec_compl[axis] = vec[axis]
             self.sph = vec_compl
-            self.cart = self.sph2cart(vec_compl)
+            self.cart = sph2cart(vec_compl)
 
-    def sph2cart(self, sph):
-        x = sph['rho'] * np.cos(sph['elev']) * np.cos(sph['azim'])
-        y = sph['rho'] * np.cos(sph['elev']) * np.sin(sph['azim'])
-        z = sph['rho'] * np.sin(sph['elev'])
-        cart = {'x': x, 'y': y, 'z': z}
-        return cart
+def sph2cart(*args):
+    if type(args[0]) == dict:
+        sph = args[0]
+    elif len(args) == 3:
+        sph = dict(rho=args[0], elev=args[1], azim=args[2])
+    else:
+        raise Exception('Error')
+    x = sph['rho'] * np.cos(sph['elev']) * np.cos(sph['azim'])
+    y = sph['rho'] * np.cos(sph['elev']) * np.sin(sph['azim'])
+    z = sph['rho'] * np.sin(sph['elev'])
+    if type(args[0]) == dict:
+        return {'x': x, 'y': y, 'z': z}
+    elif len(args) == 3:
+        return x,y,z
 
-    def cart2sph(self, cart):
-        rho = np.sqrt(cart['x'] ** 2 + cart['y'] ** 2 + cart['z'] ** 2)
-        azim = np.arctan2(cart['y'], cart['x'])
-        elev = np.arctan2(cart['z'], np.sqrt(cart['x'] ** 2 + cart['y'] ** 2))
-        sph = {'rho': rho, 'azim': azim, 'elev': elev}
-        return sph
-
+def cart2sph(*args):
+    if type(args[0]) == dict:
+        cart = args[0]
+    elif len(args) == 3:
+        cart = dict(x=args[0], y=args[1], z=args[2])
+    else:
+        raise Exception('Error')
+    rho = np.sqrt(cart['x'] ** 2 + cart['y'] ** 2 + cart['z'] ** 2)
+    azim = np.arctan2(cart['y'], cart['x'])
+    elev = np.arctan2(cart['z'], np.sqrt(cart['x'] ** 2 + cart['y'] ** 2))
+    if type(args[0]) == dict:
+        return {'rho': rho, 'azim': azim, 'elev': elev}
+    elif len(args) == 3:
+        return rho, elev, azim
 
 if __name__ == '__main__':
     a = Coord()
