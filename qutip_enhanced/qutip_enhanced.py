@@ -34,7 +34,9 @@ class Eigenvector():
         -evecs_new is a numpy array of qutip eigenvectors in arbitrary order like given by evals, evec = Qobj.eigenstates()
         -evals_new is numpy array of eigenvalues like given by evals, evec = Qobj.eigenstates()   
         """
-        self.idx_new = copy.deepcopy(self.idx)
+        print type(copy), self.idx
+        import copy as cop
+        self.idx_new = cop.deepcopy(self.idx)
         for i in range(self.dims.prod()):
             for j in range(self.dims.prod()):
                 if (self.evecs_old[i].trans() * evecs_new[j]).norm() >= 0.5 and (

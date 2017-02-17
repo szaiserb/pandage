@@ -96,7 +96,7 @@ def cart2sph(*args):
     elif len(args) == 3:
         cart = dict(x=args[0], y=args[1], z=args[2])
     else:
-        raise Exception('Error')
+        raise Exception('Error: {}'.format(args))
     rho = np.sqrt(cart['x'] ** 2 + cart['y'] ** 2 + cart['z'] ** 2)
     azim = np.arctan2(cart['y'], cart['x'])
     elev = np.arctan2(cart['z'], np.sqrt(cart['x'] ** 2 + cart['y'] ** 2))
