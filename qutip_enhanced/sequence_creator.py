@@ -4,7 +4,7 @@ import OptimalControl as OC
 import numbers
 import scipy.optimize
 import scipy.integrate
-import collections
+import coordinates
 
 class pd(dict):
 
@@ -336,13 +336,17 @@ class DDAlpha(Arbitrary):
         return np.array([self.omega, u_phi]).T
 
     def rf_array_xy(self):
-        return OC.misc.aphi2xy(self.rf_array_aphi())
+        rho, azim = tuple(np.hsplit(self.rf_array_aphi(), 2))
+        x, y, z = coordinates.sph2cart(rho, 0, azim)
+        return np.concatenate([x, y], axis=1)
 
     def mw_array_xy(self):
-        return [np.array([np.cos(phi), np.sin(phi)]) / self.rabi_period for phi in self.pi_phases]
+        return np.array([np.array([np.cos(phi), np.sin(phi)]) / self.rabi_period for phi in self.pi_phases])
 
     def mw_array_aphi(self):
-        return OC.misc.xy2aphi(self.mw_array_xy())
+        x, y = tuple(np.hsplit(self.mw_array_xy(), 2))
+        rho, elev, azim = coordinates.cart2sph(x, y, 0)
+        return np.concatenate([rho, azim], axis=1)
 
     def fields_raw(self):
         out = np.zeros((len(self.sequence()), self.n_columns))
