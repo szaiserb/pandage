@@ -1,6 +1,5 @@
 import numpy as np
 import itertools
-import OptimalControl as OC
 import numbers
 import scipy.optimize
 import scipy.integrate
