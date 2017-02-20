@@ -4,28 +4,44 @@ import OptimalControl as OC
 import numbers
 import scipy.optimize
 import scipy.integrate
+import collections
 
-def phases_dd():
+class pd(dict):
+
     ddp = dict()
     ddp['fid'] = np.array([])
-    ddp['hahn'] =np.array([0.0])
+    ddp['hahn'] = np.array([0.0])
     ddp['xy4'] = np.array([0.0, np.pi / 2., 0.0, np.pi / 2.])
     ddp['xy8'] = np.concatenate([ddp['xy4'], ddp['xy4'][::-1]])
     ddp['xy16'] = np.concatenate([ddp['xy8'], ddp['xy8'] + np.pi])
-    ddp['knill_pi'] = np.array([np.pi / 6., 0, np.pi / 2., 0, np.pi / 6.])
-    ddp['kdd4'] = np.concatenate([phasexy + ddp['knill_pi'] for phasexy in ddp['xy4']])
-    ddp['kdd8'] = np.concatenate([phasexy + ddp['knill_pi'] for phasexy in ddp['xy8']])
-    ddp['kdd16'] = np.concatenate([phasexy + ddp['knill_pi'] for phasexy in ddp['xy16']])
-    return ddp
-__PHASES_DD__ = phases_dd()
+    ddp['knillpi'] = np.array([np.pi / 6., 0, np.pi / 2., 0, np.pi / 6.])
+    ddp['kdd4'] = np.concatenate([phasexy + ddp['knillpi'] for phasexy in ddp['xy4']])
+    ddp['kdd8'] = np.concatenate([phasexy + ddp['knillpi'] for phasexy in ddp['xy8']])
+    ddp['kdd16'] = np.concatenate([phasexy + ddp['knillpi'] for phasexy in ddp['xy16']])
 
-__BASE_TAU__ = 2*192/12e3
+    def __getitem__(self, i):
+        if type(i) is not str:
+            raise Exception('Error')
+        ii = i.split("_")
+        bs = ii[-1]
+        if 'cpmg' in bs:
+            if len(bs) == 4:
+                raise Exception('Error: {} does not tell how many pi-pulses you want. Valid would be 5_cpmg8'.format(i))
+            else:
+                bp = np.array(int(bs[4:])*[0])
+        else:
+            bp = self.ddp[bs]
+        if len(ii) == 2:
+            bp = np.repeat(bp, int(ii[0]))
+        return bp
+
+__PHASES_DD__ = pd()
 
 class DDParameters():
 
-    def __init__(self, name, total_tau, rabi_period):
+    def __init__(self, name, rabi_period, **kwargs):
         self.name = name
-        self.total_tau = total_tau
+        self.set_total_tau(**kwargs)
         self.rabi_period = rabi_period
 
     @property
@@ -33,13 +49,16 @@ class DDParameters():
         name = self.name
         if name[-6:] == '_uhrig' in name:
             name = name[:-6]
-        if name[:4] == 'cpmg':
-           return np.zeros(int(name[4:]))
-        elif name in __PHASES_DD__:
-            return __PHASES_DD__[name]
-        else:
-            raise Exception("dynamical decoupling name {} not recognized".format(name))
+        return __PHASES_DD__[name]
 
+    def set_total_tau(self, **kwargs):
+        if 'tau' in kwargs:
+            if self.name[-6:] == '_uhrig':
+                raise Exception('Error: {}, {}'.format(self.name, kwargs))
+            else:
+                self.total_tau = 2*kwargs['tau']*self.number_of_pi_pulses
+        else:
+            self.total_tau = kwargs['total_tau']
     @property
     def number_of_pi_pulses(self):
         return len(self.phases)
@@ -69,11 +88,9 @@ class DDParameters():
         name = self.name
         if name[-6:] == '_uhrig' in name:
             return self.uhrig_taus
-        elif name in __PHASES_DD__ or 'cpmg' in name:
+        else:
             tau = self.total_tau/(2*self.number_of_pi_pulses)
             return [tau] + [2*tau for i in range(self.number_of_pi_pulses - 1)] + [tau]
-        else:
-            raise Exception('dynamical decoupling name not recognized')
 
     @property
     def eff_pulse_dur_waiting_time(self):
@@ -85,11 +102,12 @@ class DDParameters():
 
     @property
     def effective_durations_dd(self):
-        tau_list = self.tau_list
         if self.minimum_total_tau > self.total_tau:
             raise Exception('Waiting times smaller than zero are not allowed. '
                             'Total tau must be at least {} (current: {})'.format(self.minimum_total_tau, self.total_tau))
         return self.tau_list - self.eff_pulse_dur_waiting_time
+
+
 
 def gaussian(x, mu, sigma, x_area_range=None, area=1):
 
@@ -255,11 +273,14 @@ class RabiGaussian(Rabi):
 
 class DDAlpha(Arbitrary):
 
-    def __init__(self, pi_phases=None, spt=None, vary_times=None, wait=None, t_rf=None, rabi_period=None, target_Azz=None, omega=None):
+    def __init__(self, pi_phases=None, spt=None, vary_times=None,
+                 wait=None, target_t_rf=None, rabi_period=None,
+                 target_Azz=None, omega=None, rf_frequency=None):
+        self.rf_frequency = rf_frequency
         self.pi_phases = pi_phases
         self.spt = spt
         self.wait = wait
-        self.t_rf = t_rf
+        self.target_t_rf = target_t_rf
         self.rabi_period = rabi_period
         self.target_Azz = target_Azz
         self.vary_times = vary_times
@@ -294,6 +315,10 @@ class DDAlpha(Arbitrary):
             raise Exception('Error: {}'.format(val))
 
     @property
+    def t_rf(self):
+        return 2*self.n_pi*self.spt*self.tau()
+
+    @property
     def effective_t_rf(self):
         return self.t_rf - sum(self.vary_times.get('rf', [[], []])[1])
 
@@ -301,9 +326,6 @@ class DDAlpha(Arbitrary):
         wait = ['wait'] if self.wait is not None else []
         base = ['rf'] * self.spt + wait + ['mw'] + wait + ['rf'] * self.spt
         return list(itertools.chain(*[base for i in range(self.n_pi)]))
-
-    def tau(self):
-        return self.t_rf / (2 * self.n_pi * self.spt)
 
     def alpha(self, n):
         delta_alpha = 2 * np.pi * self.target_Azz * (self.tau() * self.spt + self.wait + 0.25 * self.rabi_period)
@@ -337,8 +359,14 @@ class DDAlpha(Arbitrary):
                 idxrf += 1
         return out
 
+    def tau(self):
+        out = self.target_t_rf / (2 * self.n_pi * self.spt)
+        if self.rf_frequency is not None:
+            out = np.around(out / float(self.rf_frequency)) *float(self.rf_frequency)
+        return out
+
     def times_raw(self):
-        td = dict(rf=self.t_rf / (2 * self.n_pi * self.spt),
+        td = dict(rf=self.tau(),
                   mw=0.5 * self.rabi_period,
                   wait=self.wait)
         return np.array([td[i] for i in self.sequence() if td[i] is not None])
