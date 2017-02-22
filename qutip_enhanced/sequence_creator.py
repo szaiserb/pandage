@@ -31,7 +31,7 @@ class pd(dict):
         else:
             bp = self.ddp[bs]
         if len(ii) == 2:
-            bp = np.repeat(bp, int(ii[0]))
+            bp = np.tile(bp, int(ii[0]))
         return bp
 
 __PHASES_DD__ = pd()
