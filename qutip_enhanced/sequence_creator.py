@@ -38,8 +38,9 @@ __PHASES_DD__ = pd()
 
 class DDParameters():
 
-    def __init__(self, name, rabi_period, **kwargs):
+    def __init__(self, name, rabi_period, time_digitization=None, **kwargs):
         self.name = name
+        self.time_digitization = time_digitization
         self.set_total_tau(**kwargs)
         self.rabi_period = rabi_period
 
@@ -50,14 +51,27 @@ class DDParameters():
             name = name[:-6]
         return __PHASES_DD__[name]
 
-    def set_total_tau(self, **kwargs):
-        if 'tau' in kwargs:
-            if self.name[-6:] == '_uhrig':
-                raise Exception('Error: {}, {}'.format(self.name, kwargs))
-            else:
-                self.total_tau = 2*kwargs['tau']*self.number_of_pi_pulses
+    @property
+    def n_tau(self):
+        if self.number_of_pi_pulses == 0:
+            return 2
         else:
-            self.total_tau = kwargs['total_tau']
+            return 2*(self.number_of_pi_pulses)
+
+    def set_total_tau(self, **kwargs):
+        if self.name[-6:] == '_uhrig':
+            if self.time_digitization is not None:
+                raise NotImplementedError('time_digitization has no effect for Urig')
+            return kwargs['total_tau']
+        else:
+            if 'tau' in kwargs:
+                tau = kwargs['tau']
+            else:
+                tau = kwargs['total_tau']/self.n_tau
+        if self.time_digitization is not None:
+            tau = np.around(tau/self.time_digitization)*self.time_digitization
+        self.total_tau = self.n_tau*tau
+
     @property
     def number_of_pi_pulses(self):
         return len(self.phases)
@@ -88,7 +102,7 @@ class DDParameters():
         if name[-6:] == '_uhrig' in name:
             return self.uhrig_taus
         else:
-            tau = self.total_tau/(2*self.number_of_pi_pulses)
+            tau = self.total_tau/self.n_tau
             return [tau] + [2*tau for i in range(self.number_of_pi_pulses - 1)] + [tau]
 
     @property
