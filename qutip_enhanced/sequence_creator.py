@@ -142,7 +142,8 @@ class Arbitrary(object):
         return [i for i, val in enumerate(self.sequence()) if val == name]
 
     def l_active(self, name):
-        return [True for val in self.locations() if val == name]
+        s = self.sequence()
+        return [True if val == name else False for val in s ]
 
     @property
     def n_bins(self):
@@ -187,8 +188,8 @@ class Arbitrary(object):
         else:
             return times
 
-    def times_center(self, name=None):
-        return np.array([0.0] + list(np.cumsum(self.times(name))))[:-1] + 0.5 * self.times(name)
+    # def times_center(self, name=None):
+    #     return np.array([0.0] + list(np.cumsum(self.times(name))))[:-1] + 0.5 * self.times(name)
 
     def fields_varied_individual(self):
         fields = self.fields_raw()
@@ -209,7 +210,6 @@ class Arbitrary(object):
     def print_info(self):
         for s, t in zip(self.sequence(), self.times()):
             print s, t
-
 
 class Wait(Arbitrary):
 
@@ -388,14 +388,128 @@ class DDAlpha(Arbitrary):
                   wait=self.wait)
         return np.array([td[i] for i in self.sequence() if td[i] is not None])
 
+class DD(Arbitrary):
 
-    # def fields(self):
-    #     times = self.times_raw()
-    #     for c in self.controls:
-    #         t = self.vary_times.get(c, [[], []])
-    #         for i, r in enumerate(t[0]):
-    #             times[self.locations(c)[r]] += t[1][i]
-    #     return times
+    def __init__(self, dd_type, rabi_period, vary_times=None, time_digitization=None, **kwargs):
+        self.dd_type = dd_type
+        self.time_digitization = time_digitization
+        self.set_total_tau(**kwargs)
+        self.rabi_period = rabi_period
+        self.vary_times = vary_times
+        self.fields = self.fields_varied_individual
+
+    column_dict = {'mw': [0, 1], 'wait': [2]}
+    controls = ['mw', 'wait']
+    n_columns = 3
+
+    def sequence(self):
+        if self.number_of_pi_pulses == 0:
+            return ['wait'] + ['wait']
+        if self.number_of_pi_pulses == 0:
+            return self.tau_list()
+        else:
+            return np.insert(['wait']*self.n_tau, range(1, self.n_tau), [['mw']*self.number_of_pi_pulses])
+
+    def mw_array_xy(self):
+        rho, azim = tuple(np.hsplit(self.mw_array_aphi(), 2))
+        x, y, z = coordinates.sph2cart(rho, 0, azim)
+        return np.concatenate([x, y], axis=1)
+
+    def mw_array_aphi(self):
+        rho = np.ones([self.number_of_pi_pulses])/self.rabi_period
+        return np.vstack([rho, self.phases]).T
+
+    def fields_raw(self):
+        out = np.zeros((len(self.sequence()), self.n_columns))
+        mw_array = self.mw_array_xy()
+        idxmw = 0
+        for i, val in enumerate(self.sequence()):
+            if val == 'mw':
+                out[i, self.column_dict[val]] = mw_array[idxmw]
+                idxmw += 1
+        return out
+
+    def tau_list(self):
+        name = self.dd_type
+        if name[-6:] == '_uhrig' in name:
+            return self.uhrig_taus
+        else:
+            tau = self.total_tau/self.n_tau
+            return np.array([tau] + [2*tau for i in range(self.number_of_pi_pulses - 1)] + [tau])
+
+    def times_raw(self):
+        tl = self.tau_list()
+        if self.number_of_pi_pulses == 0:
+            return self.tau_list()
+        else:
+            return np.insert(tl, range(1, len(tl)), [[0.5 * self.rabi_period]*self.number_of_pi_pulses])
+
+    @property
+    def phases(self):
+        name = self.dd_type
+        if name[-6:] == '_uhrig' in name:
+            name = name[:-6]
+        return __PHASES_DD__[name]
+
+    @property
+    def n_tau(self):
+        if self.number_of_pi_pulses == 0:
+            return 2
+        else:
+            return self.number_of_pi_pulses + 1
+
+    def set_total_tau(self, **kwargs):
+        if self.dd_type[-6:] == '_uhrig':
+            if self.time_digitization is not None:
+                raise NotImplementedError('time_digitization has no effect for Urig')
+            return kwargs['total_tau']
+        else:
+            if 'tau' in kwargs:
+                tau = kwargs['tau']
+            else:
+                tau = kwargs['total_tau']/self.n_tau
+        if self.time_digitization is not None:
+            tau = np.around(tau/self.time_digitization)*self.time_digitization
+        self.total_tau = self.n_tau*tau
+
+    @property
+    def number_of_pi_pulses(self):
+        return len(self.phases)
+
+    @property
+    def number_of_pulses(self):
+        return self.number_of_pi_pulses + 2
+
+    @property
+    def uhrig_pulse_positions_normalized(self):
+        return np.sin(np.pi*np.arange(self.number_of_pulses)/(2*self.number_of_pulses - 2))**2
+
+    @property
+    def uhrig_taus_normalized(self):
+        return np.diff(self.uhrig_pulse_positions_normalized)
+
+    @property
+    def uhrig_pulse_positions(self):
+        return self.total_tau*self.uhrig_pulse_positions_normalized
+
+    @property
+    def uhrig_taus(self):
+      return self.total_tau*self.uhrig_taus_normalized
+
+    @property
+    def eff_pulse_dur_waiting_time(self):
+        return np.concatenate([[3/8.*self.rabi_period], 0.5*self.rabi_period*np.ones(self.number_of_pi_pulses), [3/8.*self.rabi_period]]) #effective duration of pi pulse for each waiting time. The effective phase evolution time during the pi/2 pulse is taken as half of the pulse duration
+
+    @property
+    def minimum_total_tau(self):
+        return self.eff_pulse_dur_waiting_time[0]/self.uhrig_taus_normalized[0]
+
+    @property
+    def effective_durations_dd(self):
+        if self.minimum_total_tau > self.total_tau:
+            raise Exception('Waiting times smaller than zero are not allowed. '
+                            'Total tau must be at least {} (current: {})'.format(self.minimum_total_tau, self.total_tau))
+        return self.tau_list - self.eff_pulse_dur_waiting_time
 
 class Concatenated(Arbitrary):
 
