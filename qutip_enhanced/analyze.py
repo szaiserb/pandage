@@ -95,7 +95,7 @@ def plot_state(dml, var=None, qubit_names=None, vertical_lines_at=None):
     qubit_names = ['Qubit {}'.format(i) for i in range(n)] if qubit_names is None else qubit_names
 
     x_val = range(len(dml[0])) if (var is None or type(var[0]) is str) else var
-    x_ticks = var if type(var[0]) is str else x_val
+    x_ticks = var if (var is not None and type(var[0]) is str) else x_val
 
     opl = [sigmax, sigmay, sigmaz]
     y_labels = ['x', 'y', 'z', 'purity']
