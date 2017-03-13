@@ -5,6 +5,7 @@ import scipy.optimize
 import scipy.integrate
 import coordinates
 import itertools
+import lmfit_models
 
 class pd(dict):
 
@@ -120,20 +121,6 @@ class DDParameters():
             raise Exception('Waiting times smaller than zero are not allowed. '
                             'Total tau must be at least {} (current: {})'.format(self.minimum_total_tau, self.total_tau))
         return self.tau_list - self.eff_pulse_dur_waiting_time
-
-def gaussian(x, mu, sigma, x_area_range=None, area=1):
-
-    """
-    definition https://en.wikipedia.org/wiki/Gaussian_function
-
-    area is area under gaussian curve
-
-    """
-    a = area / (sigma * np.sqrt(2 * np.pi))
-    def f(x):
-        return  a * np.exp(-(x - mu) ** 2 / (2 * sigma ** 2))
-    area_range = scipy.integrate.quad(lambda xr: f(xr), x_area_range[0], x_area_range[1])[0]
-    return f(x)*area/area_range
 
 class Arbitrary(object):
 
@@ -278,7 +265,7 @@ class RabiGaussian(Rabi):
         self._gaussian_parameters = val
 
     def omega_list(self):
-        return gaussian(self.times_center(self.control_field), **self.gaussian_parameters)
+        return lmfit_models.gaussian(self.times_center(self.control_field), **self.gaussian_parameters)
 
 class DDAlpha(Arbitrary):
 
