@@ -7,15 +7,15 @@ import itertools
 class CosineModel(lmfit.Model):
     def __init__(self, *args, **kwargs):
 
-        def cosine(x, a, T, x0, y0, t2):
-            return a * np.cos(2 * np.pi * (x - x0) / float(T)) * np.exp(-(x - x0) / t2) + y0
+        def cosine(x, amplitude, T, x0, c, t2):
+            return amplitude * np.cos(2 * np.pi * (x - x0) / float(T)) * np.exp(-(x - x0) / t2) + c
 
         super(CosineModel, self).__init__(cosine, *args, **kwargs)
 
     def guess(self, data, x=None, **kwargs):
         def CosinusEstimator(x, y):
-            y0 = y.mean()
-            a = 2 ** 0.5 * np.sqrt(((y - y0) ** 2).sum())
+            c = y.mean()
+            amplitude = 2 ** 0.5 * np.sqrt(((y - c) ** 2).sum())
             # better to do estimation of period from
             Y = np.fft.fft(y)
             N = len(Y)
@@ -23,17 +23,17 @@ class CosineModel(lmfit.Model):
             i = abs(Y[1:N / 2 + 1]).argmax() + 1
             T = (N * D) / i
             x0 = 0
-            return a, T, x0, y0
-        a, T, x0, y0 = CosinusEstimator(x, data)
+            return amplitude, T, x0, c
+        amplitude, T, x0, c = CosinusEstimator(x, data)
         t2 = 10 * max(x)
-        return lmfit.models.update_param_vals(self.make_params(a=a, T=T, x0=x0, y0=y0, t2=t2), self.prefix, **kwargs)
+        return lmfit.models.update_param_vals(self.make_params(amplitude=amplitude, T=T, x0=x0, c=c, t2=t2), self.prefix, **kwargs)
 
 class CosineMultiDetModel(lmfit.Model):
     def __init__(self, hyperfine_list, *args, **kwargs):
 
         self.hyperfine_list = hyperfine_list
 
-        def cosine_multi_det_lmfit(x, a, T, x0, c, t2, f0):
+        def cosine_multi_det_lmfit(x, amplitude, T, x0, c, t2, f0):
             hfsl = [[+self.hyperfine_list[0], 0.0, -self.hyperfine_list[0]]]
             for hf in self.hyperfine_list[1:]:
                 hfsl.append([-hf / 2., hf / 2.])
@@ -45,7 +45,7 @@ class CosineMultiDetModel(lmfit.Model):
                 A = rabi_0 ** 2 / (rabi_0 ** 2 + delta ** 2)
                 return A * np.cos(2 * np.pi * rabi_eff * (x - x0)) * np.exp(-(x - x0) / t2)
 
-            return a * sum(rabi(d - f0, x) for d in delta_l) + c
+            return amplitude * sum(rabi(d - f0, x) for d in delta_l) + c
 
         super(CosineMultiDetModel, self).__init__(cosine_multi_det_lmfit, *args, **kwargs)
 
