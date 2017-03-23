@@ -379,9 +379,9 @@ class DD(Arbitrary):
 
     def __init__(self, dd_type=None, rabi_period=None, vary_times=None, time_digitization=None, **kwargs):
         self.dd_type = dd_type
+        self.rabi_period = rabi_period
         self.time_digitization = time_digitization
         self.set_total_tau(**kwargs)
-        self.rabi_period = rabi_period
         self.vary_times = vary_times
         self.fields = self.fields_varied_individual
 
@@ -392,8 +392,6 @@ class DD(Arbitrary):
     def sequence(self):
         if self.number_of_pi_pulses == 0:
             return ['wait'] + ['wait']
-        if self.number_of_pi_pulses == 0:
-            return self.tau_list()
         else:
             return np.insert(['wait']*self.n_tau, range(1, self.n_tau), [['mw']*self.number_of_pi_pulses])
 
@@ -447,8 +445,6 @@ class DD(Arbitrary):
 
     def set_total_tau(self, **kwargs ):
         if self.dd_type[-6:] == '_uhrig':
-            if self.time_digitization is not None:
-                raise NotImplementedError('time_digitization has no effect for Urig')
             return kwargs['total_tau']
         else:
             if 'tau' in kwargs and kwargs['tau'] is not None:
@@ -481,7 +477,10 @@ class DD(Arbitrary):
 
     @property
     def uhrig_taus(self):
-      return self.total_tau*self.uhrig_taus_normalized
+        out = self.total_tau*self.uhrig_taus_normalized
+        if self.time_digitization is not None:
+            out = np.around(out/self.time_digitization)*self.time_digitization
+        return out
 
     @property
     def eff_pulse_dur_waiting_time(self):
@@ -497,17 +496,14 @@ class DD(Arbitrary):
             raise Exception('Waiting times smaller than zero are not allowed. '
                             'Total tau must be at least {} (current: {})'.format(self.minimum_total_tau, self.total_tau))
         return self.tau_list - self.eff_pulse_dur_waiting_time
-
+#
 # class DDAlpha2(DD):
 #
-#     def __init__(self, omega, target_Azz, wait=None, rf_frequency=None, spt=1, **kwargs):
+#     def __init__(self, wait=None, rf_frequency=None, max_rf_bin_duration=None, **kwargs):
+#         self._wait = wait
+#         self._max_rf_bin_duration = max_rf_bin_duration
+#         self._rf_frequency = rf_frequency
 #         DD.__init__(self, **kwargs)
-#         self.wait = wait
-#         self.rf_frequency = rf_frequency
-#         self.spt = spt
-#         # self.target_Azz = target_Azz
-#         # self.fields = self.fields_varied_combined
-#         # self.omega = omega
 #
 #     column_dict = {'mw': [0, 1], 'rf': [2, 3], 'wait': [4]}
 #     controls = ['mw', 'rf', 'wait']
@@ -517,93 +513,180 @@ class DD(Arbitrary):
 #         out = list(itertools.chain.from_iterable([['wait', 'rf', 'wait'] if i == 'wait' else [i] for i in super(DDAlpha2, self).sequence()]))[1:-1]
 #         return ['rf']*self.spt + list(itertools.chain.from_iterable( [['rf']*2*self.spt if i == 'rf' else [i] for i in out[1:-1]])) + ['rf']*self.spt
 #
-#     # def times_raw(self):
-#     #     tl = super(DDAlpha2, self).tau_list()
-#     #     out = [(tl[0] - self.wait)/self.spt]*self.spt + [self.wait]
-#     #     for
-#     # def wait_list
+#     @property
+#     def wait(self):
+#         return self._wait
+#
+#     @property
+#     def total_rf_bins(self):
+#         return self._total_rf_bins
+#
+#     @property
+#     def rf_frequency(self):
+#         return self._rf_frequency
+#
+#     def set_total_tau(self, **kwargs ):
+#         if self.wait != np.around(self.wait/self.time_digitization)*self.time_digitization:
+#             raise ValueError('val {} does not have the right time_digitization {}'.format(self.wait, self.time_digitization))
+#         if self.dd_type[-6:] == '_uhrig':
+#             raise NotImplementedError('time_digitization has no effect for Urig')
+#         else:
+#             if 'tau' in kwargs and kwargs['tau'] is not None:
+#                 tau = kwargs['tau']
+#             else:
+#                 tau = kwargs['total_tau']/self.n_tau
+#         if self.time_digitization is not None:
+#             tau = np.around(tau/self.time_digitization)*self.time_digitization
+#         self.total_tau = self.n_tau*tau
+#
+#     #     if self.dd_type[-6:] == '_uhrig':
+#     #         raise NotImplementedError('time_digitization has no effect for Urig')
+#     #     if 'tau' in kwargs and kwargs['tau'] is not None:
+#     #         raise NotImplementedError("{}".format(kwargs))
 #     #
-#     # def tau_list(self):
 #     #
-#     #     out = [tl[0] - self.wait] + list(itertools.chain.from_iterable([[i - 2*self.wait] for i in tl]))[1:-1] + [tl[-1] - self.wait]
-#     #     return [out[0]/float(self.spt)]*self.spt + [self.wait] + list(itertools.chain.from_iterable([[self.wait] +  [i/float(2*self.spt)]*2*self.spt + [self.wait] for i in out[1:-1]])) + [self.wait] + [out[0]/float(self.spt)]*self.spt
+#     #
+#     #
+#     #
+#     #     if self.time_digitization is not None:
+#     #         tau = np.around(tau/self.time_digitization)*self.time_digitization
+#     #     self.total_tau = self.n_tau*tau
+#
+#     # def tau(self):
+#     #     out = self.target_t_rf / (2 * self.n_pi * self.spt)
+#     #     if self.rf_frequency is not None:
+#     #         out = np.around(out * float(self.rf_frequency)) / float(self.rf_frequency)
+#     #     if self.time_digitization is not None:
+#     #         out = np.around(out / float(self.time_digitization)) * float(self.time_digitization)
+#     #     return out
+#
+#     @property
+#     def tau_rf_list(self):
+#         tau_list = self.tau_list
+#         out = []
+#         out.extend([])
+#
+#         return
+#
+#     def tau_list(self):
+#         name = self.dd_type
+#         if name[-6:] == '_uhrig' in name:
+#             return self.uhrig_taus
+#         else:
+#             tau = self.total_tau / self.n_tau
+#             return np.array([tau] + [2 * tau for i in range(self.number_of_pi_pulses - 1)] + [tau])
+#
+#         # self.target_Azz = target_Azz
+#         # self.fields = self.fields_varied_combined
+#         # self.omega = omega
+#     # def __init__(self,
+#     #              wait=None, target_t_rf=None, rabi_period=None,
+#     #              target_Azz=None, omega=None, rf_frequency=None,
+#     #              time_digitization=None):
+#     #     self.time_digitization = time_digitization
+#     #     self.rf_frequency = rf_frequency
+#     #     self.pi_phases = pi_phases
+#     #     self.spt = spt
+#     #     self.wait = wait
+#     #     self.target_t_rf = target_t_rf
+#     #     self.rabi_period = rabi_period
+#     #     self.target_Azz = target_Azz
+#     #     self.vary_times = vary_times
+#     #     self.fields = self.fields_varied_combined
+#     #     self.omega = omega
+#
 #
 #     @property
 #     def t_rf(self):
-#         return 2*self.number_of_pi_pulses*self.spt*self.tau()
+#         return 'Not Implemented'
 #
-#     def tau(self):
-#         out = self.target_t_rf / (2 * self.n_pi * self.spt)
-#         if self.rf_frequency is not None:
-#             out = np.around(out * float(self.rf_frequency)) / float(self.rf_frequency)
-#         if self.time_digitization is not None:
-#             out = np.around(out / float(self.time_digitization)) * float(self.time_digitization)
-#         return out
-#
-#     def times_raw(self):
-#         td = dict(rf=self.tau(),
-#                   mw=0.5 * self.rabi_period,
-#                   wait=self.wait)
-#         return np.array([td[i] for i in self.sequence() if td[i] is not None])
-#
-#     @property
-#     def effective_t_rf(self):
-#         return self.t_rf - sum(self.vary_times.get('rf', [[], []])[1])
-#
-#     @property
-#     def omega(self):
-#         return self._omega
-#
-#     @omega.setter
-#     def omega(self, val):
-#         if val in [None, 'pi', '2pi'] or isinstance(val, numbers.Number):
-#             if val in [None, 'pi']:
-#                 o = 0.5 / self.effective_t_rf
-#             elif val == '2pi':
-#                 o = 1 / self.effective_t_rf
-#             elif isinstance(val, numbers.Number):
-#                 o = val
-#             self._omega = o * np.ones(2 * self.n_pi * self.spt)
-#         elif len(val) == 2 * self.n_pi * self.spt:
-#             self._omega = val
-#         else:
-#             raise Exception('Error: {}'.format(val))
-#
-#     def alpha(self, n):
-#         delta_alpha = 2 * np.pi * self.target_Azz * (self.tau() * self.spt + self.wait + 0.25 * self.rabi_period)
-#         return int(np.ceil(n / 2.)) * (delta_alpha + np.pi) % (2 * np.pi)
-#
-#     def rf_array_aphi(self):
-#         u_phi = np.repeat([self.alpha(n) for n in range(2 * self.n_pi)], self.spt)
-#         return np.array([self.omega, u_phi]).T
-#
-#     def rf_array_xy(self):
-#         rho, azim = tuple(np.hsplit(self.rf_array_aphi(), 2))
-#         x, y, z = coordinates.sph2cart(rho, 0, azim)
-#         return np.concatenate([x, y], axis=1)
-#
-#     def mw_array_xy(self):
-#         return np.array([np.array([np.cos(phi), np.sin(phi)]) / self.rabi_period for phi in self.pi_phases])
-#
-#     def mw_array_aphi(self):
-#         x, y = tuple(np.hsplit(self.mw_array_xy(), 2))
-#         rho, elev, azim = coordinates.cart2sph(x, y, 0)
-#         return np.concatenate([rho, azim], axis=1)
-#
-#     def fields_raw(self):
-#         out = np.zeros((len(self.sequence()), self.n_columns))
-#         mw_array = self.mw_array_xy()
-#         rf_array_xy = self.rf_array_xy()
-#         idxmw = 0
-#         idxrf = 0
-#         for i, val in enumerate(self.sequence()):
-#             if val == 'mw':
-#                 out[i, self.column_dict[val]] = mw_array[idxmw]
-#                 idxmw += 1
-#             elif val == 'rf':
-#                 out[i, self.column_dict[val]] = rf_array_xy[idxrf]
-#                 idxrf += 1
-#         return out
+#     # # def times_raw(self):
+#     # #     tl = super(DDAlpha2, self).tau_list()
+#     # #     out = [(tl[0] - self.wait)/self.spt]*self.spt + [self.wait]
+#     # #     for
+#     # # def wait_list
+#     # #
+#     # # def tau_list(self):
+#     # #
+#     # #     out = [tl[0] - self.wait] + list(itertools.chain.from_iterable([[i - 2*self.wait] for i in tl]))[1:-1] + [tl[-1] - self.wait]
+#     # #     return [out[0]/float(self.spt)]*self.spt + [self.wait] + list(itertools.chain.from_iterable([[self.wait] +  [i/float(2*self.spt)]*2*self.spt + [self.wait] for i in out[1:-1]])) + [self.wait] + [out[0]/float(self.spt)]*self.spt
+#     #
+#     # @property
+#     # def t_rf(self):
+#     #     return 2*self.number_of_pi_pulses*self.spt*self.tau()
+#     #
+#     # def tau(self):
+#     #     out = self.target_t_rf / (2 * self.n_pi * self.spt)
+#     #     if self.rf_frequency is not None:
+#     #         out = np.around(out * float(self.rf_frequency)) / float(self.rf_frequency)
+#     #     if self.time_digitization is not None:
+#     #         out = np.around(out / float(self.time_digitization)) * float(self.time_digitization)
+#     #     return out
+#     #
+#     # def times_raw(self):
+#     #     td = dict(rf=self.tau(),
+#     #               mw=0.5 * self.rabi_period,
+#     #               wait=self.wait)
+#     #     return np.array([td[i] for i in self.sequence() if td[i] is not None])
+#     #
+#     # @property
+#     # def effective_t_rf(self):
+#     #     return self.t_rf - sum(self.vary_times.get('rf', [[], []])[1])
+#     #
+#     # @property
+#     # def omega(self):
+#     #     return self._omega
+#     #
+#     # @omega.setter
+#     # def omega(self, val):
+#     #     if val in [None, 'pi', '2pi'] or isinstance(val, numbers.Number):
+#     #         if val in [None, 'pi']:
+#     #             o = 0.5 / self.effective_t_rf
+#     #         elif val == '2pi':
+#     #             o = 1 / self.effective_t_rf
+#     #         elif isinstance(val, numbers.Number):
+#     #             o = val
+#     #         self._omega = o * np.ones(2 * self.n_pi * self.spt)
+#     #     elif len(val) == 2 * self.n_pi * self.spt:
+#     #         self._omega = val
+#     #     else:
+#     #         raise Exception('Error: {}'.format(val))
+#     #
+#     # def alpha(self, n):
+#     #     delta_alpha = 2 * np.pi * self.target_Azz * (self.tau() * self.spt + self.wait + 0.25 * self.rabi_period)
+#     #     return int(np.ceil(n / 2.)) * (delta_alpha + np.pi) % (2 * np.pi)
+#     #
+#     # def rf_array_aphi(self):
+#     #     u_phi = np.repeat([self.alpha(n) for n in range(2 * self.n_pi)], self.spt)
+#     #     return np.array([self.omega, u_phi]).T
+#     #
+#     # def rf_array_xy(self):
+#     #     rho, azim = tuple(np.hsplit(self.rf_array_aphi(), 2))
+#     #     x, y, z = coordinates.sph2cart(rho, 0, azim)
+#     #     return np.concatenate([x, y], axis=1)
+#     #
+#     # def mw_array_xy(self):
+#     #     return np.array([np.array([np.cos(phi), np.sin(phi)]) / self.rabi_period for phi in self.pi_phases])
+#     #
+#     # def mw_array_aphi(self):
+#     #     x, y = tuple(np.hsplit(self.mw_array_xy(), 2))
+#     #     rho, elev, azim = coordinates.cart2sph(x, y, 0)
+#     #     return np.concatenate([rho, azim], axis=1)
+#     #
+#     # def fields_raw(self):
+#     #     out = np.zeros((len(self.sequence()), self.n_columns))
+#     #     mw_array = self.mw_array_xy()
+#     #     rf_array_xy = self.rf_array_xy()
+#     #     idxmw = 0
+#     #     idxrf = 0
+#     #     for i, val in enumerate(self.sequence()):
+#     #         if val == 'mw':
+#     #             out[i, self.column_dict[val]] = mw_array[idxmw]
+#     #             idxmw += 1
+#     #         elif val == 'rf':
+#     #             out[i, self.column_dict[val]] = rf_array_xy[idxrf]
+#     #             idxrf += 1
+#     #     return out
 
 class Concatenated(Arbitrary):
 
@@ -683,6 +766,6 @@ class Concatenated(Arbitrary):
 
     def times(self, name=None):
         return np.concatenate([i.times(name=name) for i in self.p_list])
-#
-# if __name__ == '__main__':
-#     kdd = DDAlpha2(omega=0.0, target_Azz=0.0, wait=0.5, dd_type='xy4', total_tau=100, spt=3)
+
+if __name__ == '__main__':
+    kdd = DDAlpha2(omega=0.0, target_Azz=0.0, wait=0.5, dd_type='xy4', total_tau=100, spt=3)
