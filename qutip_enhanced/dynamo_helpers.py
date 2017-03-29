@@ -1,3 +1,7 @@
+
+from __future__ import print_function, absolute_import, unicode_literals, division
+from imp import reload
+
 from qutip_enhanced import *
 import os
 import shutil
@@ -25,12 +29,12 @@ class DynPython(object):
 
     def get_eng(self, use_engine=None):
         if type(use_engine) == matlab.engine.matlabengine.MatlabEngine:
-            print 'using existing engine {}'.format(use_engine.eval('matlab.engine.engineName'))
+            print('using existing engine {}'.format(use_engine.eval('matlab.engine.engineName')))
             return use_engine
         m = matlab.engine.find_matlab()
         if use_engine is not None and use_engine in m:
             eng = matlab.engine.connect_matlab(use_engine)
-            print 'connected to {}'.format(use_engine)
+            print('connected to {}'.format(use_engine))
             return eng
         mdp = [float(i[3:]) for i in m if 'dpe' in i]
         il = itertools.count()
@@ -41,7 +45,7 @@ class DynPython(object):
         name = "dpe{}".format(n) if use_engine is None else use_engine
         eng = matlab.engine.start_matlab()
         eng.eval("matlab.engine.shareEngine('{}')".format(name), nargout=0)
-        print 'started matlab engine {}'.format(name)
+        print('started matlab engine {}'.format(name))
         return eng
 
     @property
@@ -69,7 +73,7 @@ class DynPython(object):
     def print_out(self):
         if self.print_flag:
             to_print = self.out.getvalue()
-            print to_print.replace(self.already_printed, '') #dont use strip()
+            print(to_print.replace(self.already_printed, '')) #dont use strip())
             self.already_printed = to_print
 
     @property
@@ -233,7 +237,7 @@ class DynPython(object):
         asa = self.add_slices_angles
         if asa is not None:
             np.savetxt(path, asa, fmt='%+1.4e')
-        print "add_slices_angles saved."
+        print("add_slices_angles saved.")
 
     def round2float(self, arr, val):
         return np.around(arr/val) * val
@@ -242,13 +246,13 @@ class DynPython(object):
         self.save_times_fields_mhz("{}\\fields.dat".format(base_path))
         for n, name in enumerate(self.fields_names_list):
             self.save_times_fields_aphi(n=n, path="{}\\{}.dat".format(base_path, name))
-            print "Fields {} saved.".format(name)
+            print("Fields {} saved.".format(name))
         self.save_add_slices_angles(path="{}\\add_slices_angles.dat".format(base_path))
 
     def save_export_mask(self, path):
         ems = sum(self.export_mask_list)
         np.savetxt(path, ems, fmt='%i')
-        print "Export mask saved."
+        print("Export mask saved.")
 
     def save_sequence_steps(self, path):
         """
@@ -268,18 +272,18 @@ class DynPython(object):
             fsn[i] = nl
             out.append([', '.join(step), ', '.join(['{:d}'.format(int(i)) for i in osln])])
         np.savetxt(path,  out, delimiter="\t", fmt="%s")
-        print "Sequence_steps saved."
+        print("Sequence_steps saved.")
 
     def save_matlab_output(self, path):
         with open(path, "w") as f:
             f.write(self.out.getvalue())
-        print "matlab_output saved."
+        print("matlab_output saved.")
 
     def save_script_code(self, path, script_code):
         if script_code != None:
             with open(path, "w") as text_file:
                 text_file.write(script_code)
-            print "script_code saved."
+            print("script_code saved.")
 
     def save_notebook(self, path, script_path):
         sp, file_extension = os.path.splitext(script_path)
@@ -297,7 +301,7 @@ class DynPython(object):
 
         gates = [Qobj(np.array(self.eng.eval('dyn.X({}, 1)'.format(i))), dims=[self.dims]*2) for i in range(1, self.n_bins + self.add_slices + 1)]
         qsave(gates, path)
-        print "gates saved as *.qu -file."
+        print("gates saved as *.qu -file.")
 
     def save(self, script_path=None, dns=None, script_code=None, substr=None, save_notebook=False):
         if dns is None:
@@ -318,7 +322,7 @@ class DynPython(object):
         self.save_gates(path=dns+"\\gates")
         import qutip_enhanced
         shutil.copytree(os.path.dirname(qutip_enhanced.__file__), dns + '\\qutip_enhanced')
-        print "qutip_enhanced saved."
+        print("qutip_enhanced saved.")
         self.save_dynamo_fields(base_path=dns)
         # self.save_export_mask(path=dns+"\\export_mask.dat")
         self.save_sequence_steps(path=dns + "\\sequence_steps.dat")

@@ -1,8 +1,9 @@
+from __future__ import print_function, absolute_import, unicode_literals, division
+from imp import reload
+
 import numpy as np
 from scipy.constants import *
 np.set_printoptions(suppress=True, linewidth=500, threshold=np.nan)
-
-from qutip import *
 
 import coordinates
 from qutip_enhanced import *

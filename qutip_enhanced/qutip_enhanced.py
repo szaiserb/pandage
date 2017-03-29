@@ -1,3 +1,8 @@
+
+from __future__ import print_function, absolute_import, unicode_literals, division
+from imp import reload
+
+
 from qutip import *
 import numpy as np
 np.set_printoptions(suppress=True, linewidth=500)
@@ -34,7 +39,7 @@ class Eigenvector():
         -evecs_new is a numpy array of qutip eigenvectors in arbitrary order like given by evals, evec = Qobj.eigenstates()
         -evals_new is numpy array of eigenvalues like given by evals, evec = Qobj.eigenstates()   
         """
-        print type(copy), self.idx
+        print(type(copy), self.idx)
         import copy as cop
         self.idx_new = cop.deepcopy(self.idx)
         for i in range(self.dims.prod()):
@@ -327,7 +332,7 @@ if __name__ == '__main__':
     cphase0 = get_rot_operator_all_spins(dims = [2, 2], rotation_axis={'z': 1}, rotated_spin=0, angle=np.pi/2., selective_to={1:[0]})
     cphase1 = get_rot_operator_all_spins(dims = [2, 2], rotation_axis={'z': 1}, rotated_spin=0, angle=- np.pi/2., selective_to={1:[1]})
     rotx = get_rot_operator_all_spins(dims = [2, 2], rotation_axis={'y': 1}, rotated_spin=1, angle=np.pi/2.)
-    print rotx*cphase0*cphase1*rotx.dag()
+    print(rotx*cphase0*cphase1*rotx.dag())
 
 a = np.array([[ 0.-1.j,  0.+0.j,  0.+0.j,  0.+0.j],
               [ 0.+0.j,  0.-1.j,  0.+0.j , 0.+0.j],
