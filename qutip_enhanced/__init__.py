@@ -6,6 +6,6 @@ from . import lmfit_models
 from . import nv_hamilton
 from . import sequence_creator
 from . import sequence_creator as sc
-from . import temporary_GRAPE_Philipp_misc as misc
+from . import temporary_GRAPE_Philipp_misc
 from . import dynamo_helpers
 

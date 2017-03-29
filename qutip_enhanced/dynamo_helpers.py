@@ -1,13 +1,17 @@
+# coding=utf-8
 from __future__ import print_function, absolute_import, unicode_literals, division
 from imp import reload
+__metaclass__ = type
 
 from qutip_enhanced import *
 import os
 import shutil
 import matlab.engine
 import itertools
-
+import datetime
+import time
 from . import temporary_GRAPE_Philipp_misc as misc
+import threading
 
 import StringIO
 
@@ -147,11 +151,30 @@ class DynPython(object):
     def open_ui(self):
         self.eng.ui_open(self.dyn, nargout=0)
 
-    def search(self, mask, options=None):
+    def search(self, mask, options=None, dt=10, stop_too_bad_list=None, abort=None, kill=None):
         options = {} if options is None else options
         mask = matlab.logical(mask.tolist())
-        self.eng.search(self.dyn, mask, options, stdout=self.out, stderr=self.err, nargout=0)
-        self.print_out()
+        def run():
+            if 'max_walltime' in options:
+                n = range(int(options['max_walltime']/dt))
+                options['max_walltime'] = dt
+                t0 = time.time()
+                for _ in n:
+                    if abort is not None and abort.is_set(): break
+                    if kill is not None and kill.is_set(): break
+                    self.eng.search(self.dyn, mask, options, stdout=self.out, stderr=self.err, nargout=0)
+                    frob_norm = sqrt(2 * self.eng.compute_error(self.dyn) * self.eng.eval("dyn.system.norm2"))
+                    print("Current Frobenius norm: {}".format(frob_norm))
+                    if self.eng.eval('dyn.stats{end}.term_reason') != "Wall time limit reached":
+                        break
+                    if stop_too_bad_list is not None:
+                        for i in stop_too_bad_list:
+                            if time.time() - t0 > i[0] and  frob_norm > i[1]:
+                                print("Final Frobenius norm: {}".format(sqrt(2 * self.eng.compute_error(self.dyn) * self.eng.eval("dyn.system.norm2"))))
+                                break
+        t = threading.Thread(target=run)
+        t.start()
+        return t
 
     @property
     def n_bins(self):
@@ -178,7 +201,7 @@ class DynPython(object):
         return self.times_fields_mhz[self.n_bins:, 0]
 
     def fields_xy_mhz(self, n):
-        out = self.times_fields_mhz[list(self.export_mask_rows(n)), 1:][:, ~np.all(self.export_mask_list[n] == 0, axis=0)]
+        out = self.times_fields_mhz[list(self.export_mask_rows(n)), 1:][:, ~np.all(self.export_mask_list[n]==0, axis=0)]
         if out.shape[1] == 1:
             out = np.column_stack([out, 0*out])
         return out
@@ -220,17 +243,17 @@ class DynPython(object):
         return out
 
     def save_times_fields_mhz(self, path):
-        np.savetxt(path, np.around(self.times_fields_mhz, 8), fmt='%+1.4e')
+        np.savetxt(path, np.around(self.times_fields_mhz, 9), fmt='%+1.9e')
 
     def save_times_fields_xy(self, n=None, path=None):
         t = self.round2float(self.times(n), 1/self.sample_frequency)
         txy = np.column_stack([t, self.fields_mhz(n)])
-        np.savetxt(path, np.around(txy, 8), fmt='%+1.4e')
+        np.savetxt(path, np.around(txy, 9), fmt='%+1.9e')
 
     def save_times_fields_aphi(self, n=None, path=None):
         t = self.round2float(self.times(n), 1/self.sample_frequency)
         taphi = np.column_stack([t, self.fields_aphi_mhz(n)])
-        np.savetxt(path, np.around(taphi, 8), fmt='%+1.4e')
+        np.savetxt(path, np.around(taphi, 9), fmt='%+1.9e')
 
     def save_add_slices_angles(self, path):
         asa = self.add_slices_angles

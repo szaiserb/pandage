@@ -1,13 +1,7 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Sep 13 11:10:53 2013
-
-@author: BigSk_000
-"""
-
-
+# coding=utf-8
 from __future__ import print_function, absolute_import, unicode_literals, division
 from imp import reload
+__metaclass__ = type
 
 import numpy as np
 
