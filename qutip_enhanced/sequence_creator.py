@@ -4,9 +4,9 @@ __metaclass__ = type
 
 import numpy as np
 import numbers
-import coordinates
+from . import coordinates
 import itertools
-import lmfit_models
+from . import lmfit_models
 
 
 class pd(dict):

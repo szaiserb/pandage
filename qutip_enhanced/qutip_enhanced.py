@@ -1,4 +1,3 @@
-
 from __future__ import print_function, absolute_import, unicode_literals, division
 from imp import reload
 
@@ -7,7 +6,7 @@ from qutip import *
 import numpy as np
 np.set_printoptions(suppress=True, linewidth=500)
 import itertools
-import coordinates
+from . import coordinates
 import copy
 import scipy.linalg
 import numpy as np

@@ -5,7 +5,7 @@ import numpy as np
 from scipy.constants import *
 np.set_printoptions(suppress=True, linewidth=500, threshold=np.nan)
 
-import coordinates
+from . import coordinates
 from qutip_enhanced import *
 
 class NVHam(object):
