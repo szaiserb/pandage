@@ -151,7 +151,7 @@ class DynPython(object):
     def open_ui(self):
         self.eng.ui_open(self.dyn, nargout=0)
 
-    def search(self, mask, options=None, dt=2, stop_too_bad_list=None, abort=None, kill=None):
+    def search_thread(self, mask, options=None, dt=2, stop_too_bad_list=None, abort=None, kill=None):
         options = {} if options is None else options
         mask = matlab.logical(mask.tolist())
         def run():
@@ -175,6 +175,11 @@ class DynPython(object):
         t = threading.Thread(target=run)
         t.start()
         return t
+
+    def search(self, mask, options=None):
+        options = {} if options is None else options
+        mask = matlab.logical(mask.tolist())
+        self.eng.search(self.dyn, mask, options, nargout=0)
 
     @property
     def n_bins(self):
