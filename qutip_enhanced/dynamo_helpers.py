@@ -81,14 +81,14 @@ class DynPython(object):
 
     @property
     def dyn(self):
-        return self.eng.workspace["dyn"]
+        return self.eng.workspace[str("dyn")]
 
     def set_dyn(self, task, H_drift_list, H_ctrl_list, weight):
         self.eng.addpath(self.eng.genpath(self.dynamo_path))
         initial = matlab.double(self.initial.data.todense().tolist(), is_complex=True)
         final = matlab.double(self.final.data.todense().tolist(), is_complex=True)
         self._dyn = self.eng.dynamo(task, initial, final, H_drift_list, H_ctrl_list, weight, stdout=self.out, stderr=self.err)
-        self.eng.workspace["dyn"] = self._dyn
+        self.eng.workspace[str("dyn")] = self._dyn
         self.print_out()
 
     @property
@@ -132,7 +132,7 @@ class DynPython(object):
             return np.where(self.export_mask_list[n][:, np.where(~np.all(self.export_mask_list[n] == 0, axis=0))[0][0]])[0]
 
     def set_labels(self, title, c_labels):
-        self.eng.eval("dyn.system.set_labels('{}', {}, {{{}}})".format(title, self.dims, ", ".join("'{}'".format(i) for i in c_labels)), stdout=self.out, stderr=self.err, nargout=0)
+        self.eng.eval(str("dyn.system.set_labels('{}', {}, {{{}}})").format(title, self.dims, ", ".join("'{}'".format(i) for i in c_labels)), stdout=self.out, stderr=self.err, nargout=0)
 
     def get_mask(self, optimize_times=None):
         if optimize_times is None:
@@ -151,7 +151,7 @@ class DynPython(object):
     def open_ui(self):
         self.eng.ui_open(self.dyn, nargout=0)
 
-    def search(self, mask, options=None, dt=10, stop_too_bad_list=None, abort=None, kill=None):
+    def search(self, mask, options=None, dt=2, stop_too_bad_list=None, abort=None, kill=None):
         options = {} if options is None else options
         mask = matlab.logical(mask.tolist())
         def run():
