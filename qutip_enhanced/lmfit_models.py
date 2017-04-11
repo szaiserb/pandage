@@ -9,6 +9,47 @@ import lmfit
 import lmfit.models
 import itertools
 
+
+class CosineNoOffsetNoDecayModel(lmfit.Model):
+    def __init__(self, *args, **kwargs):
+        def cosine(x, amplitude, T, x0):
+            return amplitude * np.cos(2 * np.pi * (x - x0) / float(T))
+
+        super(CosineNoOffsetNoDecayModel, self).__init__(cosine, *args, **kwargs)
+
+    def guess(self, data, x=None, **kwargs):
+        def CosineNoOffsetNoDecayEstimator(y=None, x=None):
+            a = 2**0.5 * np.sqrt( (y**2).sum() )
+            # better to do estimation of period from
+            Y = np.fft.fft(y)
+            N = len(Y)
+            D = float(x[1] - x[0])
+            i = abs(Y[1:int(N/2+1)]).argmax()+1
+            T = (N * D) / i
+            x0 = 0
+            return a, T, x0
+        amplitude, T, x0 = CosineNoOffsetNoDecayEstimator(y=data, x=x)
+        return lmfit.models.update_param_vals(self.make_params(amplitude=amplitude, T=T, x0=x0), self.prefix, **kwargs)
+
+class CosineNoDecayModel(lmfit.Model):
+    def __init__(self, *args, **kwargs):
+        def cosine(x, amplitude, T, x0, c):
+            return amplitude * np.cos(2 * np.pi * (x - x0) / float(T)) + c
+
+        super(CosineNoDecayModel, self).__init__(cosine, *args, **kwargs)
+
+    def guess(self, data, x=None, **kwargs):
+        c = data.mean()
+        y_temp = y - c
+        m = CosineNoOffsetNoDecayModel()
+        p = m.fit(y_temp, m.guess(data=y_temp, x=x), x=x).result.params
+        print(p)
+        if p['amplitude'] < 0:
+            p['amplitude'].value *= -1
+            p['x0'].value = ((p['x0'] / p['T'] + 0.5) % 1) * p['T']
+            p = m.fit(y_temp, m.guess(data=y_temp, x=x), x=x).result.params
+        return lmfit.models.update_param_vals(self.make_params(amplitude=p['amplitude'].value, T=p['T'].value, x0=p['x0'].value, c=c), self.prefix, **kwargs)
+
 class CosineModel(lmfit.Model):
     def __init__(self, *args, **kwargs):
 
@@ -18,20 +59,9 @@ class CosineModel(lmfit.Model):
         super(CosineModel, self).__init__(cosine, *args, **kwargs)
 
     def guess(self, data, x=None, **kwargs):
-        def CosinusEstimator(x, y):
-            c = y.mean()
-            amplitude = 2 ** 0.5 * np.sqrt(((y - c) ** 2).sum())
-            # better to do estimation of period from
-            Y = np.fft.fft(y)
-            N = len(Y)
-            D = float(x[1] - x[0])
-            i = abs(Y[1:N / 2 + 1]).argmax() + 1
-            T = (N * D) / i
-            x0 = 0
-            return amplitude, T, x0, c
-        amplitude, T, x0, c = CosinusEstimator(x, data)
-        t2 = 10 * max(x)
-        return lmfit.models.update_param_vals(self.make_params(amplitude=amplitude, T=T, x0=x0, c=c, t2=t2), self.prefix, **kwargs)
+        p = CosineNoDecayModel().guess(data, x=x)
+        return lmfit.models.update_param_vals(self.make_params(amplitude=p['amplitude'].value, T=p['T'].value, x0=p['x0'].value, c=p['c'].value, t2=10 * max(x)), self.prefix, **kwargs)
+
 
 class CosineMultiDetModel(lmfit.Model):
     def __init__(self, hyperfine_list, *args, **kwargs):
@@ -54,53 +84,31 @@ class CosineMultiDetModel(lmfit.Model):
 
         super(CosineMultiDetModel, self).__init__(cosine_multi_det_lmfit, *args, **kwargs)
 
-    # def guess(self, data, x=None, **kwargs):
-    #     def CosinusEstimator(x, y):
-    #         c = y.mean()
-    #         a = 2 ** 0.5 * np.sqrt(((y - c) ** 2).sum())
-    #         # better to do estimation of period from
-    #         Y = np.fft.fft(y)
-    #         N = len(Y)
-    #         D = float(x[1] - x[0])
-    #         i = abs(Y[1:N / 2 + 1]).argmax() + 1
-    #         T = (N * D) / i
-    #         x0 = 0
-    #         return a, T, x0, c
-    #
-    #     a, T, x0, c = CosinusEstimator(x, data)
-    #     t2 = 10 * max(x)
-    #     return lmfit.models.update_param_vals(self.make_params(a=a, T=T, x0=x0, c=c, t2=t2), self.prefix, **kwargs)
-    #
-    # def guess2(self, data, x=None, **kwargs):
-    #     y_offset = data.mean()
-    #     y = data - y_offset
-    #     try:
-    #         p = pi3d.Fit.Fit(x, y, pi3d.Fit.CosinusNoOffset, pi3d.Fit.CosinusNoOffsetEstimator)
-    #     except:
-    #         return None
-    #     if p[0] < 0:
-    #         p[0] = -p[0]
-    #         p[2] = ((p[2] / p[1] + 0.5) % 1) * p[1]
-    #         p = pi3d.Fit.Fit(x, y, pi3d.Fit.CosinusNoOffset, p)
-    #     p = (p[0], p[1], p[2], y_offset)
-    #     p = pi3d.Fit.Fit(x, self.results, pi3d.Fit.Cosinus, p)
-    #     while (p[2] > 0.5 * p[1]):
-    #         p[2] -= p[1]
-    #     p = pi3d.Fit.Fit(x, self.results, pi3d.Fit.Cosinus, p)
-    #     p = list(p)
-    #     p.append(10 * max(x))
-    #     p = pi3d.Fit.Fit(x, self.results, pi3d.Fit.Cosinus_dec, p)
-    #     pp = list(p)
-    #     pp.append(self.centerfreq)
-    #     import Fitmodule
-    #     d = dict(zip(['a', 'T', 'x0', 'c', 't2', 'f0'], pp))
-    #     fitresult, fitparams = Fitmodule.Fit(x, self.results, pi3d.Fit.CosineMultiDetLmFit, d)
-
 if __name__ == '__main__':
-    mod = CosineModel()
-    x = np.linspace(0, 2 * np.pi, 100)
-    y = np.cos(x)
-    pars = mod.guess(y, x)
-    a = mod.fit(y, pars, x=x)
+    fp = "D:\data/NuclearOPs\CNOT_KDD\cnot_kdd/20170411-h13m43s31_cnot_kdd/20170411-h14m04s25_kdd_data.hdf"
+
+
     import matplotlib.pyplot as plt
-    a.plot_fit()
+    import pandas as pd
+    import numpy as np
+    import os
+    import lmfit
+
+    data = pd.read_hdf(fp)
+
+    d = data.groupby(['seq_num', 'x']).agg({'result_0': np.mean}).reset_index([0, 1])
+    aggd = d.pivot(columns='seq_num', index='x')
+    fig, ax = plt.subplots()
+    aggd.plot(ax=ax, legend=False)
+    ax.set_title("Rabi_oscillations (x-axis scaling wrong)")
+
+    mod = CosineModel()
+    y = np.array(d[d.seq_num == int(0)].result_0)
+    x = aggd.index.values
+    pars = mod.guess(data=y, x=x)
+    pars['T'].value = 2*np.pi
+    pars['T'].vary = False
+    result = mod.fit(y, pars, x=x)
+    plt.plot(x, result.best_fit)
+    plt.title("Fit of rabi_oscillations (x-axis scaling right)")
+    a = np.array([0, result.params['T'].value, result.params['x0'].value])
