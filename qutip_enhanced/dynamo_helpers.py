@@ -12,7 +12,6 @@ import datetime
 import time
 from . import temporary_GRAPE_Philipp_misc as misc
 import threading
-import numpy as np
 
 if sys.version_info.major == 2:
     from StringIO import StringIO
@@ -155,7 +154,7 @@ class DynPython:
     def open_ui(self):
         self.eng.ui_open(self.dyn, nargout=0)
 
-    def search_thread(self, mask, options=None, dt=2, stop_too_bad_list=None, abort=None, kill=None):
+    def search_thread(self, mask, options=None, dt=10, stop_too_bad_fun=None, abort=None, kill=None):
         options = {} if options is None else options
         mask = matlab.logical(mask.tolist())
         def run():
@@ -167,15 +166,19 @@ class DynPython:
                     if abort is not None and abort.is_set(): break
                     if kill is not None and kill.is_set(): break
                     self.eng.search(self.dyn, mask, options, stdout=self.out, stderr=self.err, nargout=0)
-                    frob_norm = np.sqrt(2 * self.eng.compute_error(self.dyn) * self.eng.eval("dyn.system.norm2"))
-                    print("Current Frobenius norm: {}".format(frob_norm))
+                    frob_norm = sqrt(2 * self.eng.compute_error(self.dyn) * self.eng.eval("dyn.system.norm2"))
                     if self.eng.eval('dyn.stats{end}.term_reason') != "Wall time limit reached":
                         break
-                    if stop_too_bad_list is not None:
-                        for i in stop_too_bad_list:
-                            if time.time() - t0 > i[0] and  frob_norm > i[1]:
-                                print("Final Frobenius norm: {}".format(np.sqrt(2 * self.eng.compute_error(self.dyn) * self.eng.eval("dyn.system.norm2"))))
-                                break
+                    elapsed_time = time.time() - t0
+                    if stop_too_bad_fun is not None and elapsed_time > 60:
+                        if frob_norm > stop_too_bad_fun(elapsed_time):
+                            s1 = 'Final'
+                        else:
+                            s1 = 'Current'
+                    else:
+                        s1 = 'Current'
+                    print("{} Frobenius norm: {} ({})".format(s1, frob_norm, stop_too_bad_fun(elapsed_time)))
+                    if s1 == 'Final': break
         t = threading.Thread(target=run)
         t.start()
         return t
@@ -252,22 +255,22 @@ class DynPython:
         return out
 
     def save_times_fields_mhz(self, path):
-        np.savetxt(path, np.around(self.times_fields_mhz, 9), fmt='%+1.9e')
+        np.savetxt(path, np.around(self.times_fields_mhz, 9), fmt=str('%+1.9e'))
 
     def save_times_fields_xy(self, n=None, path=None):
         t = self.round2float(self.times(n), 1/self.sample_frequency)
         txy = np.column_stack([t, self.fields_mhz(n)])
-        np.savetxt(path, np.around(txy, 9), fmt='%+1.9e')
+        np.savetxt(path, np.around(txy, 9), fmt=str('%+1.9e'))
 
     def save_times_fields_aphi(self, n=None, path=None):
         t = self.round2float(self.times(n), 1/self.sample_frequency)
         taphi = np.column_stack([t, self.fields_aphi_mhz(n)])
-        np.savetxt(path, np.around(taphi, 9), fmt='%+1.9e')
+        np.savetxt(path, np.around(taphi, 9), fmt=str('%+1.9e'))
 
     def save_add_slices_angles(self, path):
         asa = self.add_slices_angles
         if asa is not None:
-            np.savetxt(path, asa, fmt='%+1.4e')
+            np.savetxt(path, asa, fmt=str('%+1.4e'))
         print("add_slices_angles saved.")
 
     def round2float(self, arr, val):
@@ -282,7 +285,7 @@ class DynPython:
 
     def save_export_mask(self, path):
         ems = sum(self.export_mask_list)
-        np.savetxt(path, ems, fmt='%i')
+        np.savetxt(path, ems, fmt=str('%i'))
         print("Export mask saved.")
 
     def save_sequence_steps(self, path):
@@ -302,7 +305,7 @@ class DynPython:
                     osln.append(nl[j])
             fsn[i] = nl
             out.append([', '.join(step), ', '.join(['{:d}'.format(int(i)) for i in osln])])
-        np.savetxt(path,  out, delimiter="\t", fmt="%s")
+        np.savetxt(path,  out, delimiter="\t", fmt=str("%s"))
         print("Sequence_steps saved.")
 
     def save_matlab_output(self, path):
