@@ -1,4 +1,4 @@
-from qutip_enhanced import *
+from .qutip_enhanced import *
 
 from . import analyze
 from . import coordinates
@@ -8,4 +8,7 @@ from . import sequence_creator
 from . import sequence_creator as sc
 from . import temporary_GRAPE_Philipp_misc
 from . import dynamo_helpers
+
+import numpy as np
+
 

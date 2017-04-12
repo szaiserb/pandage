@@ -50,25 +50,25 @@ class Coord():
     def check_validity(self, vec):
         if len(vec) > 3:
             raise Exception("No more than three coordinates are allowed!")
-        if vec.has_key(self.cart_coord[0]) or vec.has_key(self.cart_coord[1]) or vec.has_key(self.cart_coord[2]):
-            if vec.has_key(self.sph_coord[0]) or vec.has_key(self.sph_coord[1]) or vec.has_key(self.sph_coord[2]):
+        if self.cart_coord[0] in vec or self.cart_coord[1] in vec or self.cart_coord[2] in vec:
+            if self.sph_coord[0] in vec or self.sph_coord[1] in vec or self.sph_coord[2] in vec:
                 raise Exception("Cartesian and spherical coordinates mixed!")
         for key in vec.keys():
             if not key in self.cart_coord + self.sph_coord:
                 raise Exception("The axis " + str(key) + " is not allowed!")
 
     def complete(self, vec):
-        if vec.has_key(self.cart_coord[0]) or vec.has_key(self.cart_coord[1]) or vec.has_key(self.cart_coord[2]):
+        if self.cart_coord[0] in vec or self.cart_coord[1] in vec or self.cart_coord[2] in vec:
             vec_compl = {'x': 0, 'y': 0, 'z': 0}
             for axis in self.cart_coord:
-                if vec.has_key(axis):
+                if axis in vec:
                     vec_compl[axis] = vec[axis]
             self.cart = vec_compl
             self.sph = cart2sph(vec_compl)
         else:
             vec_compl = {'rho': 1, 'azim': 0, 'elev': 0}
             for axis in self.sph_coord:
-                if vec.has_key(axis):
+                if axis in vec:
                     vec_compl[axis] = vec[axis]
             self.sph = vec_compl
             self.cart = sph2cart(vec_compl)

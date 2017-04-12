@@ -1,6 +1,5 @@
 # coding=utf-8
 from __future__ import print_function, absolute_import, unicode_literals, division
-from imp import reload
 __metaclass__ = type
 
 from qutip import *
@@ -17,7 +16,7 @@ from mpl_toolkits.mplot3d import proj3d
 
 np.set_printoptions(linewidth=1e5)  # matrices are displayd much more clearly
 
-class Eigenvector():
+class Eigenvector:
     def __init__(self, dims):
         """
         Eigenvalues are not sorted in any way which makes plotting or 
@@ -270,7 +269,7 @@ def get_rot_operator_all_spins(dims, rotation_axis={'x': 1, 'y': 1}, rotated_spi
         -selective_to is dictionary that includes the spins a that the rotation should be selective to.
         omit a spin, if this spins spin state should not play a role
         """
-        return dict(selective_to.items() + [[i, range(dims[i])] for i in range(len(dims)) if not i in selective_to])
+        return dict(list(selective_to.items()) + [[i, range(dims[i])] for i in range(len(dims)) if not i in selective_to])
 
     def add_spin(dim, rot_op, side, selectivity):
         dims_rot_op = np.array(rot_op.dims[0])

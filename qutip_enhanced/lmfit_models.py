@@ -40,7 +40,7 @@ class CosineNoDecayModel(lmfit.Model):
 
     def guess(self, data, x=None, **kwargs):
         c = data.mean()
-        y_temp = y - c
+        y_temp = data - c
         m = CosineNoOffsetNoDecayModel()
         p = m.fit(y_temp, m.guess(data=y_temp, x=x), x=x).result.params
         print(p)

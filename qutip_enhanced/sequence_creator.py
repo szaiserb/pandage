@@ -11,16 +11,20 @@ from . import lmfit_models
 
 
 class pd(dict):
-    ddp = dict()
-    ddp['fid'] = np.array([])
-    ddp['hahn'] = np.array([0.0])
-    ddp['xy4'] = np.array([0.0, np.pi / 2., 0.0, np.pi / 2.])
-    ddp['xy8'] = np.concatenate([ddp['xy4'], ddp['xy4'][::-1]])
-    ddp['xy16'] = np.concatenate([ddp['xy8'], ddp['xy8'] + np.pi])
-    ddp['knillpi'] = np.array([np.pi / 6., 0, np.pi / 2., 0, np.pi / 6.])
-    ddp['kdd4'] = np.concatenate([phasexy + ddp['knillpi'] for phasexy in ddp['xy4']])
-    ddp['kdd8'] = np.concatenate([phasexy + ddp['knillpi'] for phasexy in ddp['xy8']])
-    ddp['kdd16'] = np.concatenate([phasexy + ddp['knillpi'] for phasexy in ddp['xy16']])
+
+    def __init__(self):
+        super(pd, self).__init__(self)
+        self.ddp = dict()
+        self.ddp['fid'] = np.array([])
+        self.ddp['hahn'] = np.array([0.0])
+        self.ddp['xy4'] = np.array([0.0, np.pi / 2., 0.0, np.pi / 2.])
+        self.ddp['xy8'] = np.concatenate([self.ddp['xy4'], self.ddp['xy4'][::-1]])
+        self.ddp['xy16'] = np.concatenate([self.ddp['xy8'], self.ddp['xy8'] + np.pi])
+        self.ddp['knillpi'] = np.array([np.pi / 6., 0, np.pi / 2., 0, np.pi / 6.])
+        self.ddp['kdd4'] = np.concatenate([phasexy + self.ddp['knillpi'] for phasexy in self.ddp['xy4']])
+        self.ddp['kdd8'] = np.concatenate([phasexy + self.ddp['knillpi'] for phasexy in self.ddp['xy8']])
+        self.ddp['kdd16'] = np.concatenate([phasexy + self.ddp['knillpi'] for phasexy in self.ddp['xy16']])
+
 
     def __getitem__(self, i):
         if type(i) is not str:

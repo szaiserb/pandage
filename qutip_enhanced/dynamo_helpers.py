@@ -4,7 +4,7 @@ from imp import reload
 __metaclass__ = type
 
 from qutip_enhanced import *
-import os
+import os, sys
 import shutil
 import matlab.engine
 import itertools
@@ -12,10 +12,14 @@ import datetime
 import time
 from . import temporary_GRAPE_Philipp_misc as misc
 import threading
+import numpy as np
 
-import StringIO
+if sys.version_info.major == 2:
+    from StringIO import StringIO
+else:
+    from io import StringIO
 
-class DynPython(object):
+class DynPython:
 
     def __init__(self, dynamo_path, initial, final, add_slices=None, dims=None, sample_frequency=12e3, use_engine=None, print_flag=True):
         self.add_slices = add_slices
@@ -23,8 +27,8 @@ class DynPython(object):
         self.eng = self.get_eng(use_engine=use_engine)
         self.sample_frequency = sample_frequency
         self.dynamo_path = dynamo_path
-        self.out = StringIO.StringIO()
-        self.err = StringIO.StringIO()
+        self.out = StringIO()
+        self.err = StringIO()
         self.already_printed = ''
         self.initial = initial
         self.final = final
@@ -42,7 +46,7 @@ class DynPython(object):
         mdp = [float(i[3:]) for i in m if 'dpe' in i]
         il = itertools.count()
         while True:
-            n = il.next()
+            n = next(il)
             if not n in mdp:
                 break
         name = "dpe{}".format(n) if use_engine is None else use_engine
@@ -163,14 +167,14 @@ class DynPython(object):
                     if abort is not None and abort.is_set(): break
                     if kill is not None and kill.is_set(): break
                     self.eng.search(self.dyn, mask, options, stdout=self.out, stderr=self.err, nargout=0)
-                    frob_norm = sqrt(2 * self.eng.compute_error(self.dyn) * self.eng.eval("dyn.system.norm2"))
+                    frob_norm = np.sqrt(2 * self.eng.compute_error(self.dyn) * self.eng.eval("dyn.system.norm2"))
                     print("Current Frobenius norm: {}".format(frob_norm))
                     if self.eng.eval('dyn.stats{end}.term_reason') != "Wall time limit reached":
                         break
                     if stop_too_bad_list is not None:
                         for i in stop_too_bad_list:
                             if time.time() - t0 > i[0] and  frob_norm > i[1]:
-                                print("Final Frobenius norm: {}".format(sqrt(2 * self.eng.compute_error(self.dyn) * self.eng.eval("dyn.system.norm2"))))
+                                print("Final Frobenius norm: {}".format(np.sqrt(2 * self.eng.compute_error(self.dyn) * self.eng.eval("dyn.system.norm2"))))
                                 break
         t = threading.Thread(target=run)
         t.start()
