@@ -1,10 +1,21 @@
 # coding=utf-8
 from __future__ import print_function, absolute_import, unicode_literals, division
-from imp import reload
+
 __metaclass__ = type
 
+import sys, os
+if sys.version_info.major == 2:
+    from imp import reload
+    from Queue import Queue
+    from StringIO import StringIO
+else:
+    from importlib import reload
+    from queue import Queue
+    from io import StringIO
+
+import matlab.engine
+
 from qutip_enhanced import *
-import os, sys
 import shutil
 import matlab.engine
 import itertools
@@ -12,11 +23,6 @@ import datetime
 import time
 from . import temporary_GRAPE_Philipp_misc as misc
 import threading
-
-if sys.version_info.major == 2:
-    from StringIO import StringIO
-else:
-    from io import StringIO
 
 class DynPython:
 
@@ -154,7 +160,7 @@ class DynPython:
     def open_ui(self):
         self.eng.ui_open(self.dyn, nargout=0)
 
-    def search_thread(self, mask, options=None, dt=10, stop_too_bad_fun=None, abort=None, kill=None):
+    def search_thread(self, mask, options=None, dt=2., stop_too_bad_fun=None, abort=None, kill=None):
         options = {} if options is None else options
         mask = matlab.logical(mask.tolist())
         def run():
@@ -166,19 +172,18 @@ class DynPython:
                     if abort is not None and abort.is_set(): break
                     if kill is not None and kill.is_set(): break
                     self.eng.search(self.dyn, mask, options, stdout=self.out, stderr=self.err, nargout=0)
-                    frob_norm = sqrt(2 * self.eng.compute_error(self.dyn) * self.eng.eval("dyn.system.norm2"))
-                    if self.eng.eval('dyn.stats{end}.term_reason') != "Wall time limit reached":
-                        break
+                    frob_norm = np.sqrt(2 * self.eng.compute_error(self.dyn) * self.eng.eval("dyn.system.norm2"))
+                    print(self.eng.eval('dyn.stats{end}.term_reason') )
                     elapsed_time = time.time() - t0
-                    if stop_too_bad_fun is not None and elapsed_time > 60:
+                    if stop_too_bad_fun is not None and elapsed_time > 120:
                         if frob_norm > stop_too_bad_fun(elapsed_time):
                             s1 = 'Final'
                         else:
                             s1 = 'Current'
                     else:
                         s1 = 'Current'
-                    print("{} Frobenius norm: {} ({})".format(s1, frob_norm, stop_too_bad_fun(elapsed_time)))
-                    if s1 == 'Final': break
+                    print("{} Frobenius norm: {} ({}), t={}s".format(s1, frob_norm, stop_too_bad_fun(elapsed_time), elapsed_time))
+                    if s1 == 'Final' or self.eng.eval('dyn.stats{end}.term_reason') != "Wall time limit reached": break
         t = threading.Thread(target=run)
         t.start()
         return t

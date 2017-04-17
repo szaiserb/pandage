@@ -87,7 +87,6 @@ class CosineMultiDetModel(lmfit.Model):
 if __name__ == '__main__':
     fp = "D:\data/NuclearOPs\CNOT_KDD\cnot_kdd/20170411-h13m43s31_cnot_kdd/20170411-h14m04s25_kdd_data.hdf"
 
-
     import matplotlib.pyplot as plt
     import pandas as pd
     import numpy as np
