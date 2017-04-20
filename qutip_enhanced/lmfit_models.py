@@ -29,6 +29,9 @@ class CosineNoOffsetNoDecayModel(lmfit.Model):
             x0 = 0
             return a, T, x0
         amplitude, T, x0 = CosineNoOffsetNoDecayEstimator(y=data, x=x)
+        if amplitude < 0:
+            amplitude *= -1
+            x0 = ((x0 / T + 0.5) % 1) * T
         return lmfit.models.update_param_vals(self.make_params(amplitude=amplitude, T=T, x0=x0), self.prefix, **kwargs)
 
 class CosineNoDecayModel(lmfit.Model):
@@ -43,7 +46,6 @@ class CosineNoDecayModel(lmfit.Model):
         y_temp = data - c
         m = CosineNoOffsetNoDecayModel()
         p = m.fit(y_temp, m.guess(data=y_temp, x=x), x=x).result.params
-        print(p)
         if p['amplitude'] < 0:
             p['amplitude'].value *= -1
             p['x0'].value = ((p['x0'] / p['T'] + 0.5) % 1) * p['T']
@@ -60,6 +62,9 @@ class CosineModel(lmfit.Model):
 
     def guess(self, data, x=None, **kwargs):
         p = CosineNoDecayModel().guess(data, x=x)
+        if p['amplitude'] < 0:
+            p['amplitude'].value *= -1
+            p['x0'].value = ((p['x0'] / p['T'] + 0.5) % 1) * p['T']
         return lmfit.models.update_param_vals(self.make_params(amplitude=p['amplitude'].value, T=p['T'].value, x0=p['x0'].value, c=p['c'].value, t2=10 * max(x)), self.prefix, **kwargs)
 
 
@@ -86,7 +91,6 @@ class CosineMultiDetModel(lmfit.Model):
 
 if __name__ == '__main__':
     fp = "D:\data/NuclearOPs\CNOT_KDD\cnot_kdd/20170411-h13m43s31_cnot_kdd/20170411-h14m04s25_kdd_data.hdf"
-
 
     import matplotlib.pyplot as plt
     import pandas as pd

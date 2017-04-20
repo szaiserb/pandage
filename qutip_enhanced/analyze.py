@@ -16,13 +16,16 @@ def purity(dm):
 def test_states(gate, pure=False, **kwargs):
     dims = gate.dims[0]
     out = {}
-    x = basis(2, 0) + basis(2, 1)
-    xm = basis(2, 0) - basis(2, 1)
-    y = basis(2, 0) + 1j * basis(2, 1)
-    ym = basis(2, 0) - 1j * basis(2, 1)
-    z = basis(2, 0)
-    zm = basis(2, 1)
-    test_states_single = dict([(name, locals()[name]) for name in ['x', 'xm', 'y', 'ym', 'z', 'zm']])
+    test_states_single=dict(
+        x=basis(2, 0) + basis(2, 1),
+        xm=basis(2, 0) - basis(2, 1),
+        y=basis(2, 0) + 1j * basis(2, 1),
+        ym=basis(2, 0) - 1j * basis(2, 1),
+        z=basis(2, 0),
+        zm=basis(2, 1),
+    )
+
+    # test_states_single = dict([(name, locals()[name]) for name in ['x', 'xm', 'y', 'ym', 'z', 'zm']])
     if 'names_multi_list' in kwargs:
         names_multi_list = kwargs.get('names_multi_list')
     else:

@@ -1,14 +1,12 @@
 # coding=utf-8
 from __future__ import print_function, absolute_import, unicode_literals, division
-from imp import reload
 __metaclass__ = type
 
 import numpy as np
 from scipy.constants import *
 np.set_printoptions(suppress=True, linewidth=500, threshold=np.nan)
 
-from . import coordinates
-from qutip_enhanced import *
+from qutip_enhanced.qutip_enhanced import *
 
 class NVHam(object):
     """
@@ -183,10 +181,10 @@ class NVHam(object):
         """
         loc_cart = coordinates.Coord().coord_unit(location, 'cart')
         rho = coordinates.Coord().coord(location, 'sph')['rho']
-        x, y, z = [loc_cart[fi] for i in ['x', 'y', 'z']]
+        x, y, z = [loc_cart[i] for i in ['x', 'y', 'z']]
         prefactor = mu_0 / (4.0 * pi) * h * self.gamma['e'] * 1e6 * self.gamma['13c'] * 1e6 / rho ** 3  # given in Hertz
         prefactor_mhz = prefactor * 1e-6  # given in MHz
-        mat = numpy.matrix([[1 - 3 * x * x, -3 * x * y, -3 * x * z],
+        mat = np.matrix([[1 - 3 * x * x, -3 * x * y, -3 * x * z],
                             [-3 * x * y, 1 - 3 * y * y, -3 * y * z],
                             [-3 * x * z, -3 * y * z, 1 - 3 * z * z]])
         return prefactor_mhz * mat
@@ -252,11 +250,12 @@ if __name__ == '__main__':
 
     e = Eigenvector(dims=[2,3])
     B_list = np.linspace(0.1, 0.105, 50)
-    for i in B_list:
-        h_nv = NVHam(magnet_field={'z': i}, n_type='14n', nitrogen_levels=[0, 1, 2], electron_levels=[1, 2]).h_nv
-        e.sort(h_nv.eigenstates()[1], h_nv.eigenenergies())
-    import matplotlib.pyplot as plt
-    plt.plot(B_list, e.evals_sorted_list)
+    h_nv = NVHam(magnet_field={'z': 0.0}, n_type='14n', nitrogen_levels=[0, 1, 2], electron_levels=[1, 2])
+    # for i in B_list:
+    #     h_nv = NVHam(magnet_field={'z': i}, n_type='14n', nitrogen_levels=[0, 1, 2], electron_levels=[1, 2]).h_nv
+    #     e.sort(h_nv.eigenstates()[1], h_nv.eigenenergies())
+    # import matplotlib.pyplot as plt
+    # plt.plot(B_list, e.evals_sorted_list)
 
     # def h_nv_rotating_frame(self, rotation_operator):
     #     U = (1j * rotation_operator * 2 * pi * t).expm()
