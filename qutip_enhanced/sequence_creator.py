@@ -1,5 +1,5 @@
 # coding=utf-8
-from __future__ import print_function, absolute_import, unicode_literals, division
+from __future__ import print_function, absolute_import, division
 from imp import reload
 __metaclass__ = type
 
@@ -28,7 +28,7 @@ class pd(dict):
 
     def __getitem__(self, i):
         if type(i) is not str:
-            raise Exception('Error')
+            raise Exception('Error:{}, {}'.format(type(i), i))
         ii = i.split("_")
         bs = ii[-1]
         if 'cpmg' in bs:
