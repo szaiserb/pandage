@@ -5,12 +5,8 @@ __metaclass__ = type
 
 import sys, os
 if sys.version_info.major == 2:
-    from imp import reload
-    from Queue import Queue
     from StringIO import StringIO
 else:
-    from importlib import reload
-    from queue import Queue
     from io import StringIO
 
 import matlab.engine
@@ -204,9 +200,6 @@ class DynPython:
         return out
 
     def times(self, n):
-        """
-        :param sample_frequency: in MHz
-        """
         return self.times_fields_mhz[list(self.export_mask_rows(n)), 0]
 
     @property
