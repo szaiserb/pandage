@@ -22,8 +22,7 @@ import threading
 
 class DynPython:
 
-    def __init__(self, dynamo_path, initial, final, add_slices=None, dims=None, sample_frequency=12e3, use_engine=None, print_flag=True):
-        self.add_slices = add_slices
+    def __init__(self, dynamo_path, initial, final, dims=None, sample_frequency=12e3, use_engine=None, print_flag=True):
         self.dims = dims
         self.eng = self.get_eng(use_engine=use_engine)
         self.sample_frequency = sample_frequency
@@ -58,10 +57,12 @@ class DynPython:
 
     @property
     def fields_names_list(self):
-        if hasattr(self, '_fields_names'):
-            return self._fields_names
-        else:
-            return ["{}".format(i) for i in range(len(self.export_mask_list))]
+        field_names_list = self._fields_names if hasattr(self, '_fields_names') else ["{}".format(i) for i in range(len(self.export_mask_list))]
+        return field_names_list
+        # if hasattr(self, '_fields_names'):
+        #     return self._fields_names
+        # else:
+        #     return ["{}".format(i) for i in range(len(self.export_mask_list))]
 
     @property
     def dims(self):
@@ -69,10 +70,9 @@ class DynPython:
 
     @dims.setter
     def dims(self, val):
-        if type(val) is list or (type(val) is np.ndarray and len(val.shape) == 1):
-            self._dims = val
-        else:
+        if not(type(val) is list or (type(val) is np.ndarray and len(val.shape) == 1)):
             raise Exception("Error: {}".format(val))
+        self._dims = val
 
     @fields_names_list.setter
     def fields_names_list(self, val):
@@ -105,15 +105,12 @@ class DynPython:
 
     @export_mask_list.setter
     def export_mask_list(self, val):
-        columns = self.get_mask().shape[1] - 1 # last column of the optimize mask are timeslices
-        if val is None:
-            pass
-        if type(val) is list:
-            for i, v in enumerate(val):
-                if v.shape != (self.n_bins, columns):
-                    raise Exception('Error: i: {}, v.shape: {}, bins: {}, columns: {}'.format(i, v.shape, self.n_bins, columns))
-        else:
+        if type(val) is not list:
             raise Exception('Error, {}'.format(val))
+        columns = self.get_mask().shape[1] - 1 # last column of the optimize mask are timeslices
+        for i, v in enumerate(val):
+            if v.shape != (self.n_bins, columns):
+                raise Exception('Error: i: {}, v.shape: {}, bins: {}, columns: {}'.format(i, v.shape, self.n_bins, columns))
         self._export_mask_list = val
 
     @property
@@ -139,14 +136,14 @@ class DynPython:
     def set_labels(self, title, c_labels):
         self.eng.eval(str("dyn.system.set_labels('{}', {}, {{{}}})").format(title, self.dims, ", ".join("'{}'".format(i) for i in c_labels)), stdout=self.out, stderr=self.err, nargout=0)
 
-    def get_mask(self, optimize_times=None):
-        if optimize_times is None:
-            return np.array(self.eng.eval("dyn.opt.control_mask"))
-        else:
-            return np.array(self.eng.full_mask(self.dyn, int(optimize_times)))
+    def get_mask(self, optimize_times=False):
+        # if optimize_times is None:
+        #     return np.array(self.eng.eval("dyn.opt.control_mask"))
+        # else:
+        return np.array(self.eng.full_mask(self.dyn, int(optimize_times)))
 
-    def seq_init(self, n_bins, add_slices, TL, control_type, control_par):
-        self.eng.seq_init(self.dyn, float(n_bins + add_slices), TL, control_type, control_par, stdout=self.out, stderr=self.err, nargout=0)
+    def seq_init(self, n_bins, TL, control_type, control_par):
+        self.eng.seq_init(self.dyn, n_bins, TL, control_type, control_par, stdout=self.out, stderr=self.err, nargout=0)
         self.print_out()
 
     def set_controls(self, fields):
@@ -156,7 +153,7 @@ class DynPython:
     def open_ui(self):
         self.eng.ui_open(self.dyn, nargout=0)
 
-    def search_thread(self, mask, options=None, dt=2., stop_too_bad_fun=None, abort=None, kill=None):
+    def search_thread(self, mask, options=None, dt=2., dt_walltime=120., stop_too_bad_fun=None, abort=None, kill=None):
         options = {} if options is None else options
         mask = matlab.logical(mask.tolist())
         def run():
@@ -171,7 +168,7 @@ class DynPython:
                     frob_norm = np.sqrt(2 * self.eng.compute_error(self.dyn) * self.eng.eval("dyn.system.norm2"))
                     print(self.eng.eval('dyn.stats{end}.term_reason') )
                     elapsed_time = time.time() - t0
-                    if stop_too_bad_fun is not None and elapsed_time > 120:
+                    if stop_too_bad_fun is not None and elapsed_time > dt_walltime:
                         if frob_norm > stop_too_bad_fun(elapsed_time):
                             s1 = 'Final'
                         else:
@@ -191,7 +188,7 @@ class DynPython:
 
     @property
     def n_bins(self):
-        return len(self.get_mask()) - self.add_slices
+        return len(self.get_mask())
 
     @property
     def times_fields_mhz(self):
@@ -206,10 +203,6 @@ class DynPython:
     def times_bins(self):
         return self.times_fields_mhz[:self.n_bins, 0]
 
-    @property
-    def times_add_slices(self):
-        return self.times_fields_mhz[self.n_bins:, 0]
-
     def fields_xy_mhz(self, n):
         out = self.times_fields_mhz[list(self.export_mask_rows(n)), 1:][:, ~np.all(self.export_mask_list[n]==0, axis=0)]
         if out.shape[1] == 1:
@@ -219,17 +212,17 @@ class DynPython:
     def fields_aphi_mhz(self, n):
         return misc.xy2aphi(self.fields_xy_mhz(n))
 
-    @property
-    def fields_add_slices_mhz(self):
-        out = self.times_fields_mhz[self.n_bins:, -self.add_slices:]
-        if self.add_slices > 1:
-            out = np.diag(out)
-        return out
-
-    @property
-    def add_slices_angles(self):
-        if self.add_slices > 0:
-            return (2 * np.pi * self.times_add_slices*self.fields_add_slices_mhz) % (2 * np.pi)
+    # @property
+    # def fields_add_slices_mhz(self):
+    #     out = self.times_fields_mhz[self.n_bins:, -self.add_slices:]
+    #     if self.add_slices > 1:
+    #         out = np.diag(out)
+    #     return out
+    #
+    # @property
+    # def add_slices_angles(self):
+    #     if self.add_slices > 0:
+    #         return (2 * np.pi * self.times_add_slices*self.fields_add_slices_mhz) % (2 * np.pi)
 
     def X(self, n_ens, include_initial=True, include_final=True):
         out = []
@@ -240,7 +233,7 @@ class DynPython:
                 if out[-1][-1].isket:
                     out[-1][-1] = ket2dm(out[-1][-1])
                 out[-1][-1].dims = [self.dims, self.dims]
-            for j in range(1, self.n_bins + self.add_slices + 1):
+            for j in range(1, self.n_bins + 1):
                 out[-1].append(Qobj(np.array(self.eng.eval('dyn.X({}, {})'.format(j, i)))))
                 if out[-1][-1].isket:
                     out[-1][-1] = ket2dm(out[-1][-1])
@@ -266,10 +259,11 @@ class DynPython:
         np.savetxt(path, np.around(taphi, 9), fmt=str('%+1.9e'))
 
     def save_add_slices_angles(self, path):
-        asa = self.add_slices_angles
-        if asa is not None:
-            np.savetxt(path, asa, fmt=str('%+1.4e'))
-        print("add_slices_angles saved.")
+        pass
+        # asa = self.add_slices_angles
+        # if asa is not None:
+        #     np.savetxt(path, asa, fmt=str('%+1.4e'))
+        # print("add_slices_angles saved.")
 
     def round2float(self, arr, val):
         return np.around(arr/val) * val
@@ -279,7 +273,7 @@ class DynPython:
         for n, name in enumerate(self.fields_names_list):
             self.save_times_fields_aphi(n=n, path="{}\\{}.dat".format(base_path, name))
             print("Fields {} saved.".format(name))
-        self.save_add_slices_angles(path="{}\\add_slices_angles.dat".format(base_path))
+        # self.save_add_slices_angles(path="{}\\add_slices_angles.dat".format(base_path))
 
     def save_export_mask(self, path):
         ems = sum(self.export_mask_list)
@@ -331,7 +325,7 @@ class DynPython:
 
     def save_gates(self, path):
 
-        gates = [Qobj(np.array(self.eng.eval('dyn.X({}, 1)'.format(i))), dims=[self.dims]*2) for i in range(1, self.n_bins + self.add_slices + 1)]
+        gates = [Qobj(np.array(self.eng.eval('dyn.X({}, 1)'.format(i))), dims=[self.dims]*2) for i in range(1, self.n_bins + 1)]
         qsave(gates, path)
         print("gates saved as *.qu -file.")
 
