@@ -1,5 +1,5 @@
 # coding=utf-8
-from __future__ import print_function, absolute_import, division
+from __future__ import print_function, division
 from imp import reload
 __metaclass__ = type
 
