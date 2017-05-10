@@ -252,10 +252,9 @@ class RabiGaussian(Rabi):
 class DDAlpha(Arbitrary):
     def __init__(self, pi_phases=None, spt=None,
                  wait=None, target_t_rf=None, rabi_period=None,
-                 target_Azz=None, omega=None, rf_frequency=None,
+                 target_Azz=None, omega=None,
                  time_digitization=None):
         self.time_digitization = time_digitization
-        self.rf_frequency = rf_frequency
         self.pi_phases = pi_phases
         self.spt = spt
         self.wait = wait
@@ -340,8 +339,6 @@ class DDAlpha(Arbitrary):
 
     def tau(self):
         out = self.target_t_rf / (2 * self.n_pi * self.spt)
-        if self.rf_frequency is not None:
-            out = np.around(out * float(self.rf_frequency)) / float(self.rf_frequency)
         if self.time_digitization is not None:
             out = np.around(out / float(self.time_digitization)) * float(self.time_digitization)
         return out
