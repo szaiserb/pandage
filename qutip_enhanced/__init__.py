@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Qt5Agg')
 from .qutip_enhanced import *
 
 from . import analyze
