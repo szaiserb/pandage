@@ -1,21 +1,26 @@
 # coding=utf-8
 from __future__ import print_function, absolute_import, division
-from imp import reload
 __metaclass__ = type
 
-
-import numpy as np
-import lmfit
 import lmfit.models
+import lmfit.lineshapes
 import itertools
 
 
+def cosine_no_decay_no_offset(x, amplitude, T, x0):
+    return amplitude * np.cos(2 * np.pi * (x - x0) / float(T))
+
+def cosine_no_decay(x, amplitude, T, x0, c):
+    return cosine_no_decay_no_offset(x, amplitude, T, x0) + c
+
+def cosine(x, amplitude, T, x0, c, t2):
+    return cosine_no_decay_no_offset(x, amplitude, T, x0) * np.exp(-(x - x0) / t2) + c
+
 class CosineNoOffsetNoDecayModel(lmfit.Model):
     def __init__(self, *args, **kwargs):
-        def cosine(x, amplitude, T, x0):
-            return amplitude * np.cos(2 * np.pi * (x - x0) / float(T))
 
-        super(CosineNoOffsetNoDecayModel, self).__init__(cosine, *args, **kwargs)
+
+        super(CosineNoOffsetNoDecayModel, self).__init__(cosine_no_decay_no_offset, *args, **kwargs)
 
     def guess(self, data, x=None, **kwargs):
         def CosineNoOffsetNoDecayEstimator(y=None, x=None):
@@ -36,10 +41,7 @@ class CosineNoOffsetNoDecayModel(lmfit.Model):
 
 class CosineNoDecayModel(lmfit.Model):
     def __init__(self, *args, **kwargs):
-        def cosine(x, amplitude, T, x0, c):
-            return amplitude * np.cos(2 * np.pi * (x - x0) / float(T)) + c
-
-        super(CosineNoDecayModel, self).__init__(cosine, *args, **kwargs)
+        super(CosineNoDecayModel, self).__init__(cosine_no_decay, *args, **kwargs)
 
     def guess(self, data, x=None, **kwargs):
         c = data.mean()
@@ -54,10 +56,6 @@ class CosineNoDecayModel(lmfit.Model):
 
 class CosineModel(lmfit.Model):
     def __init__(self, *args, **kwargs):
-
-        def cosine(x, amplitude, T, x0, c, t2):
-            return amplitude * np.cos(2 * np.pi * (x - x0) / float(T)) * np.exp(-(x - x0) / t2) + c
-
         super(CosineModel, self).__init__(cosine, *args, **kwargs)
 
     def guess(self, data, x=None, **kwargs):

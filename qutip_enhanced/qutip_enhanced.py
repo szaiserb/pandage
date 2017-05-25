@@ -331,7 +331,7 @@ if __name__ == '__main__':
     rotx = get_rot_operator_all_spins(dims = [2, 2], rotation_axis={'y': 1}, rotated_spin=1, angle=np.pi/2.)
     print(rotx*cphase0*cphase1*rotx.dag())
 
-a = np.array([[ 0.-1.j,  0.+0.j,  0.+0.j,  0.+0.j],
-              [ 0.+0.j,  0.-1.j,  0.+0.j , 0.+0.j],
-              [ 0.+0.j,  0.+0.j , 0.+1.j,  0.+0.j],
-              [ 0.+0.,  0.+0.j , 0.+0.j,  0.+1.j]])
+    a = np.array([[ 0.-1.j,  0.+0.j,  0.+0.j,  0.+0.j],
+                  [ 0.+0.j,  0.-1.j,  0.+0.j , 0.+0.j],
+                  [ 0.+0.j,  0.+0.j , 0.+1.j,  0.+0.j],
+                  [ 0.+0.,  0.+0.j , 0.+0.j,  0.+1.j]])

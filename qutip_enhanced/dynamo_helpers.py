@@ -17,7 +17,7 @@ import matlab.engine
 import itertools
 import datetime
 import time
-from . import temporary_GRAPE_Philipp_misc as misc
+from . import misc
 import threading
 
 class DynPython:
@@ -92,6 +92,7 @@ class DynPython:
         self.eng.addpath(self.eng.genpath(self.dynamo_path))
         initial = matlab.double(self.initial.data.todense().tolist(), is_complex=True)
         final = matlab.double(self.final.data.todense().tolist(), is_complex=True)
+        weight = matlab.double(weight.tolist())
         self._dyn = self.eng.dynamo(task, initial, final, H_drift_list, H_ctrl_list, weight, stdout=self.out, stderr=self.err)
         self.eng.workspace[str("dyn")] = self._dyn
         self.print_out()
@@ -209,8 +210,13 @@ class DynPython:
             out = np.column_stack([out, 0*out])
         return out
 
+    def xy2aphi(xy):
+        norm = np.array([np.linalg.norm(xy, axis=1)]).transpose()
+        phi = np.arctan2(xy[:, 1:2], xy[:, 0:1])
+        return np.concatenate([norm, phi], axis=1)
+
     def fields_aphi_mhz(self, n):
-        return misc.xy2aphi(self.fields_xy_mhz(n))
+        return self.xy2aphi(self.fields_xy_mhz(n))
 
     # @property
     # def fields_add_slices_mhz(self):

@@ -6,7 +6,7 @@ import numpy as np
 import numbers
 from . import coordinates
 import itertools
-from . import lmfit_models
+import lmfit.lineshapes
 
 
 class pd(dict):
@@ -247,7 +247,7 @@ class RabiGaussian(Rabi):
         self._gaussian_parameters = val
 
     def omega_list(self):
-        return lmfit_models.gaussian(self.times_center(self.control_field), **self.gaussian_parameters)
+        return lmfit.lineshapes.gaussian(self.times_center(self.control_field), **self.gaussian_parameters)
 
 class DDAlpha(Arbitrary):
     def __init__(self, pi_phases=None, spt=None,
