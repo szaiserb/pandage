@@ -122,7 +122,8 @@ class DynPython:
             for j, em in enumerate(self.export_mask_list):
                 if np.any(em[i]):
                     step.append(self.fields_names_list[j])
-            seq.append(step)
+            if len(step) > 0:
+                seq.append(step)
         return seq
 
     def export_mask_columns(self, n):
@@ -210,7 +211,7 @@ class DynPython:
             out = np.column_stack([out, 0*out])
         return out
 
-    def xy2aphi(xy):
+    def xy2aphi(self, xy):
         norm = np.array([np.linalg.norm(xy, axis=1)]).transpose()
         phi = np.arctan2(xy[:, 1:2], xy[:, 0:1])
         return np.concatenate([norm, phi], axis=1)
