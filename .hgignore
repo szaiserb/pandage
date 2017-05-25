@@ -12,6 +12,7 @@ tmp_trash/**
 *.orig
 *.egg-info
 *.pot
+*-checkpoint.ipynb
 *.py[co]
 __pycache__
 MANIFEST
