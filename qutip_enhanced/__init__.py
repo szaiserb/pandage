@@ -8,5 +8,4 @@ from . import lmfit_models
 from . import nv_hamilton
 from . import sequence_creator
 from . import sequence_creator as sc
-from . import misc
 from . import dynamo_helpers
