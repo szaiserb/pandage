@@ -19,13 +19,6 @@ import datetime
 import time
 import threading
 
-# coding=utf-8
-from __future__ import print_function, absolute_import, division
-
-__metaclass__ = type
-
-import numpy as np
-import itertools
 import lmfit.lineshapes
 from .qutip_enhanced import *
 
