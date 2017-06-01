@@ -130,10 +130,10 @@ class DDParameters:
 
 class Arbitrary:
     def locations(self, name):
-        return [i for i, val in enumerate(self.sequence) if val == name]
+        return [i for i, val in enumerate(self.sequence) if name in val]
 
     def l_active(self, name):
-        return [True if val == name else False for val in self.sequence]
+        return [True if name in val else False for val in self.sequence]
 
     @property
     def n_bins(self):
@@ -163,6 +163,10 @@ class Arbitrary:
         else:
             return fields
 
+    # def load(self, path):
+    #
+
+
     def split(self, locations, n):
         self._times_full =  np.array(list(itertools.chain(*[[t/n] * n if idx in locations else [t] for idx, t in enumerate(self.times_full)])))
         self._fields_full = np.repeat(self.fields_full, [n if i in locations else 1 for i in range(self.n_bins)], axis=0)
@@ -183,7 +187,7 @@ class Wait(Arbitrary):
 
     @property
     def sequence(self):
-        return getattr(self, '_sequence', ['wait'] * self.n_bins_wait)
+        return getattr(self, '_sequence', [['wait']] * self.n_bins_wait)
 
     @property
     def fields_full(self):
@@ -208,7 +212,7 @@ class Rabi(Arbitrary):
 
     @property
     def sequence(self):
-        return getattr(self, '_sequence', [self.control_field] * self.n_bins_rabi)
+        return getattr(self, '_sequence', [[self.control_field]] * self.n_bins_rabi)
 
     def omega_list(self):
         return np.ones([self.n_bins_rabi]) * self.omega
@@ -293,8 +297,8 @@ class DDAlpha(Arbitrary):
 
     @property
     def sequence(self):
-        wait = ['wait'] if self.wait is not None else []
-        base = ['rf'] * self.spt + wait + ['mw'] + wait + ['rf'] * self.spt
+        wait = [['wait']] if self.wait is not None else []
+        base = [['rf']] * self.spt + wait + [['mw']] + wait + [['rf']] * self.spt
         return getattr(self, '_sequence', list(itertools.chain(*[base for i in range(self.n_pi)])))
 
     def alpha(self, n):
@@ -366,8 +370,9 @@ class DD(Arbitrary):
         if self.number_of_pi_pulses == 0:
             out = ['wait'] + ['wait']
         else:
-            out = np.insert(['wait'] * self.n_tau, range(1, self.n_tau), [['mw'] * self.number_of_pi_pulses])
-        getattr(self, '_sequence', out)
+            out = list(np.insert(['wait'] * self.n_tau, range(1, self.n_tau), [['mw'] * self.number_of_pi_pulses]))
+
+        return getattr(self, '_sequence', [[i] for i in out])
 
     def mw_array_xy(self):
         rho, azim = tuple(np.hsplit(self.mw_array_aphi(), 2))
@@ -479,7 +484,7 @@ class Z(Arbitrary):
         self.column_dict = dict([("z{}".format(i), [i]) for i in range(len(fields_l))])
         self.controls = list(self.column_dict.keys())
         self.n_columns = len(self.column_dict)
-        self.sequence = getattr(self, '_sequence', self.controls)
+        self.sequence = getattr(self, '_sequence', [[i] for i in self.controls])
         self.fields_full = getattr(self, '_fields_full', np.diag(fields_l))
         self.times_full = getattr(self, '_times_full', np.array(times_l))
 
