@@ -140,7 +140,10 @@ class Arbitrary:
 
     @property
     def n_columns(self):
-        return int(np.sum([len(i) for i in self.column_dict.keys()]))
+        """
+        n_columns != n_controls, as e.g. 'mw' might have 'x' and 'y' control
+        """
+        return int(np.sum([len(i) for i in self.column_dict.values()]))
 
     def locations(self, name):
         return [i for i, val in enumerate(self.sequence) if name in val]
@@ -176,18 +179,23 @@ class Arbitrary:
         else:
             return fields
 
-    # def fields_aphi_mhz(self, name=None):
-    #     l = []
-    #     for k in self.columns:
-    #         if
-    #     if name is None:
-    #         pass
-    #     else:
-    #         if len(self.column_dict) == 1:
-    #
-    #
-    #
-    #     return self.xy2aphi(self.fields_xy_mhz(n))
+    def xy2aphi(self, xy):
+        norm = np.array([np.linalg.norm(xy, axis=1)]).transpose()
+        phi = np.arctan2(xy[:, 1:2], xy[:, 0:1])
+        return np.concatenate([norm, phi], axis=1)
+
+    def fields_aphi_mhz(self, name=None):
+        l = []
+        for k, v in self.column_dict.items():
+            if name is None or k == name:
+                l.append(self.fields_full[:, self.column_dict[k]])
+                if len(v) == 2:
+                    l[-1] = self.xy2aphi(l[-1])
+
+        out = np.concatenate(l, axis=1)
+        if name is not None:
+            out = out[self.locations(name)]
+        return out
 
     def split(self, locations, n):
         self._times_full =  np.array(list(itertools.chain(*[[t/n] * n if idx in locations else [t] for idx, t in enumerate(self.times_full)])))
@@ -431,11 +439,11 @@ class DDAlpha(Arbitrary):
         idxmw = 0
         idxrf = 0
         for i, val in enumerate(self.sequence):
-            if val == 'mw':
-                out[i, self.column_dict[val]] = mw_array[idxmw]
+            if 'mw' in val:
+                out[i, self.column_dict['mw']] = mw_array[idxmw]
                 idxmw += 1
-            elif val == 'rf':
-                out[i, self.column_dict[val]] = rf_array_xy[idxrf]
+            elif 'rf' in val:
+                out[i, self.column_dict['rf']] = rf_array_xy[idxrf]
                 idxrf += 1
         return getattr(self, '_fields_full', out)
 
@@ -488,8 +496,8 @@ class DD(Arbitrary):
         mw_array = self.mw_array_xy()
         idxmw = 0
         for i, val in enumerate(self.sequence):
-            if val == 'mw':
-                out[i, self.column_dict[val]] = mw_array[idxmw]
+            if 'mw' in val:
+                out[i, self.column_dict['mw']] = mw_array[idxmw]
                 idxmw += 1
         return getattr(self, '_fields_full', out)
 
