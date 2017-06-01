@@ -225,53 +225,51 @@ class Arbitrary:
             out[k] = v
         self._control_names_dict = out
 
+    @property
+    def export_mask_dict(self):
+        return self._export_mask_dict
 
+    @export_mask_dict.setter
+    def export_mask_dict(self, val):
+        if type(val) is not collections.OrderedDict:
+            raise Exception('Error, {}, {}'.format(val, type(val)))
+        for k, v in val.items():
+            if v.shape != (self.n_bins, self.n_columns):
+                raise Exception('Error: i: {}, v.shape: {}, bins: {}, columns: {}'.format(i, v.shape, self.n_bins, self.n_columns))
+        self._export_mask_dict = val
 
+    @property
+    def export_sequence(self):
+        seq = []
+        for i in range(self.n_bins):
+            step = []
+            for k, v in self.export_mask_dict.items():
+                if np.any(v[i]):
+                    step.append(self.control_names_dict[k])
+            if len(step) > 0:
+                seq.append(step)
+        return seq
 
-    # #
-    # # export_mask_list = [dda.mask(name='rf'),
-    # #                     dda.mask(name='mw'),
-    # #                     dda.mask(name='wait')]
-    # # fields_names_list = ['RF', 'MW', 'WAIT']
-    #
-    # # @property
-    # # def fields_names_list(self):
-    # #     field_names_list = self._fields_names_list if hasattr(self, '_fields_names_list') else ["{}".format(i) for i in range(len(self.export_mask_list))]
-    # #     return field_names_list
-    # #
-    # # @fields_names_list.setter
-    # # def fields_names_list(self, val):
-    # #     self._fields_names_list = val
-    #
-    # @property
-    # def export_mask_list(self):
-    #     if not hasattr(self, '_export_mask_list') or self._export_mask_list is None:
-    #         return [self.get_mask()[:self.n_bins, :]]
-    #     else:
-    #         return self._export_mask_list
-    #
-    # @export_mask_list.setter
-    # def export_mask_list(self, val):
-    #     if type(val) is not list:
-    #         raise Exception('Error, {}'.format(val))
-    #     columns = self.get_mask().shape[1] - 1 # last column of the optimize mask are timeslices
-    #     for i, v in enumerate(val):
-    #         if v.shape != (self.n_bins, columns):
-    #             raise Exception('Error: i: {}, v.shape: {}, bins: {}, columns: {}'.format(i, v.shape, self.n_bins, columns))
-    #     self._export_mask_list = val
-    #
-    # @property
-    # def sequence(self):
-    #     seq = []
-    #     for i in range(self.n_bins):
-    #         step = []
-    #         for j, em in enumerate(self.export_mask_list):
-    #             if np.any(em[i]):
-    #                 step.append(self.fields_names_list[j])
-    #         if len(step) > 0:
-    #             seq.append(step)
-    #     return seq
-    #
+    def save_sequence_steps(self, path):
+        """
+        saves the sequence ['RF, WAIT', 'WAIT', 'MW', ..] along with the line number in the respective file
+        :param path:
+        :return:
+        """
+        fsn = np.empty((self.n_bins, len(self.export_mask_dict.keys())))
+        nl_d = dict([(v, 0) for v in self.export_mask_dict.keys()])
+        out = []
+        for i, step in enumerate(self.export_sequence):
+            osln = []
+            for k, v in self.control_names_dict.items():
+                if v in step:
+                    nl_d[k] += 1
+                    osln.append(nl_d[k])
+            fsn[i] = nl_d.values()
+            out.append([', '.join(step), ', '.join(['{:d}'.format(int(i)) for i in osln])])
+        np.savetxt(path, out, delimiter="\t", fmt=str("%s"))
+        print("Sequence_steps saved.")
+
     # def export_mask_columns(self, n):
     #     return np.where(~np.all(self.export_mask_list[n] == 0, axis=0))[0]
     #
@@ -281,17 +279,6 @@ class Arbitrary:
     #     else:
     #         return np.where(self.export_mask_list[n][:, np.where(~np.all(self.export_mask_list[n] == 0, axis=0))[0][0]])[0]
     #
-    # @property
-    # def times_fields_mhz(self):
-    #     out = np.array(self.eng.eval("dyn.export"))
-    #     out[:, 1:] *= 2 * np.pi
-    #     return out
-    #
-    # def xy2aphi(self, xy):
-    #     norm = np.array([np.linalg.norm(xy, axis=1)]).transpose()
-    #     phi = np.arctan2(xy[:, 1:2], xy[:, 0:1])
-    #     return np.concatenate([norm, phi], axis=1)
-
 class Wait(Arbitrary):
     def __init__(self, n_bins_wait, t_wait):
         self.n_bins_wait = n_bins_wait

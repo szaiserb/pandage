@@ -356,6 +356,14 @@ class DynPython:
     def fields_aphi_mhz(self, n):
         return self.xy2aphi(self.fields_xy_mhz(n))
 
+# TIMES FULL EXPORT TIME 2pi
+
+    # @property
+    # def times_fields_mhz(self):
+    #     out = np.array(self.eng.eval("dyn.export"))
+    #     out[:, 1:] *= 2 * np.pi
+    #     return out
+
     # @property
     # def fields_add_slices_mhz(self):
     #     out = self.times_fields_mhz[self.n_bins:, -self.add_slices:]
