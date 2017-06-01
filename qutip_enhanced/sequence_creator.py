@@ -163,13 +163,10 @@ class Arbitrary:
         else:
             return fields
 
-    def split(self, name, n):
-        repeats = [n if i in self.locations(name) else 1 for i in range(self.n_bins)]
-        if not (hasattr(self, '_times_full') and hasattr(self, '_fields_full')):
-            raise Exception("Error")
-        self._sequence = list(itertools.chain(*[[i] if i is not name else [i] * n for i in self._sequence]))
-        self._times_full = np.repeat(self._times_full, repeats, axis=0)
-        self._fields_full = np.repeat(self._fields_full, repeats, axis=0)
+    def split(self, locations, n):
+        self._times_full =  np.array(list(itertools.chain(*[[t/n] * n if idx in locations else [t] for idx, t in enumerate(self.times_full)])))
+        self._fields_full = np.repeat(self.fields_full, [n if i in locations else 1 for i in range(self.n_bins)], axis=0)
+        self._sequence = list(itertools.chain(*[[item] * n if idx in locations else [item] for idx, item in enumerate(self.sequence)]))
 
     def print_info(self):
         for s, t in zip(self.sequence, self.times()):
