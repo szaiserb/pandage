@@ -7,7 +7,7 @@ import numbers
 from . import coordinates
 import itertools
 import lmfit.lineshapes
-
+import collections
 
 class pd(dict):
 
@@ -129,6 +129,19 @@ class DDParameters:
         return self.tau_list - self.eff_pulse_dur_waiting_time
 
 class Arbitrary:
+
+    @property
+    def controls(self):
+        if hasattr(self, '_controls'):
+            return self._controls
+        elif type(self.column_dict) is not collections.OrderedDict:
+            raise Exception("Error: {}, {}".format(self.column_dict, type(self.column_dict)))
+        return self.column_dict.keys()
+
+    @property
+    def n_columns(self):
+        return int(np.sum([len(i) for i in self.column_dict.keys()]))
+
     def locations(self, name):
         return [i for i, val in enumerate(self.sequence) if name in val]
 
@@ -163,9 +176,18 @@ class Arbitrary:
         else:
             return fields
 
-    # def load(self, path):
+    # def fields_aphi_mhz(self, name=None):
+    #     l = []
+    #     for k in self.columns:
+    #         if
+    #     if name is None:
+    #         pass
+    #     else:
+    #         if len(self.column_dict) == 1:
     #
-
+    #
+    #
+    #     return self.xy2aphi(self.fields_xy_mhz(n))
 
     def split(self, locations, n):
         self._times_full =  np.array(list(itertools.chain(*[[t/n] * n if idx in locations else [t] for idx, t in enumerate(self.times_full)])))
@@ -176,14 +198,98 @@ class Arbitrary:
         for s, t in zip(self.sequence, self.times()):
             print(s, t)
 
+    def save_times_fields_mhz(self, path):
+        np.savetxt(path, np.around(np.concatenate([self.times_full.reshape(-1,1), self.fields_full], axis=1), 9), fmt=str('%+1.9e'))
+
+    @property
+    def control_names_dict(self):
+        return getattr(self, '_control_names_dict', collections.OrderedDict([(cn, cn) for cn in self.controls]))
+
+    @control_names_dict.setter
+    def control_names_dict(self, val):
+        """
+        NOTE: Not all controls have to be given, if e.g. only 'mw' should be renamed to 'MW' then val = {'mw': 'MW'} is allowed
+        """
+        out = self.control_names_dict
+        for k, v  in val.items():
+            if k not in self.controls:
+                raise Exception("Error: {}, {}, {}, {}".format(val, self.control_names_dict), k, v)
+            out[k] = v
+        self._control_names_dict = out
+
+
+
+
+    # #
+    # # export_mask_list = [dda.mask(name='rf'),
+    # #                     dda.mask(name='mw'),
+    # #                     dda.mask(name='wait')]
+    # # fields_names_list = ['RF', 'MW', 'WAIT']
+    #
+    # # @property
+    # # def fields_names_list(self):
+    # #     field_names_list = self._fields_names_list if hasattr(self, '_fields_names_list') else ["{}".format(i) for i in range(len(self.export_mask_list))]
+    # #     return field_names_list
+    # #
+    # # @fields_names_list.setter
+    # # def fields_names_list(self, val):
+    # #     self._fields_names_list = val
+    #
+    # @property
+    # def export_mask_list(self):
+    #     if not hasattr(self, '_export_mask_list') or self._export_mask_list is None:
+    #         return [self.get_mask()[:self.n_bins, :]]
+    #     else:
+    #         return self._export_mask_list
+    #
+    # @export_mask_list.setter
+    # def export_mask_list(self, val):
+    #     if type(val) is not list:
+    #         raise Exception('Error, {}'.format(val))
+    #     columns = self.get_mask().shape[1] - 1 # last column of the optimize mask are timeslices
+    #     for i, v in enumerate(val):
+    #         if v.shape != (self.n_bins, columns):
+    #             raise Exception('Error: i: {}, v.shape: {}, bins: {}, columns: {}'.format(i, v.shape, self.n_bins, columns))
+    #     self._export_mask_list = val
+    #
+    # @property
+    # def sequence(self):
+    #     seq = []
+    #     for i in range(self.n_bins):
+    #         step = []
+    #         for j, em in enumerate(self.export_mask_list):
+    #             if np.any(em[i]):
+    #                 step.append(self.fields_names_list[j])
+    #         if len(step) > 0:
+    #             seq.append(step)
+    #     return seq
+    #
+    # def export_mask_columns(self, n):
+    #     return np.where(~np.all(self.export_mask_list[n] == 0, axis=0))[0]
+    #
+    # def export_mask_rows(self, n):
+    #     if not self.export_mask_list[n].any():
+    #         return np.array([])
+    #     else:
+    #         return np.where(self.export_mask_list[n][:, np.where(~np.all(self.export_mask_list[n] == 0, axis=0))[0][0]])[0]
+    #
+    # @property
+    # def times_fields_mhz(self):
+    #     out = np.array(self.eng.eval("dyn.export"))
+    #     out[:, 1:] *= 2 * np.pi
+    #     return out
+    #
+    # def xy2aphi(self, xy):
+    #     norm = np.array([np.linalg.norm(xy, axis=1)]).transpose()
+    #     phi = np.arctan2(xy[:, 1:2], xy[:, 0:1])
+    #     return np.concatenate([norm, phi], axis=1)
+
 class Wait(Arbitrary):
     def __init__(self, n_bins_wait, t_wait):
         self.n_bins_wait = n_bins_wait
         self.t_wait = t_wait
 
     column_dict = {'wait': [0]}
-    controls = ['wait']
-    n_columns = 1
 
     @property
     def sequence(self):
@@ -205,10 +311,7 @@ class Rabi(Arbitrary):
         self.phase = phase
         self.omega = omega
         self.control_field = control_field
-        self.column_dict = {self.control_field: [0, 1]}
-        self.controls = [self.control_field]
-
-    n_columns = 2
+        self.column_dict = collections.OrderedDict([(self.control_field, [0, 1])])
 
     @property
     def sequence(self):
@@ -264,9 +367,7 @@ class DDAlpha(Arbitrary):
         self.target_Azz = target_Azz
         self.omega = omega
 
-    column_dict = {'mw': [0, 1], 'rf': [2, 3], 'wait': [4]}
-    controls = ['mw', 'rf', 'wait']
-    n_columns = 5
+    column_dict = collections.OrderedDict([('mw', [0, 1]), ('rf', [2, 3]), ('wait', [4])])
 
     @property
     def n_pi(self):
@@ -349,7 +450,7 @@ class DDAlpha(Arbitrary):
         td = dict(rf=self.tau(),
                   mw=0.5 * self.rabi_period,
                   wait=self.wait)
-        out = np.array([td[i] for i in self.sequence if td[i] is not None])
+        out = np.array([td[i[0]] for i in self.sequence if td[i[0]] is not None])
         out[self.locations('wait')[0]] /= 2
         out[self.locations('wait')[-1]] /= 2
         return getattr(self, '_times_full', out)
@@ -361,9 +462,7 @@ class DD(Arbitrary):
         self.time_digitization = time_digitization
         self.set_total_tau(**kwargs)
 
-    column_dict = {'mw': [0, 1], 'wait': [2]}
-    controls = ['mw', 'wait']
-    n_columns = 3
+    column_dict = collections.OrderedDict([('mw', [0, 1]), ('wait', [2])])
 
     @property
     def sequence(self):
@@ -481,12 +580,10 @@ class DD(Arbitrary):
 
 class Z(Arbitrary):
     def __init__(self, fields_l, times_l):
-        self.column_dict = dict([("z{}".format(i), [i]) for i in range(len(fields_l))])
-        self.controls = list(self.column_dict.keys())
-        self.n_columns = len(self.column_dict)
-        self.sequence = getattr(self, '_sequence', [[i] for i in self.controls])
-        self.fields_full = getattr(self, '_fields_full', np.diag(fields_l))
-        self.times_full = getattr(self, '_times_full', np.array(times_l))
+        self.column_dict = collections.OrderedDict([("z{}".format(i), [i]) for i in range(len(fields_l))])
+        self.fields_full = np.diag(fields_l)
+        self.times_full = np.array(times_l)
+        self.sequence = [[i] for i in self.controls]
 
 class Concatenated(Arbitrary):
     def __init__(self, p_list, controls):
@@ -494,7 +591,7 @@ class Concatenated(Arbitrary):
             if not issubclass(type(p), Arbitrary):
                 raise Exception('Error: type of p is {}'.type(p))
         self.p_list = p_list
-        self.controls = controls
+        self._controls = controls
         self.check_control_length()
 
     def set_p_list(self, times_full, fields_full):

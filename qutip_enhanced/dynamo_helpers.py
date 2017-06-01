@@ -171,12 +171,12 @@ class DynPython:
 
     @property
     def fields_names_list(self):
-        field_names_list = self._fields_names if hasattr(self, '_fields_names') else ["{}".format(i) for i in range(len(self.export_mask_list))]
+        field_names_list = self._fields_names_list if hasattr(self, '_fields_names_list') else ["{}".format(i) for i in range(len(self.export_mask_list))]
         return field_names_list
-        # if hasattr(self, '_fields_names'):
-        #     return self._fields_names
-        # else:
-        #     return ["{}".format(i) for i in range(len(self.export_mask_list))]
+
+    @fields_names_list.setter
+    def fields_names_list(self, val):
+        self._fields_names_list = val
 
     @property
     def dims(self):
@@ -188,9 +188,7 @@ class DynPython:
             raise Exception("Error: {}".format(val))
         self._dims = val
 
-    @fields_names_list.setter
-    def fields_names_list(self, val):
-        self._fields_names = val
+
 
     def print_out(self):
         if self.print_flag:
@@ -210,6 +208,92 @@ class DynPython:
         self._dyn = self.eng.dynamo(task, initial, final, H_drift_list, H_ctrl_list, weight, stdout=self.out, stderr=self.err)
         self.eng.workspace[str("dyn")] = self._dyn
         self.print_out()
+
+    def set_labels(self, title, c_labels):
+        self.eng.eval(str("dyn.system.set_labels('{}', {}, {{{}}})").format(title, self.dims, ", ".join("'{}'".format(i) for i in c_labels)), stdout=self.out, stderr=self.err, nargout=0)
+
+    def get_mask(self, optimize_times=False):
+        return np.array(self.eng.full_mask(self.dyn, int(optimize_times)))
+
+    def seq_init(self, n_bins, TL, control_type, control_par):
+        self.eng.seq_init(self.dyn, n_bins, TL, control_type, control_par, stdout=self.out, stderr=self.err, nargout=0)
+        self.print_out()
+
+    def set_controls(self, fields):
+        self.eng.set_controls(self.dyn, fields, stdout=self.out, stderr=self.err, nargout=0)
+        self.print_out()
+
+    def open_ui(self):
+        self.eng.ui_open(self.dyn, nargout=0)
+
+    def search_thread(self, mask, options=None, dt=2., dt_walltime=120., stop_too_bad_fun=None, abort=None, kill=None):
+        options = {} if options is None else options
+        mask = matlab.logical(mask.tolist())
+
+        def run():
+            if 'max_walltime' in options:
+                n = range(int(options['max_walltime'] / dt))
+                options['max_walltime'] = dt
+                t0 = time.time()
+                for _ in n:
+                    if abort is not None and abort.is_set(): break
+                    if kill is not None and kill.is_set(): break
+                    self.eng.search(self.dyn, mask, options, stdout=self.out, stderr=self.err, nargout=0)
+                    frob_norm = np.sqrt(2 * self.eng.compute_error(self.dyn) * self.eng.eval("dyn.system.norm2"))
+                    print(self.eng.eval('dyn.stats{end}.term_reason'))
+                    elapsed_time = time.time() - t0
+                    if stop_too_bad_fun is not None and elapsed_time > dt_walltime:
+                        if frob_norm > stop_too_bad_fun(elapsed_time):
+                            s1 = 'Final'
+                        else:
+                            s1 = 'Current'
+                    else:
+                        s1 = 'Current'
+                    print("{} Frobenius norm: {} ({}), t={}s".format(s1, frob_norm, stop_too_bad_fun(elapsed_time), elapsed_time))
+                    if s1 == 'Final' or self.eng.eval('dyn.stats{end}.term_reason') != "Wall time limit reached": break
+
+        t = threading.Thread(target=run)
+        t.start()
+        return t
+
+    def search(self, mask, options=None):
+        options = {} if options is None else options
+        mask = matlab.logical(mask.tolist())
+        self.eng.search(self.dyn, mask, options, nargout=0)
+
+    @property
+    def n_bins(self):
+        return len(self.get_mask())
+
+    def X(self, n_ens, include_initial=True, include_final=True):
+        out = []
+        for i in range(1, n_ens + 1):
+            out.append([])
+            if include_initial:
+                out[-1].append(Qobj(self.initial))
+                if out[-1][-1].isket:
+                    out[-1][-1] = ket2dm(out[-1][-1])
+                out[-1][-1].dims = [self.dims, self.dims]
+            for j in range(1, self.n_bins + 1):
+                out[-1].append(Qobj(np.array(self.eng.eval('dyn.X({}, {})'.format(j, i)))))
+                if out[-1][-1].isket:
+                    out[-1][-1] = ket2dm(out[-1][-1])
+                out[-1][-1].dims = [self.dims, self.dims]
+            if include_final:
+                out[-1].append(Qobj(self.final))
+                if out[-1][-1].isket:
+                    out[-1][-1] = ket2dm(out[-1][-1])
+                out[-1][-1].dims = [self.dims, self.dims]
+        return out
+
+
+    @property
+    def fields_names_list(self):
+        return getattr(self, '_fields_names_list', ["{}".format(i) for i in range(len(self.export_mask_list))])
+
+    @fields_names_list.setter
+    def fields_names_list(self, val):
+        self._fields_names_list = val
 
     @property
     def export_mask_list(self):
@@ -249,63 +333,6 @@ class DynPython:
         else:
             return np.where(self.export_mask_list[n][:, np.where(~np.all(self.export_mask_list[n] == 0, axis=0))[0][0]])[0]
 
-    def set_labels(self, title, c_labels):
-        self.eng.eval(str("dyn.system.set_labels('{}', {}, {{{}}})").format(title, self.dims, ", ".join("'{}'".format(i) for i in c_labels)), stdout=self.out, stderr=self.err, nargout=0)
-
-    def get_mask(self, optimize_times=False):
-        # if optimize_times is None:
-        #     return np.array(self.eng.eval("dyn.opt.control_mask"))
-        # else:
-        return np.array(self.eng.full_mask(self.dyn, int(optimize_times)))
-
-    def seq_init(self, n_bins, TL, control_type, control_par):
-        self.eng.seq_init(self.dyn, n_bins, TL, control_type, control_par, stdout=self.out, stderr=self.err, nargout=0)
-        self.print_out()
-
-    def set_controls(self, fields):
-        self.eng.set_controls(self.dyn, fields, stdout=self.out, stderr=self.err, nargout=0)
-        self.print_out()
-
-    def open_ui(self):
-        self.eng.ui_open(self.dyn, nargout=0)
-
-    def search_thread(self, mask, options=None, dt=2., dt_walltime=120., stop_too_bad_fun=None, abort=None, kill=None):
-        options = {} if options is None else options
-        mask = matlab.logical(mask.tolist())
-        def run():
-            if 'max_walltime' in options:
-                n = range(int(options['max_walltime']/dt))
-                options['max_walltime'] = dt
-                t0 = time.time()
-                for _ in n:
-                    if abort is not None and abort.is_set(): break
-                    if kill is not None and kill.is_set(): break
-                    self.eng.search(self.dyn, mask, options, stdout=self.out, stderr=self.err, nargout=0)
-                    frob_norm = np.sqrt(2 * self.eng.compute_error(self.dyn) * self.eng.eval("dyn.system.norm2"))
-                    print(self.eng.eval('dyn.stats{end}.term_reason') )
-                    elapsed_time = time.time() - t0
-                    if stop_too_bad_fun is not None and elapsed_time > dt_walltime:
-                        if frob_norm > stop_too_bad_fun(elapsed_time):
-                            s1 = 'Final'
-                        else:
-                            s1 = 'Current'
-                    else:
-                        s1 = 'Current'
-                    print("{} Frobenius norm: {} ({}), t={}s".format(s1, frob_norm, stop_too_bad_fun(elapsed_time), elapsed_time))
-                    if s1 == 'Final' or self.eng.eval('dyn.stats{end}.term_reason') != "Wall time limit reached": break
-        t = threading.Thread(target=run)
-        t.start()
-        return t
-
-    def search(self, mask, options=None):
-        options = {} if options is None else options
-        mask = matlab.logical(mask.tolist())
-        self.eng.search(self.dyn, mask, options, nargout=0)
-
-    @property
-    def n_bins(self):
-        return len(self.get_mask())
-
     @property
     def times_fields_mhz(self):
         out = np.array(self.eng.eval("dyn.export"))
@@ -314,10 +341,6 @@ class DynPython:
 
     def times(self, n):
         return self.times_fields_mhz[list(self.export_mask_rows(n)), 0]
-
-    @property
-    def times_bins(self):
-        return self.times_fields_mhz[:self.n_bins, 0]
 
     def fields_xy_mhz(self, n):
         out = self.times_fields_mhz[list(self.export_mask_rows(n)), 1:][:, ~np.all(self.export_mask_list[n]==0, axis=0)]
@@ -344,27 +367,6 @@ class DynPython:
     # def add_slices_angles(self):
     #     if self.add_slices > 0:
     #         return (2 * np.pi * self.times_add_slices*self.fields_add_slices_mhz) % (2 * np.pi)
-
-    def X(self, n_ens, include_initial=True, include_final=True):
-        out = []
-        for i in range(1, n_ens + 1):
-            out.append([])
-            if include_initial:
-                out[-1].append(Qobj(self.initial))
-                if out[-1][-1].isket:
-                    out[-1][-1] = ket2dm(out[-1][-1])
-                out[-1][-1].dims = [self.dims, self.dims]
-            for j in range(1, self.n_bins + 1):
-                out[-1].append(Qobj(np.array(self.eng.eval('dyn.X({}, {})'.format(j, i)))))
-                if out[-1][-1].isket:
-                    out[-1][-1] = ket2dm(out[-1][-1])
-                out[-1][-1].dims = [self.dims, self.dims]
-            if include_final:
-                out[-1].append(Qobj(self.final))
-                if out[-1][-1].isket:
-                    out[-1][-1] = ket2dm(out[-1][-1])
-                out[-1][-1].dims = [self.dims, self.dims]
-        return out
 
     def save_times_fields_mhz(self, path):
         np.savetxt(path, np.around(self.times_fields_mhz, 9), fmt=str('%+1.9e'))
