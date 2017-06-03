@@ -21,6 +21,7 @@ import threading
 
 import lmfit.lineshapes
 from .qutip_enhanced import *
+from . import sequence_creator
 
 SDx = jmat(.5, 'x')  # np.array([[0.0, 1.0], [1.0, 0.0]], dtype='complex_') / 2.
 SDy = jmat(.5, 'y')  # np.array([[0.0, -1.0j], [1.0j, 0.0]], dtype='complex_') / 2.
@@ -134,12 +135,11 @@ def ensemble(base, weight_base=None):
     return det, ps, weight
 
 
-class DynPython:
+class DynPython(sequence_creator.Arbitrary):
 
-    def __init__(self, dynamo_path, initial, final, dims=None, sample_frequency=12e3, use_engine=None, print_flag=True):
+    def __init__(self, dynamo_path, initial, final, dims=None, use_engine=None, print_flag=True):
         self.dims = dims
         self.eng = self.get_eng(use_engine=use_engine)
-        self.sample_frequency = sample_frequency
         self.dynamo_path = dynamo_path
         self.out = StringIO()
         self.err = StringIO()
@@ -170,15 +170,6 @@ class DynPython:
         return eng
 
     @property
-    def fields_names_list(self):
-        field_names_list = self._fields_names_list if hasattr(self, '_fields_names_list') else ["{}".format(i) for i in range(len(self.export_mask_list))]
-        return field_names_list
-
-    @fields_names_list.setter
-    def fields_names_list(self, val):
-        self._fields_names_list = val
-
-    @property
     def dims(self):
         return self._dims
 
@@ -187,8 +178,6 @@ class DynPython:
         if not(type(val) is list or (type(val) is np.ndarray and len(val.shape) == 1)):
             raise Exception("Error: {}".format(val))
         self._dims = val
-
-
 
     def print_out(self):
         if self.print_flag:
@@ -215,11 +204,12 @@ class DynPython:
     def get_mask(self, optimize_times=False):
         return np.array(self.eng.full_mask(self.dyn, int(optimize_times)))
 
-    def seq_init(self, n_bins, TL, control_type, control_par):
-        self.eng.seq_init(self.dyn, n_bins, TL, control_type, control_par, stdout=self.out, stderr=self.err, nargout=0)
+    def seq_init(self, TL, control_type, control_par):
+        self.eng.seq_init(self.dyn, len(self.sequence), matlab.double(TL.tolist()), control_type, control_par, stdout=self.out, stderr=self.err, nargout=0)
         self.print_out()
 
-    def set_controls(self, fields):
+    def set_fields(self, fields):
+        fields = matlab.double(np.array(fields, dtype=np.complex64).tolist(), is_complex=True)
         self.eng.set_controls(self.dyn, fields, stdout=self.out, stderr=self.err, nargout=0)
         self.print_out()
 
@@ -261,10 +251,6 @@ class DynPython:
         mask = matlab.logical(mask.tolist())
         self.eng.search(self.dyn, mask, options, nargout=0)
 
-    @property
-    def n_bins(self):
-        return len(self.get_mask())
-
     def X(self, n_ens, include_initial=True, include_final=True):
         out = []
         for i in range(1, n_ens + 1):
@@ -286,150 +272,13 @@ class DynPython:
                 out[-1][-1].dims = [self.dims, self.dims]
         return out
 
+    @property
+    def times_full(self):
+        return np.array(self.eng.eval("dyn.export"))[:, 0]
 
     @property
-    def fields_names_list(self):
-        return getattr(self, '_fields_names_list', ["{}".format(i) for i in range(len(self.export_mask_list))])
-
-    @fields_names_list.setter
-    def fields_names_list(self, val):
-        self._fields_names_list = val
-
-    @property
-    def export_mask_list(self):
-        if not hasattr(self, '_export_mask_list') or self._export_mask_list is None:
-            return [self.get_mask()[:self.n_bins, :]]
-        else:
-            return self._export_mask_list
-
-    @export_mask_list.setter
-    def export_mask_list(self, val):
-        if type(val) is not list:
-            raise Exception('Error, {}'.format(val))
-        columns = self.get_mask().shape[1] - 1 # last column of the optimize mask are timeslices
-        for i, v in enumerate(val):
-            if v.shape != (self.n_bins, columns):
-                raise Exception('Error: i: {}, v.shape: {}, bins: {}, columns: {}'.format(i, v.shape, self.n_bins, columns))
-        self._export_mask_list = val
-
-    @property
-    def sequence(self):
-        seq = []
-        for i in range(self.n_bins):
-            step = []
-            for j, em in enumerate(self.export_mask_list):
-                if np.any(em[i]):
-                    step.append(self.fields_names_list[j])
-            if len(step) > 0:
-                seq.append(step)
-        return seq
-
-    def export_mask_columns(self, n):
-        return np.where(~np.all(self.export_mask_list[n] == 0, axis=0))[0]
-
-    def export_mask_rows(self, n):
-        if not self.export_mask_list[n].any():
-            return np.array([])
-        else:
-            return np.where(self.export_mask_list[n][:, np.where(~np.all(self.export_mask_list[n] == 0, axis=0))[0][0]])[0]
-
-    @property
-    def times_fields_mhz(self):
-        out = np.array(self.eng.eval("dyn.export"))
-        out[:, 1:] *= 2 * np.pi
-        return out
-
-    def times(self, n):
-        return self.times_fields_mhz[list(self.export_mask_rows(n)), 0]
-
-    def fields_xy_mhz(self, n):
-        out = self.times_fields_mhz[list(self.export_mask_rows(n)), 1:][:, ~np.all(self.export_mask_list[n]==0, axis=0)]
-        if out.shape[1] == 1:
-            out = np.column_stack([out, 0*out])
-        return out
-
-    def xy2aphi(self, xy):
-        norm = np.array([np.linalg.norm(xy, axis=1)]).transpose()
-        phi = np.arctan2(xy[:, 1:2], xy[:, 0:1])
-        return np.concatenate([norm, phi], axis=1)
-
-    def fields_aphi_mhz(self, n):
-        return self.xy2aphi(self.fields_xy_mhz(n))
-
-# TIMES FULL EXPORT TIME 2pi
-
-    # @property
-    # def times_fields_mhz(self):
-    #     out = np.array(self.eng.eval("dyn.export"))
-    #     out[:, 1:] *= 2 * np.pi
-    #     return out
-
-    # @property
-    # def fields_add_slices_mhz(self):
-    #     out = self.times_fields_mhz[self.n_bins:, -self.add_slices:]
-    #     if self.add_slices > 1:
-    #         out = np.diag(out)
-    #     return out
-    #
-    # @property
-    # def add_slices_angles(self):
-    #     if self.add_slices > 0:
-    #         return (2 * np.pi * self.times_add_slices*self.fields_add_slices_mhz) % (2 * np.pi)
-
-    def save_times_fields_mhz(self, path):
-        np.savetxt(path, np.around(self.times_fields_mhz, 9), fmt=str('%+1.9e'))
-
-    def save_times_fields_xy(self, n=None, path=None):
-        t = self.round2float(self.times(n), 1/self.sample_frequency)
-        txy = np.column_stack([t, self.fields_mhz(n)])
-        np.savetxt(path, np.around(txy, 9), fmt=str('%+1.9e'))
-
-    def save_times_fields_aphi(self, n=None, path=None):
-        t = self.round2float(self.times(n), 1/self.sample_frequency)
-        taphi = np.column_stack([t, self.fields_aphi_mhz(n)])
-        np.savetxt(path, np.around(taphi, 9), fmt=str('%+1.9e'))
-
-    def save_add_slices_angles(self, path):
-        pass
-        # asa = self.add_slices_angles
-        # if asa is not None:
-        #     np.savetxt(path, asa, fmt=str('%+1.4e'))
-        # print("add_slices_angles saved.")
-
-    def round2float(self, arr, val):
-        return np.around(arr/val) * val
-
-    def save_dynamo_fields(self, base_path):
-        self.save_times_fields_mhz("{}\\fields.dat".format(base_path))
-        for n, name in enumerate(self.fields_names_list):
-            self.save_times_fields_aphi(n=n, path="{}\\{}.dat".format(base_path, name))
-            print("Fields {} saved.".format(name))
-        # self.save_add_slices_angles(path="{}\\add_slices_angles.dat".format(base_path))
-
-    def save_export_mask(self, path):
-        ems = sum(self.export_mask_list)
-        np.savetxt(path, ems, fmt=str('%i'))
-        print("Export mask saved.")
-
-    def save_sequence_steps(self, path):
-        """
-        saves the sequence ['RF, WAIT', 'WAIT', 'MW', ..] along with the line number in the respective file
-        :param path:
-        :return:
-        """
-        fsn = np.empty((self.n_bins, len(self.export_mask_list)))
-        nl = np.zeros(len(self.export_mask_list))
-        out = []
-        for i, step in enumerate(self.sequence):
-            osln = []
-            for j, name in enumerate(self.fields_names_list):
-                if name in step:
-                    nl[j] += 1
-                    osln.append(nl[j])
-            fsn[i] = nl
-            out.append([', '.join(step), ', '.join(['{:d}'.format(int(i)) for i in osln])])
-        np.savetxt(path,  out, delimiter="\t", fmt=str("%s"))
-        print("Sequence_steps saved.")
+    def fields_full(self):
+        return 2 * np.pi*np.array(self.eng.eval("dyn.export"))[:, 1:]
 
     def save_matlab_output(self, path):
         with open(path, "w") as f:
@@ -449,7 +298,6 @@ class DynPython:
             shutil.copy(sp + '.ipynb', dp + '.ipynb')
             shutil.move(sp + '.html', dp + '.html')
             shutil.move(sp + '.py', dp + '.py')
-
 
     def save_matlab_workspace(self, path):
         self.eng.save(path, nargout=0)
@@ -480,9 +328,9 @@ class DynPython:
         import qutip_enhanced
         shutil.copytree(os.path.dirname(qutip_enhanced.__file__), dns + '\\qutip_enhanced')
         print("qutip_enhanced saved.")
-        self.save_dynamo_fields(base_path=dns)
+        self.save_dynamo_fields(directory=dns)
         # self.save_export_mask(path=dns+"\\export_mask.dat")
-        self.save_sequence_steps(path=dns + "\\sequence_steps.dat")
+        self.save_export_sequence_steps(path=dns + "\\sequence_steps.dat")
         return dns
 
 def rotop(*args, **kwargs):

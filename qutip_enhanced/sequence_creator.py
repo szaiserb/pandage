@@ -45,6 +45,14 @@ class pd(dict):
 __PHASES_DD__ = pd()
 
 
+def xy2aphi(xy):
+    norm = np.array([np.linalg.norm(xy, axis=1)]).transpose()
+    phi = np.arctan2(xy[:, 1:2], xy[:, 0:1])
+    return np.concatenate([norm, phi], axis=1)
+
+def round2float(arr, val):
+    return np.around(arr/val) * val
+
 class DDParameters:
     def __init__(self, name, rabi_period, time_digitization=None, **kwargs):
         self.name = name
@@ -179,19 +187,16 @@ class Arbitrary:
         else:
             return fields
 
-    def xy2aphi(self, xy):
-        norm = np.array([np.linalg.norm(xy, axis=1)]).transpose()
-        phi = np.arctan2(xy[:, 1:2], xy[:, 0:1])
-        return np.concatenate([norm, phi], axis=1)
+    def times_fields(self, name):
+        return np.concatenate([self.times(name).reshape(-1, 1), self.fields(name)], axis=1)
 
-    def fields_aphi_mhz(self, name=None):
+    def fields_aphi(self, name=None):
         l = []
         for k, v in self.column_dict.items():
             if name is None or k == name:
                 l.append(self.fields_full[:, self.column_dict[k]])
                 if len(v) == 2:
-                    l[-1] = self.xy2aphi(l[-1])
-
+                    l[-1] = xy2aphi(l[-1])
         out = np.concatenate(l, axis=1)
         if name is not None:
             out = out[self.locations(name)]
@@ -202,83 +207,70 @@ class Arbitrary:
         self._fields_full = np.repeat(self.fields_full, [n if i in locations else 1 for i in range(self.n_bins)], axis=0)
         self._sequence = list(itertools.chain(*[[item] * n if idx in locations else [item] for idx, item in enumerate(self.sequence)]))
 
-    def print_info(self):
-        for s, t in zip(self.sequence, self.times()):
-            print(s, t)
-
-    def save_times_fields_mhz(self, path):
-        np.savetxt(path, np.around(np.concatenate([self.times_full.reshape(-1,1), self.fields_full], axis=1), 9), fmt=str('%+1.9e'))
-
     @property
-    def control_names_dict(self):
-        return getattr(self, '_control_names_dict', collections.OrderedDict([(cn, cn) for cn in self.controls]))
+    def export_names_dict(self):
+        return getattr(self, '_export_names_dict', dict([(k, k) for k in self.controls]))
 
-    @control_names_dict.setter
-    def control_names_dict(self, val):
+    @export_names_dict.setter
+    def export_names_dict(self, val):
         """
         NOTE: Not all controls have to be given, if e.g. only 'mw' should be renamed to 'MW' then val = {'mw': 'MW'} is allowed
         """
-        out = self.control_names_dict
+        out = {}
         for k, v  in val.items():
             if k not in self.controls:
-                raise Exception("Error: {}, {}, {}, {}".format(val, self.control_names_dict), k, v)
+                raise Exception("Error: {}, {}, {}, {}".format(val, out, k, v))
             out[k] = v
-        self._control_names_dict = out
-
-    @property
-    def export_mask_dict(self):
-        return self._export_mask_dict
-
-    @export_mask_dict.setter
-    def export_mask_dict(self, val):
-        if type(val) is not collections.OrderedDict:
-            raise Exception('Error, {}, {}'.format(val, type(val)))
-        for k, v in val.items():
-            if v.shape != (self.n_bins, self.n_columns):
-                raise Exception('Error: i: {}, v.shape: {}, bins: {}, columns: {}'.format(i, v.shape, self.n_bins, self.n_columns))
-        self._export_mask_dict = val
+        self._export_names_dict = out
 
     @property
     def export_sequence(self):
-        seq = []
-        for i in range(self.n_bins):
-            step = []
-            for k, v in self.export_mask_dict.items():
-                if np.any(v[i]):
-                    step.append(self.control_names_dict[k])
-            if len(step) > 0:
-                seq.append(step)
-        return seq
+        seq = [[] for _ in range(self.n_bins)]
+        for name in self.export_names_dict.keys():
+            m = self.mask(name)
+            for i, row in enumerate(m):
+                if np.any(row):
+                    seq[i].append(self.export_names_dict[name])
+        return [i for i in seq if len(i)> 0]
 
-    def save_sequence_steps(self, path):
+    def save_export_sequence_steps(self, path):
         """
         saves the sequence ['RF, WAIT', 'WAIT', 'MW', ..] along with the line number in the respective file
         :param path:
         :return:
         """
-        fsn = np.empty((self.n_bins, len(self.export_mask_dict.keys())))
-        nl_d = dict([(v, 0) for v in self.export_mask_dict.keys()])
+        fsn = np.empty((self.n_bins, len(self.export_names_dict)))
+        nl_d = dict([(v, 0) for v in self.export_names_dict])
         out = []
         for i, step in enumerate(self.export_sequence):
             osln = []
-            for k, v in self.control_names_dict.items():
-                if v in step:
-                    nl_d[k] += 1
-                    osln.append(nl_d[k])
+            for name, export_name in self.export_names_dict.items():
+                if export_name in step:
+                    nl_d[name] += 1
+                    osln.append(nl_d[name])
             fsn[i] = nl_d.values()
             out.append([', '.join(step), ', '.join(['{:d}'.format(int(i)) for i in osln])])
         np.savetxt(path, out, delimiter="\t", fmt=str("%s"))
         print("Sequence_steps saved.")
 
-    # def export_mask_columns(self, n):
-    #     return np.where(~np.all(self.export_mask_list[n] == 0, axis=0))[0]
-    #
-    # def export_mask_rows(self, n):
-    #     if not self.export_mask_list[n].any():
-    #         return np.array([])
-    #     else:
-    #         return np.where(self.export_mask_list[n][:, np.where(~np.all(self.export_mask_list[n] == 0, axis=0))[0][0]])[0]
-    #
+    def save_times_fields(self, path, name=None):
+        np.savetxt(path, np.around(self.times_fields(name), 9), fmt=str('%+1.9e'))
+
+    def save_times_fields_aphi(self, name, path=None, sample_frequency=12e3):
+        t = round2float(self.times(name), 1/sample_frequency)
+        taphi = np.column_stack([t, self.fields_aphi(name)])
+        np.savetxt(path, np.around(taphi, 9), fmt=str('%+1.9e'))
+
+    def save_dynamo_fields(self, directory):
+        self.save_times_fields("{}\\fields.dat".format(directory))
+        for k, v in self.export_names_dict.items():
+            self.save_times_fields_aphi(name=k, path="{}\\{}.dat".format(directory, v))
+            print("Fields {} saved.".format(v))
+
+    def print_info(self):
+        for s, t in zip(self.sequence, self.times()):
+            print(s, t)
+
 class Wait(Arbitrary):
     def __init__(self, n_bins_wait, t_wait):
         self.n_bins_wait = n_bins_wait
@@ -618,7 +610,7 @@ class Concatenated(Arbitrary):
                             raise Exception('Error: Control {} has different column length on different items of p_list'.format(c))
                         else:
                             n_cc[c] = len(p.column_dict[c])
-            out = {}
+            out = collections.OrderedDict()
             idx = 0
             for c in self.controls:
                 out[c] = list(np.arange(n_cc[c]) + idx)
