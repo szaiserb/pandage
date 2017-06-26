@@ -563,6 +563,7 @@ class PlotData:
             self._data = val
             self.parameter_table.setColumnCount(len(self.parameter_names_reduced()))
             self.parameter_table.setHorizontalHeaderLabels(self.parameter_names_reduced())
+            self.set_observations()
         else:
             self._data = val
         self.set_parameters()
@@ -607,7 +608,6 @@ class PlotData:
                 self.parameter_table.item(n_params + item_idx, column_idx).setData(0x0100, item)
                 if not column_idx == self.column_index(self.x_axis_name):
                     self.parameter_table.item(n_params + item_idx, column_idx).setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
-        self.set_observations()
 
     def set_observations(self):
         for obs in self.data.observation_names:
@@ -636,7 +636,6 @@ class PlotData:
         # TODO: iterate over all selected items and generate selected_items_list
 
         selected_items_list = [[i for i in self.selected_items(column_name)] for column_name in self.parameter_names_reduced()]
-        print(selected_items_list)
         if all([len(i) == 0 for i in selected_items_list]):
             return []
         for idx, item, name in zip(range(len(selected_items_list)), selected_items_list, self.parameter_names_reduced()):
@@ -657,7 +656,6 @@ class PlotData:
 
         self.ax = self.fig.add_subplot(111)
         for pdi in self.ret_line_plot_data():
-            print(pdi)
             self.ax.plot(pdi['x'], pdi['y'], 'o-',
                          label='NONE',  # '{}\n{}\n{}'.format(self.setpoint1_v.itemData(self.setpoint1_v.currentIndex()), self.setpoint2_v.itemData(self.setpoint2_v.currentIndex()), self.ddy.currentText() )
                          )
