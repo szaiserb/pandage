@@ -11,7 +11,8 @@ import itertools
 from numbers import Number
 import collections
 import subprocess
-from PyQt5.QtWidgets import QWidget, QGridLayout, QListWidgetItem, QAbstractItemView, QListWidget, QLabel, QPlainTextEdit, QFrame
+from PyQt5.QtWidgets import QWidget, QGridLayout, QListWidgetItem, QAbstractItemView, QTableWidget, QListWidget, QLabel, QPlainTextEdit, QFrame, QTableWidgetItem
+from PyQt5.QtCore import Qt
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -519,20 +520,38 @@ class PlotData:
         self.layout = QGridLayout(self.window)
         self.init_gui()
         self.window.setWindowTitle(title)
-        self.clear()
 
     x_axis_name = 'x'
 
     def init_gui(self):
         # Figure
         self.fig = Figure()
-        self.ax = self.fig.add_subplot(111)
         self.canvas = FigureCanvas(self.fig)
         self.toolbar = NavigationToolbar(self.canvas, self.window)
+
+        self.ax = self.fig.add_subplot(111)
+        self.canvas.draw()
+
         # infos
         self.info = QPlainTextEdit()
         self.info.setFrameStyle(QFrame.NoFrame | QFrame.Sunken)
         self.info.setBackgroundVisible(True)
+
+        self.parameter_table = QTableWidget()
+        self.parameter_table.itemSelectionChanged.connect(self.update_plot)
+
+        self.observation_widget = QListWidget()
+        self.observation_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.observation_widget.itemSelectionChanged.connect(self.update_plot)
+
+
+        self.layout.addWidget(self.canvas, 2, 1, 1, 15)
+        self.layout.addWidget(self.parameter_table, 1, 1, 1, 15)
+        self.layout.addWidget(self.toolbar, 3, 4, 1, 15)
+        self.layout.addWidget(self.info, 2, 16, 1, 1)
+
+        self.layout.addWidget(self.observation_widget, 1, 16, 1, 1)
+
 
     @property
     def data(self):
@@ -541,43 +560,83 @@ class PlotData:
     @data.setter
     def data(self, val):
         if not hasattr(self, '_data'):
-            print('No data available. Initializing..')
-            self.assign_layout(val)
-            self.set_parameters(val)
+            self._data = val
+            self.parameter_table.setColumnCount(len(self.parameter_names_reduced()))
+            self.parameter_table.setHorizontalHeaderLabels(self.parameter_names_reduced())
         else:
-            self.set_parameters(val)
-        self._data = val
+            self._data = val
+        self.set_parameters()
         self.update_plot()
 
-    def set_parameters(self, data):
-        for name in self.parameter_names_reduced(data):
-            for item in self.new_parameters_l(name, data):
-                new_item = QListWidgetItem(str(item))
-                new_item.setData(0x0100, item)
-                getattr(self, name).addItem(new_item)
+    def new_parameters_l(self, column_name):
+        return [i for i in getattr(self.data.df, column_name).unique() if i not in self.column_data(column_name)]
 
-    def parameter_names_reduced(self, data=None):
-        data = self.data if data is None else data
-        return [i for i in data.parameter_names if not '_idx' in i]
+    def column_data(self, column_name):
+        out = []
+        for row in range(self.parameter_table.rowCount()):
+            o = self.parameter_table.item(row, self.column_index(column_name))
+            if o.text() != '':
+                out.append(o.data(0x0100))
+        return out
 
-    def observation_names_reduced(self, data=None):
-        data = self.data if data is None else data
-        return [i for i in data.observation_names if not i in ['trace', 'start_time', 'end_time', 'thresholds']]
+    @property
+    def column_names(self):
+        return [self.parameter_table.horizontalHeaderItem(i).text() for i in range(self.parameter_table.columnCount())]
 
-    def widget_data_l(self, name):
-        return [getattr(self, name).item(i).data(0x0100) for i in range(getattr(self, name).count())]
+    def column_index(self, column_name):
+        return self.column_names.index(column_name)
 
-    def new_parameters_l(self, name, data):
-        wd = self.widget_data_l(name)
-        return [i for i in getattr(data.df, name).unique() if i not in wd]
+    def add_row(self, n_new):
+        if n_new > 0:
+            n_old = self.parameter_table.rowCount()
+            self.parameter_table.setRowCount(n_old+n_new)
+            for rc in itertools.product(range(n_old, n_old+n_new), range(self.parameter_table.columnCount())):
+                new_item = QTableWidgetItem('')
+                new_item.setData(0x0100, None)
+                new_item.setFlags(Qt.NoItemFlags)
+                self.parameter_table.setItem(rc[0], rc[1], new_item)
+
+    def set_parameters(self):
+        for column_idx, name in enumerate(self.parameter_names_reduced()):
+            n_rows = self.parameter_table.rowCount()
+            n_params = len(self.column_data(name))
+            new_params = self.new_parameters_l(name)
+            self.add_row(max(n_params + len(new_params) - n_rows, 0))
+            for item_idx, item in enumerate(new_params):
+                self.parameter_table.item(n_params + item_idx, column_idx).setText(str(item))
+                self.parameter_table.item(n_params + item_idx, column_idx).setData(0x0100, item)
+                if not column_idx == self.column_index(self.x_axis_name):
+                    self.parameter_table.item(n_params + item_idx, column_idx).setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+        self.set_observations()
+
+    def set_observations(self):
+        for obs in self.data.observation_names:
+            self.observation_widget.addItem(QListWidgetItem(obs))
+
+    def parameter_names_reduced(self):
+        return [i for i in self.data.parameter_names if not '_idx' in i]
+
+    def observation_names_reduced(self):
+        return [i for i in self.data.observation_names if not i in ['trace', 'start_time', 'end_time', 'thresholds']]
 
     def ret_line_plot_data_single(self, condition_dict, observation_name):
         out = self.data.df[functools.reduce(np.logical_and, [self.data.df[key] == val for key, val in condition_dict.items() if val not in ['__all__', '__average__']])]
         # TODO: wont work for dates as can not be averaged
         return out.groupby([key for key, val in condition_dict.items() if val != '__average__']).agg({observation_name: np.mean}).reset_index()
 
+    def selected_items(self, column_name):
+        out = []
+        for item in self.parameter_table.selectedItems():
+            if item.column() == self.column_index(column_name=column_name):
+                out.append(item.data(0x0100))
+        return out
+
     def ret_line_plot_data(self):
-        selected_items_list = [[i.data(0x0100) for i in getattr(self, name).selectedItems()] for name in self.parameter_names_reduced()]
+
+        # TODO: iterate over all selected items and generate selected_items_list
+
+        selected_items_list = [[i for i in self.selected_items(column_name)] for column_name in self.parameter_names_reduced()]
+        print(selected_items_list)
         if all([len(i) == 0 for i in selected_items_list]):
             return []
         for idx, item, name in zip(range(len(selected_items_list)), selected_items_list, self.parameter_names_reduced()):
@@ -588,51 +647,32 @@ class PlotData:
         plot_data = []
         for p in itertools.product(*selected_items_list):
             condition_dict = collections.OrderedDict([(ni, pi) for ni, pi in zip(self.parameter_names_reduced(), p)])
-            for observation_name in self.observations.selectedItems():
+            for observation_name in self.observation_widget.selectedItems():
                 dfxy = self.ret_line_plot_data_single(condition_dict, observation_name.text())
                 plot_data.append(dict(condition_dict=condition_dict, observation_name=observation_name.text(), x=getattr(dfxy, self.x_axis_name), y=getattr(dfxy, observation_name.text())))
         return plot_data
 
-    def assign_layout(self, data):
-        # Lists
-        for name in self.parameter_names_reduced(data) + ['observations']:
-            setattr(self, name, QListWidget())
-            getattr(self, name).setSelectionMode(QAbstractItemView.ExtendedSelection)
-            getattr(self, name).itemSelectionChanged.connect(self.update_plot)
-
-        for obs in data.observation_names:
-            self.observations.addItem(QListWidgetItem(obs))
-
-        self.layout.addWidget(self.canvas, 4, 1, 10, 10)
-        self.layout.addWidget(self.toolbar, 14, 1, 1, 1)
-        for ix, name in enumerate(self.parameter_names_reduced(data)):
-            self.layout.addWidget(QLabel(name), 1, 0 + ix * 1, 1, 1)
-            self.layout.addWidget(getattr(self, name), 2, 0 + ix * 1, 2, 1)
-        self.layout.addWidget(self.observations, 2, 0 + len(self.parameter_names_reduced(data)) * 1, 2, 1)
-        getattr(self, self.x_axis_name).setEnabled(False)
-        self.layout.addWidget(self.info, 5, 11, 4, 4)
-
     def update_plot(self):
         self.fig.clear()
+
         self.ax = self.fig.add_subplot(111)
-        self.ax.clear()
         for pdi in self.ret_line_plot_data():
+            print(pdi)
             self.ax.plot(pdi['x'], pdi['y'], 'o-',
                          label='NONE',  # '{}\n{}\n{}'.format(self.setpoint1_v.itemData(self.setpoint1_v.currentIndex()), self.setpoint2_v.itemData(self.setpoint2_v.currentIndex()), self.ddy.currentText() )
                          )
         self.canvas.draw()
 
-    def clear(self):
-        self.fig.clear()
+    # def clear(self):
+    #     self.fig.clear()
+    #     self.fig.patch.set_visible(False)
+    #     # self.ax.axis('off')
+    #     # pic = img.imread("{}/images/panda.png".format(os.path.dirname(__file__)))
+    #     # self.ax.imshow(pic)
+    #     # self.canvas.draw()
+    #     self.clean_fig = True
 
-        self.fig.patch.set_visible(False)
-        self.ax.axis('off')
-        pic = img.imread("{}/images/panda.png".format(os.path.dirname(__file__)))
-        self.ax.imshow(pic)
-        self.canvas.draw()
-        self.clean_fig = True
-
-# class PlotDataOld(object):
+    # class PlotDataOld(object):
 #     def __init__(self, title):
 #         self.window = QWidget()
 #         self.layout = QGridLayout(self.window)
