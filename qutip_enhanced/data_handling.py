@@ -757,5 +757,20 @@ class PlotData:
                     cidx += 1
         self.update_plot()
 
-
+    def clear(self):
+        print('Clearing..')
+        self.fit_result_table.clearSelection()
+        self.fit_result_table.clear()
+        self.fit_result_table.setColumnCount(0)
+        self.fit_result_table.setRowCount(0)
+        self.fit_select_table.clearSelection()
+        self.fit_select_table.clear()
+        self.fit_select_table.setColumnCount(0)
+        self.fit_select_table.setRowCount(0)
+        self.parameter_table.clearSelection()
+        self.parameter_table.clear()
+        self.parameter_table.setColumnCount(0)
+        self.parameter_table.setRowCount(0)
+        if hasattr(self, '_data'):
+            delattr(self, '_data')
 

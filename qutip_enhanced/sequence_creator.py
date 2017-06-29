@@ -3,11 +3,13 @@ from __future__ import print_function, absolute_import, division
 __metaclass__ = type
 
 import numpy as np
+import pandas as pd
 import numbers
 from . import coordinates
 import itertools
 import lmfit.lineshapes
 import collections
+import __builtin__
 
 class pd(dict):
 
@@ -233,12 +235,8 @@ class Arbitrary:
                     seq[i].append(self.export_names_dict[name])
         return [i for i in seq if len(i)> 0]
 
-    def save_export_sequence_steps(self, path):
-        """
-        saves the sequence ['RF, WAIT', 'WAIT', 'MW', ..] along with the line number in the respective file
-        :param path:
-        :return:
-        """
+    @property
+    def sequence_steps(self):
         fsn = np.empty((self.n_bins, len(self.export_names_dict)))
         nl_d = dict([(v, 0) for v in self.export_names_dict])
         out = []
@@ -250,22 +248,55 @@ class Arbitrary:
                     osln.append(nl_d[name])
             fsn[i] = nl_d.values()
             out.append([', '.join(step), ', '.join(['{:d}'.format(int(i)) for i in osln])])
-        np.savetxt(path, out, delimiter="\t", fmt=str("%s"))
+        return out
+
+    def save_export_sequence_steps(self, path):
+        """
+        saves the sequence ['RF, WAIT', 'WAIT', 'MW', ..] along with the line number in the respective file
+        :param path:
+        :return:
+        """
+        np.savetxt(path, self.sequence_steps, delimiter="\t", fmt=str("%s"))
         print("Sequence_steps saved.")
+
+    def sequence_steps_for_script(self, sample_frequency=12e3):
+        """
+        I HAVE NO IDEA HOW THIS BEHAVES WHEN MORE THAN ONE CONTROL IS TURNED ON AT ONCE
+        """
+        _WAVE_FILE_DICT_ = dict([(self.export_names_dict[key], self.times_fields_aphi(name=key, sample_frequency=sample_frequency)) for key in self.export_names_dict])
+
+        sequence_steps = []
+        for i in self.sequence_steps:
+            sequence_steps.append([[i[0]], [int(i[1])]])
+            sequence_steps[-1][1] = dict([(key, val) for key, val in zip(['length_mus', 'omega', 'phases'], _WAVE_FILE_DICT_[sequence_steps[-1][0][0]][sequence_steps[-1][1][0] - 1])])
+            sequence_steps[-1][1]['omega'] = [sequence_steps[-1][1]['omega']]
+            if sequence_steps[-1][0][0] != 'WAIT':
+                sequence_steps[-1][1]['phases'] = np.degrees([sequence_steps[-1][1]['phases']])
+        return sequence_steps
 
     def save_times_fields(self, path, name=None):
         np.savetxt(path, np.around(self.times_fields(name), 9), fmt=str('%+1.9e'))
 
+    def times_fields_aphi(self, name, sample_frequency=12e3):
+        t = round2float(self.times(name), 1 / sample_frequency)
+        return np.column_stack([t, self.fields_aphi(name)])
+
     def save_times_fields_aphi(self, name, path=None, sample_frequency=12e3):
-        t = round2float(self.times(name), 1/sample_frequency)
-        taphi = np.column_stack([t, self.fields_aphi(name)])
-        np.savetxt(path, np.around(taphi, 9), fmt=str('%+1.9e'))
+        np.savetxt(path, np.around(self.times_fields_aphi(name=name, sample_frequency=sample_frequency), 9), fmt=str('%+1.9e'))
 
     def save_dynamo_fields(self, directory):
         self.save_times_fields("{}\\fields.dat".format(directory))
         for k, v in self.export_names_dict.items():
             self.save_times_fields_aphi(name=k, path="{}\\{}.dat".format(directory, v))
             print("Fields {} saved.".format(v))
+
+    # def dataframe(self):
+    #     out = Data()
+    #     pn = ['time', 'control_name', ]
+    #
+    #     parameter_names = ret_property_array_like_typ('parameter_names', str)
+    #     parameter_base = ret_property_array_like_typ('ensemble_base', (list, np.ndarray))
+    #     observation_names = ret_property_array_like_typ('observation_names', str)
 
     def print_info(self):
         for s, t in zip(self.sequence, self.times()):
