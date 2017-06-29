@@ -21,6 +21,8 @@ from matplotlib.figure import Figure
 import matplotlib.image as img
 import functools
 import __builtin__
+import lmfit
+from . import lmfit_models
 
 
 class TC:
@@ -514,6 +516,77 @@ class Data:
         df = self.df if df is None else df
         return df[functools.reduce(np.logical_and, [df[key] == val for key, val in d.items()])]
 
+class QTableWidgetEnhanced(QTableWidget):
+
+    def column_data(self, column_name):
+
+        out = []
+        for row in range(self.rowCount()):
+            o = self.item(row, self.column_index(column_name))
+            if o.text() != '':
+                out.append(o.data(0x0100))
+        return out
+
+    @property
+    def column_names(self):
+        return [self.horizontalHeaderItem(i).text() for i in range(self.columnCount())]
+
+    def column_index(self, column_name):
+        return self.column_names.index(column_name)
+
+    def add_rows(self, n_new):
+        if n_new > 0:
+            n_old = self.rowCount()
+            self.setRowCount(n_old+n_new)
+            for rc in itertools.product(range(n_old, n_old+n_new), range(self.columnCount())):
+                new_item = QTableWidgetItem('')
+                new_item.setData(0x0100, None)
+                new_item.setFlags(Qt.NoItemFlags)
+                self.setItem(rc[0], rc[1], new_item)
+
+    def set_columns(self, desired_total_count, header):
+        if desired_total_count != len(header):
+            raise Exception("Error: {}{}".format(desired_total_count, header))
+        self.setColumnCount(desired_total_count)
+        self.setHorizontalHeaderLabels(header)
+        for rc in itertools.product(range(self.rowCount()), range(desired_total_count)):
+            new_item = QTableWidgetItem('')
+            new_item.setData(0x0100, None)
+            new_item.setFlags(Qt.NoItemFlags)
+            self.setItem(rc[0], rc[1], new_item)
+
+    def append_to_column_parameters(self, column_name, parameters):
+        cd = self.column_data(column_name)
+        new_params = [i for i in parameters if i not in cd]
+        delta_n_row = len(parameters) - self.rowCount()
+        if delta_n_row > 0:
+            self.add_rows(delta_n_row)
+        for row_idx, new_param in zip(len(parameters) - len(new_params) + np.arange(0, len(parameters)), new_params):
+            self.item(row_idx, self.column_index(column_name)).setText(str(new_param))
+            self.item(row_idx, self.column_index(column_name)).setData(0x0100, new_param)
+            self.item(row_idx, self.column_index(column_name)).setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+
+    def set_column_flags(self, column_name, flag):
+        for row in range(self.rowCount()):
+            self.item(row, self.column_index(column_name)).setFlags(flag)
+
+    def selected_table_items(self, column_name):
+        out = []
+        for item in self.selectedItems():
+            if item.column() == self.column_index(column_name=column_name):
+                out.append(item.data(0x0100))
+        return out
+
+    def selected_items_unique_column_indices(self):
+        return list(set([i.row() for i in self.selectedItems()]))
+
+    def clear_table_contents(self):
+        for idx in itertools.product(range(self.rowCount()), range(self.columnCount())):
+            self.clearSelection()
+            self.item(idx[0], idx[1]).setText('')
+            self.item(idx[0], idx[1]).setData(0x0100, None)
+            self.item(idx[0], idx[1]).setFlags(Qt.NoItemFlags)
+
 class PlotData:
     def __init__(self, title):
         self.window = QWidget()
@@ -537,16 +610,22 @@ class PlotData:
         self.info.setFrameStyle(QFrame.NoFrame | QFrame.Sunken)
         self.info.setBackgroundVisible(True)
 
-        self.parameter_table = QTableWidget()
-        self.parameter_table.itemSelectionChanged.connect(self.update_plot)
+        self.parameter_table = QTableWidgetEnhanced()
+        # self.parameter_table.itemSelectionChanged.connect(self.update_fit_select_table_and_plot)
+
+        self.fit_select_table = QTableWidgetEnhanced()
+        # self.fit_select_table.itemSelectionChanged.connect(self.update_fit_result_table)
+
+        self.fit_result_table = QTableWidgetEnhanced()
 
         self.observation_widget = QListWidget()
         self.observation_widget.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.observation_widget.itemSelectionChanged.connect(self.update_plot)
-
+        # self.observation_widget.itemSelectionChanged.connect(self.update_fit_select_table_and_plot)
 
         self.layout.addWidget(self.canvas, 2, 1, 1, 15)
         self.layout.addWidget(self.parameter_table, 1, 1, 1, 15)
+        self.layout.addWidget(self.fit_select_table, 3, 1, 1, 15)
+        self.layout.addWidget(self.fit_result_table, 4, 1, 1, 15)
         self.layout.addWidget(self.toolbar, 3, 4, 1, 15)
         self.layout.addWidget(self.info, 2, 16, 1, 1)
 
@@ -569,48 +648,14 @@ class PlotData:
         self.set_parameters()
         self.update_plot()
 
-    def new_parameters_l(self, column_name):
-        return [i for i in getattr(self.data.df, column_name).unique() if i not in self.column_data(column_name)]
-
-    def column_data(self, column_name):
-        out = []
-        for row in range(self.parameter_table.rowCount()):
-            o = self.parameter_table.item(row, self.column_index(column_name))
-            if o.text() != '':
-                out.append(o.data(0x0100))
-        return out
-
-    @property
-    def column_names(self):
-        return [self.parameter_table.horizontalHeaderItem(i).text() for i in range(self.parameter_table.columnCount())]
-
-    def column_index(self, column_name):
-        return self.column_names.index(column_name)
-
-    def add_row(self, n_new):
-        if n_new > 0:
-            n_old = self.parameter_table.rowCount()
-            self.parameter_table.setRowCount(n_old+n_new)
-            for rc in itertools.product(range(n_old, n_old+n_new), range(self.parameter_table.columnCount())):
-                new_item = QTableWidgetItem('')
-                new_item.setData(0x0100, None)
-                new_item.setFlags(Qt.NoItemFlags)
-                self.parameter_table.setItem(rc[0], rc[1], new_item)
-
     def set_parameters(self):
-        for column_idx, name in enumerate(self.parameter_names_reduced()):
-            n_rows = self.parameter_table.rowCount()
-            n_params = len(self.column_data(name))
-            new_params = self.new_parameters_l(name)
-            self.add_row(max(n_params + len(new_params) - n_rows, 0))
-            for item_idx, item in enumerate(new_params):
-                self.parameter_table.item(n_params + item_idx, column_idx).setText(str(item))
-                self.parameter_table.item(n_params + item_idx, column_idx).setData(0x0100, item)
-                if not column_idx == self.column_index(self.x_axis_name):
-                    self.parameter_table.item(n_params + item_idx, column_idx).setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+        for column_name in  self.parameter_names_reduced():
+            self.parameter_table.append_to_column_parameters(column_name, getattr(self.data.df, column_name).unique())
+            if column_name == self.x_axis_name:
+                self.parameter_table.set_column_flags(column_name, Qt.NoItemFlags)
 
     def set_observations(self):
-        for obs in self.data.observation_names:
+        for obs in self.observation_names_reduced():
             self.observation_widget.addItem(QListWidgetItem(obs))
 
     def parameter_names_reduced(self):
@@ -624,368 +669,93 @@ class PlotData:
         # TODO: wont work for dates as can not be averaged
         return out.groupby([key for key, val in condition_dict.items() if val != '__average__']).agg({observation_name: np.mean}).reset_index()
 
-    def selected_items(self, column_name):
-        out = []
-        for item in self.parameter_table.selectedItems():
-            if item.column() == self.column_index(column_name=column_name):
-                out.append(item.data(0x0100))
-        return out
+    def selected_plot_items(self):
+        out = [[i for i in self.parameter_table.selected_table_items(column_name)] for column_name in self.parameter_names_reduced()]
+        if all([len(i) == 0 for i in out]):
+            return []
+        for idx, item, name in zip(range(len(out)), out, self.parameter_names_reduced()):
+            if name == self.x_axis_name:
+                out[idx] = ['__all__']
+            elif len(item) == 0:
+                out[idx] = ['__average__']
+        return itertools.product(*out)
 
     def ret_line_plot_data(self):
-
-        # TODO: iterate over all selected items and generate selected_items_list
-
-        selected_items_list = [[i for i in self.selected_items(column_name)] for column_name in self.parameter_names_reduced()]
-        if all([len(i) == 0 for i in selected_items_list]):
-            return []
-        for idx, item, name in zip(range(len(selected_items_list)), selected_items_list, self.parameter_names_reduced()):
-            if name == self.x_axis_name:
-                selected_items_list[idx] = ['__all__']
-            elif len(item) == 0:
-                selected_items_list[idx] = ['__average__']
         plot_data = []
-        for p in itertools.product(*selected_items_list):
+        for p in self.selected_plot_items():
             condition_dict = collections.OrderedDict([(ni, pi) for ni, pi in zip(self.parameter_names_reduced(), p)])
             for observation_name in self.observation_widget.selectedItems():
                 dfxy = self.ret_line_plot_data_single(condition_dict, observation_name.text())
-                plot_data.append(dict(condition_dict=condition_dict, observation_name=observation_name.text(), x=getattr(dfxy, self.x_axis_name), y=getattr(dfxy, observation_name.text())))
+                condition_dict_reduced = collections.OrderedDict([(key, val) for key, val in condition_dict.items() if val not in ['__average__', '__all__']])
+                plot_data.append(dict(condition_dict_reduced=condition_dict_reduced, observation_name=observation_name.text(), x=getattr(dfxy, self.x_axis_name), y=getattr(dfxy, observation_name.text())))
         return plot_data
 
     def update_plot(self):
         self.fig.clear()
 
         self.ax = self.fig.add_subplot(111)
-        for pdi in self.ret_line_plot_data():
-            self.ax.plot(pdi['x'], pdi['y'], 'o-',
+        psl = []
+        for idx, pdi in enumerate(self.ret_line_plot_data()):
+            if idx in self.fit_select_table.selected_items_unique_column_indices():
+                psl.append('o')
+            else:
+                psl.append('o-')
+            self.ax.plot(pdi['x'], pdi['y'], psl[-1],
                          label='NONE',  # '{}\n{}\n{}'.format(self.setpoint1_v.itemData(self.setpoint1_v.currentIndex()), self.setpoint2_v.itemData(self.setpoint2_v.currentIndex()), self.ddy.currentText() )
                          )
+        for idx, fi in enumerate(getattr(self, 'fit_results', [])):
+            fi[1].plot_fit(ax=self.ax)
         self.canvas.draw()
 
-    # def clear(self):
-    #     self.fig.clear()
-    #     self.fig.patch.set_visible(False)
-    #     # self.ax.axis('off')
-    #     # pic = img.imread("{}/images/panda.png".format(os.path.dirname(__file__)))
-    #     # self.ax.imshow(pic)
-    #     # self.canvas.draw()
-    #     self.clean_fig = True
+    def update_fit_select_table_and_plot(self):
+        self.fit_result_table.clear_table_contents()
+        self.fit_select_table.clear_table_contents()
+        cpd = collections.OrderedDict()
+        spt = list(self.selected_plot_items())
+        for column_idx, column_name in enumerate(self.parameter_names_reduced()):
+            cpd[column_name] = []
+            for pi in spt:
+                if not pi[column_idx] in ['__average__', '__all__']:
+                    cpd[column_name].append(pi[column_idx])
+            if len(cpd[column_name]) == 0:
+                del cpd[column_name]
+        self.fit_select_table.set_columns(len(cpd.keys()), cpd.keys())
+        for column_name, parameters in cpd.items():
+            self.fit_select_table.append_to_column_parameters(column_name, parameters)
+        self.update_plot()
 
-    # class PlotDataOld(object):
-#     def __init__(self, title):
-#         self.window = QWidget()
-#         self.layout = QGridLayout(self.window)
-#         self.init_gui()
-#         self.window.setWindowTitle(title)
-#         self.clear()
-#
-#     def init_gui(self):
-#
-#         # Figure
-#         self.fig = Figure()
-#         self.canvas = FigureCanvas(self.fig)
-#         self.toolbar = NavigationToolbar(self.canvas, self.window)
-#         # self.toolbar.hide()
-#
-#         # Code
-#         self.code = QTextEdit()
-#
-#         # Buttons
-#         self.button = QPushButton('Plot')
-#         self.fitbutton = QCheckBox('Fit')
-#         self.clearbutton = QPushButton('Clear')
-#         self.multiplot = QCheckBox('Add Plot')
-#         self.agg_data = QCheckBox('Plot aggregated data')
-#
-#         self.loop_over_sp1 = QCheckBox('All setpoint 1')
-#         self.loop_over_sp2 = QCheckBox('All setpoint 2')
-#         self.loop_over_results = QCheckBox('results')
-#
-#         # set points of values for dataframe
-#         self.setpoint1_l = QLabel('Setpoint 1')
-#         self.setpoint2_l = QLabel('Setpoint 2')
-#         self.setpoint1 = QComboBox()
-#         self.setpoint2 = QComboBox()
-#         self.setpoint1_v = QComboBox()
-#         self.setpoint2_v = QComboBox()
-#         self.test = QListWidget()
-#
-#         # data to be plotted
-#         self.x_l = QLabel('X axis')
-#         self.y_l = QLabel('Y axis')
-#         self.ddx = QComboBox()
-#         self.ddy = QComboBox()
-#
-#         # infos
-#         self.info = QPlainTextEdit()
-#         self.info.setFrameStyle(QFrame.NoFrame | QFrame.Sunken )
-#         self.info.setBackgroundVisible(True)
-#
-#         # Button actions
-#         self.button.clicked.connect(lambda: self.plot())  # update plot when choosing something from dropdown menu
-#         self.clearbutton.clicked.connect(self.clear)  # clear figure
-#         self.ddy.activated.connect(lambda: self.plot())  # if dropdown menu chances, update plot
-#         self.setpoint1.activated.connect(lambda: self.setpoint_changed())  # if dropdown menu chances, update plot
-#         self.setpoint2.activated.connect(lambda: self.setpoint_changed())  # if dropdown menu chances, update plot
-#         self.setpoint1_v.activated.connect(lambda: self.plot())  # if dropdown menu chances, update plot
-#         self.setpoint2_v.activated.connect(lambda: self.plot())  # if dropdown menu chances, update plot
-#
-#         self.assign_layout()
-#
-#     def assign_layout(self):
-#
-#         self.layout.addWidget(self.canvas, 1, 1, 10, 10)
-#
-#         self.layout.addWidget(self.toolbar, 12, 1, 1, 1)
-#
-#         self.layout.addWidget(self.button, 9, 14, 1, 1)
-#         self.layout.addWidget(self.fitbutton, 9, 13, 1, 1)
-#
-#         self.layout.addWidget(self.loop_over_sp1, 8, 11, 1, 1)
-#         self.layout.addWidget(self.loop_over_sp2, 8, 12, 1, 1)
-#         self.layout.addWidget(self.loop_over_results, 8, 13, 1, 1)
-#
-#         self.layout.addWidget(self.setpoint1_l, 1, 11, 1, 1)
-#         self.layout.addWidget(self.setpoint1, 1, 12, 1, 1)
-#         self.layout.addWidget(self.setpoint1_v, 1, 13, 1, 1)
-#
-#         self.layout.addWidget(self.setpoint2_l, 2, 11, 1, 1)
-#         self.layout.addWidget(self.setpoint2, 2, 12, 1, 1)
-#         self.layout.addWidget(self.setpoint2_v, 2, 13, 1, 1)
-#
-#         self.layout.addWidget(self.x_l, 3, 11, 1, 1)
-#         self.layout.addWidget(self.ddx, 3, 12, 1, 1)
-#         self.layout.addWidget(self.y_l, 3, 13, 1, 1)
-#         self.layout.addWidget(self.ddy, 3, 14, 1, 1)
-#
-#         self.layout.addWidget(self.multiplot, 9, 11, 1, 1)
-#         self.layout.addWidget(self.agg_data, 9, 12, 1, 1)
-#         self.layout.addWidget(self.clearbutton, 10, 11, 1, 4)
-#
-#         self.layout.addWidget(self.info, 4, 11, 4, 4)
-#
-#         # self.layout.addWidget(self.code, 5,11, 1, 1)
-#
-#     @property
-#     def data(self):
-#         return self._data
-#
-#     @data.setter
-#     def data(self, val):
-#         self._data = val
-#         self.ddxy()
-#
-#     @property
-#     def parameters(self):
-#         if not hasattr(self, '_parameters'):
-#             return ['seq_num', 'x', 'seq_num_idx', 'x_idx']
-#         return self._parameters
-#
-#     @parameters.setter
-#     def parameters(self, val):
-#         self._parameters = val
-#
-#     @property
-#     def fit_data(self):
-#         if not hasattr(self, '_fit_data'):
-#             return (np.array([0.]), np.array([0.]))
-#         else:
-#             return self._fit_data
-#
-#     @fit_data.setter
-#     def fit_data(self, val):
-#         self._fit_data = val
-#
-#     @property
-#     def columns(self):
-#         return self._data.columns
-#
-#     @property
-#     def sp1(self):
-#         return self.setpoint1.currentText()
-#
-#     @sp1.setter
-#     def sp1(self, val):
-#         self.setpoint1.setCurrentText(val)
-#         # self.setpoint_changed()
-#
-#     @property
-#     def sp2(self):
-#         return self.setpoint2.currentText()
-#
-#     @sp2.setter
-#     def sp2(self, val):
-#         self.setpoint2.setCurrentText(val)
-#         # self.setpoint_changed()
-#
-#     @property
-#     def ax_x(self):
-#         return self.ddx.currentText()
-#
-#     @ax_x.setter
-#     def ax_x(self, val):
-#         self.ddx.setCurrentText(val)
-#
-#     @property
-#     def ax_y(self):
-#         return self.ddy.currentText()
-#
-#     @ax_y.setter
-#     def ax_y(self, val):
-#         self.ddy.setCurrentText(val)
-#     @property
-#     def agg_column(self):
-#         if not hasattr(self, '_agg_column'):
-#             return ['seq_num', 'x']
-#         else:
-#             return self._agg_column
-#
-#     @agg_column.setter
-#     def agg_column(self, val):
-#         self._agg_column = val
-#
-#     @property
-#     def agg_dict(self):
-#         if not hasattr(self, '_agg_dict'):
-#             return dict(result_0=np.nanmean,
-#                         # result_1=np.nanmean,
-#                         # result_2=np.nanmean,
-#                         events=np.nanmean
-#                         )
-#         else:
-#             return self._agg_dict
-#
-#     @agg_dict.setter
-#     def agg_dict(self, val):
-#         self._agg_dict = val
-#
-#     @property
-#     def num_res(self):
-#         if not hasattr(self, '_num_res'):
-#             return ['result_0']
-#         else:
-#             return self._num_res
-#
-#     @num_res.setter
-#     def num_res(self, val):
-#         self._num_res = val
-#
-#     def ddxy(self):
-#         self.setpoint1.addItems(self.columns)
-#         self.setpoint1.setDuplicatesEnabled(False)
-#         self.setpoint2.addItems(self.columns)
-#         self.setpoint2.setDuplicatesEnabled(False)
-#         self.ddx.addItems(self.columns)
-#         self.ddx.setDuplicatesEnabled(False)
-#         self.ddy.addItems(self.columns)
-#         self.ddy.setDuplicatesEnabled(False)
-#
-#     def setpoint_changed(self):
-#         self.setpoint1_v.clear()
-#         self.setpoint2_v.clear()
-#         for item in self.data[self.setpoint1.currentText()].drop_duplicates().values:
-#             self.setpoint1_v.addItem('{}'.format(item), item)
-#             self.setpoint1_v.setDuplicatesEnabled(False)
-#         for item in self.data[self.setpoint2.currentText()].drop_duplicates().values:
-#             self.setpoint2_v.addItem('{}'.format(item), item)
-#             self.setpoint2_v.setDuplicatesEnabled(False)
-#
-#     def ret_line_plot_data(self):
-#         try:
-#             if self.agg_data.checkState() == 0:
-#                 temp = self._data.loc[(self._data[self.setpoint1.currentText()] == self.setpoint1_v.itemData(self.setpoint1_v.currentIndex())) & (self._data[self.setpoint2.currentText()] == self.setpoint2_v.itemData(self.setpoint2_v.currentIndex()))]
-#                 x = temp[self.ddx.currentText()].values
-#                 y = temp[self.ddy.currentText()].values
-#             else:
-#                 if self.loop_over_sp1.checkState() == 2:
-#                     temp = self.data.groupby([self.setpoint1.currentText(), self.ddx.currentText()], as_index=False).agg(self.agg_dict)
-#                     values_sp1 = [self.setpoint1_v.itemText(i) for i in range(self.setpoint1_v.count())]
-#                     r = []
-#                     for val in values_sp1:
-#                         r.append(temp[(temp[self.setpoint1.currentText()] == float(val))][self.ddy.currentText()].values)
-#                 if self.loop_over_sp2.checkState() == 2:
-#                     temp = self.data.groupby([self.setpoint2.currentText(), self.ddx.currentText()], as_index=False).agg(self.agg_dict)
-#                     values_sp2 = [self.setpoint2_v.itemText(i) for i in range(self.setpoint2_v.count())]
-#                     r = []
-#                     for val in values_sp2:
-#                         r.append(temp[(temp[self.setpoint2.currentText()] == float(val))][self.ddy.currentText()].values)
-#                 if self.loop_over_results.checkState() == 2:
-#                     # temp = self._data.loc[(self._data[self.setpoint1.currentText()] == self.setpoint1_v.itemData(self.setpoint1_v.currentIndex())) & (self._data[self.setpoint2.currentText()] == self.setpoint2_v.itemData(self.setpoint2_v.currentIndex()))]
-#                     temp = self.data.groupby(self.agg_column, as_index=False).agg(self.agg_dict)[(self._data[self.setpoint2.currentText()] == self.setpoint2_v.itemData(self.setpoint2_v.currentIndex()))]
-#                     x = temp[self.ddx.currentText()].values
-#                     y = temp[['result_{}'.format(i) for i in range(self.num_res)]].values
-#                 else:
-#                     temp = self.data.groupby(self.agg_column, as_index=False).agg(self.agg_dict)[(self._data[self.setpoint2.currentText()] == self.setpoint2_v.itemData(self.setpoint2_v.currentIndex()))]
-#                     x = temp[self.ddx.currentText()].values
-#                     y = temp[self.ddy.currentText()].values
-#             return x, y
-#         except:
-#             raise Exception
-#
-#     def fit(self):
-#         try:
-#             self.ax.plot(self.fit_data[0], self.fit_data[1], '-')
-#         except:
-#             raise Exception
-#
-#
-#
-#     def plot(self):
-#         if self.setpoint1_v.currentText() == u'':
-#             self.setpoint_changed()
-#             self.setpoint1_v.setCurrentIndex(0)
-#         if self.setpoint2_v.currentText() == u'':
-#             self.setpoint_changed()
-#             self.setpoint2_v.setCurrentIndex(0)
-#         try:
-#             x, y = self.ret_line_plot_data()
-#             if self.clean_fig:
-#                 self.fig.clear()
-#                 self.clean_fig = False
-#             if self.multiplot.checkState() == 0:
-#                 self.fig.clear()
-#             if not hasattr(self, 'ax') or self.multiplot.checkState() == 0:
-#                 self.ax = self.fig.add_subplot(111)
-#             self.ax.plot(x, y, 'o-', label='{}\n{}\n{}'.format(self.setpoint1_v.itemData(self.setpoint1_v.currentIndex()),
-#                                                                self.setpoint2_v.itemData(self.setpoint2_v.currentIndex()),
-#                                                                self.ddy.currentText()
-#                                                                )
-#                          )
-#             if self.fitbutton.checkState() == 2:
-#                 self.fit()
-#             self.ax.set_xlabel('{}'.format(self.ddx.currentText()))
-#             self.ax.set_ylabel('{}'.format(self.ddy.currentText()))
-#             # ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-#             # box = ax.get_position()
-#             # ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-#             self.canvas.draw()
-#         except:
-#             raise Exception
-#
-#     def toggle_setpoints(self):
-#         if self.agg_data.checkState() == 2:
-#             if self.loop_over_sp1.checkState() == 0:
-#                 self.setpoint1.setEditable(False)
-#                 self.setpoint1_v.setEditable(False)
-#             if self.loop_over_sp2.checkState() == 0:
-#                 self.setpoint2.setEditable(False)
-#                 self.setpoint2_v.setEditable(False)
-#             if self.loop_over_results.checkState() == 0:
-#                 self.ddx.setEditable(False)
-#                 self.ddy.setEditable(False)
-#         else:
-#             self.setpoint1.setEditable(True)
-#             self.setpoint1_v.setEditable(True)
-#             self.setpoint2.setEditable(True)
-#             self.setpoint2_v.setEditable(True)
-#             self.ddx.setEditable(True)
-#             self.ddy.setEditable(True)
-#
-#     def clear(self):
-#         self.fig.clear()
-#         ax = self.fig.add_subplot(111)
-#         self.fig.patch.set_visible(False)
-#         ax.axis('off')
-#         pic = img.imread("{}/images/panda.png".format(os.path.dirname(__file__)))
-#         ax.imshow(pic)
-#         self.canvas.draw()
-#         self.clean_fig = True
+
+        # self.fit_result_str = "\n".join(["{}: {}".format(key, val.value) for key, val in self.fit_result.params.items()])
+        # if self.fit_function in ['Cosinus decay', 'Cosinus dec offset']:  # now always true because of outer if, but later useful
+        #     self.contrast = 100 * abs(self.fit_result.params['amplitude'].value * 2)
+        # self.fit = self.fit_result.best_fit
+
+    def update_fit_result_table(self):
+        spi = list(self.ret_line_plot_data())
+        mod = lmfit_models.CosineModel()
+        self.fit_results = []
+        for i in [spi[idx] for idx in self.fit_select_table.selected_items_unique_column_indices()]:
+            try:
+                params = mod.guess(data=i['y'], x=i['x'])
+                self.fit_results.append([i, mod.fit(i['y'], params, x=i['x'])])
+            except:
+                self.fit_results.append([i, None])
+                print('fitting failed: {}'.format(i))
+        header = self.fit_results[0][0]['condition_dict_reduced'].keys() + ['observation_name'] + self.fit_results[0][1].params.keys()
+        self.fit_result_table.setColumnCount(len(header))
+        self.fit_result_table.setHorizontalHeaderLabels(header)
+        for ridx, fri in enumerate(self.fit_results):
+            if fri[1] is not None:
+                self.fit_result_table.add_rows(1)
+
+                cidx = 0
+                for key, val in fri[0]['condition_dict_reduced'].items() + [('observation_name', fri[0]['observation_name'])] + [(key, val.value) for key, val in fri[1].params.items()]:
+                    new_item = QTableWidgetItem(str(val))
+                    new_item.setData(0x0100, val)
+                    new_item.setFlags(Qt.ItemIsSelectable)
+                    self.fit_result_table.setItem(ridx, cidx, new_item)
+                    cidx += 1
+        self.update_plot()
+
+
+
