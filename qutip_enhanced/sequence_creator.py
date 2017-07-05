@@ -9,7 +9,7 @@ from . import coordinates
 import itertools
 import lmfit.lineshapes
 import collections
-import __builtin__
+
 
 class pd(dict):
 

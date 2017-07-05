@@ -3,7 +3,7 @@ from __future__ import print_function, absolute_import, division
 
 __metaclass__ = type
 
-import os
+import os, sys
 
 import numpy as np
 import pandas as pd
@@ -22,7 +22,10 @@ from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationTo
 from matplotlib.figure import Figure
 import matplotlib.image as img
 import functools
-import __builtin__
+if sys.version_info.major == 2:
+    import __builtin__
+else:
+    import builtins as __builtin__
 import lmfit
 from . import lmfit_models
 

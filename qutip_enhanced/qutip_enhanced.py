@@ -5,11 +5,11 @@ __metaclass__ = type
 from qutip import *
 import numpy as np
 np.set_printoptions(suppress=True, linewidth=500)
-import itertools
+
 from . import coordinates
 import copy
 import scipy.linalg
-import numpy as np
+
 from numpy import *
 from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d import proj3d
