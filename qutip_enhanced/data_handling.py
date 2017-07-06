@@ -307,13 +307,13 @@ class PlotData(plot_data_gui.Ui_window):
         self.plot_fit_layout.addWidget(self.canvas_fit, 1, 1, 20, 20)
         self.toolbar_fit_layout.addWidget(self.toolbar_fit, 21, 1, 1, 20)
 
-
         self.ax_fit = self.fig_fit.add_subplot(111)
         self.ax_fit.plot(np.linspace(-2., 2., 100), np.linspace(-2,2.,100)**2)
         self.canvas_fit.draw()
 
         self.update_plot_button.clicked.connect(self.update_fit_select_table_and_plot)
-        # self.update_fit_result_button.clicked.connect(self.update_fit_result_table)
+        self.update_fit_result_button.clicked.connect(self.update_fit_result_table)
+        self.parameter_tab.setCurrentIndex(0)
 
     @property
     def data(self):
@@ -329,7 +329,17 @@ class PlotData(plot_data_gui.Ui_window):
         else:
             self._data = val
         self.set_parameters()
-        self.update_plot()
+        self.plot_all_if_none()
+        self.update_fit_select_table_and_plot()
+
+    def plot_all_if_none(self):
+        if len(self.parameter_table.selectedItems()) == 0:
+            column_names = self.parameter_names_reduced()[1:]
+            column_names.remove(self.x_axis_name)
+            for cn in column_names:
+                self.parameter_table.selectColumn(self.parameter_table.column_index(cn))
+        if len(self.observation_widget.selectedItems()) == 0:
+            self.observation_widget.item(0).setSelected(True)
 
     def set_parameters(self):
         for column_name in  self.parameter_names_reduced():
@@ -375,23 +385,26 @@ class PlotData(plot_data_gui.Ui_window):
 
     def update_plot(self):
         self.fig.clear()
-
         self.ax = self.fig.add_subplot(111)
-        psl = []
         for idx, pdi in enumerate(self.ret_line_plot_data()):
-            if idx in self.fit_select_table.selected_items_unique_column_indices():
-                psl.append('o')
-            else:
-                psl.append('o-')
-            self.ax.plot(pdi['x'], pdi['y'], psl[-1],
+            self.ax.plot(pdi['x'], pdi['y'], '-',
                          label='NONE',  # '{}\n{}\n{}'.format(self.setpoint1_v.itemData(self.setpoint1_v.currentIndex()), self.setpoint2_v.itemData(self.setpoint2_v.currentIndex()), self.ddy.currentText() )
                          )
-        for idx, fi in enumerate(getattr(self, 'fit_results', [])):
-            fi[1].plot_fit(ax=self.ax)
         self.canvas.draw()
 
+    def update_plot_fit(self):
+        self.fig_fit.clear()
+        self.ax_fit = self.fig_fit.add_subplot(111)
+        for idx, fi in enumerate(getattr(self, 'fit_results', [])):
+            color = self.ax_fit._get_lines.get_next_color()
+            r = fi[1]
+            x = r.userkws['x']
+            y = r.eval(params=r.params, x=x)
+            self.ax_fit.plot(x,y, '-', color=color)
+            self.ax_fit.plot(x, r.data, 'o', color=color, markersize=3.5)
+            self.canvas_fit.draw()
+
     def update_fit_select_table_and_plot(self):
-        self.fit_result_table.clear_table_contents()
         self.fit_select_table.clear_table_contents()
         cpd = collections.OrderedDict()
         spt = list(self.selected_plot_items())
@@ -408,6 +421,7 @@ class PlotData(plot_data_gui.Ui_window):
         self.update_plot()
 
     def update_fit_result_table(self):
+        self.fit_result_table.clear_table_contents()
         spi = list(self.ret_line_plot_data())
         mod = lmfit_models.CosineModel()
         self.fit_results = []
@@ -435,7 +449,7 @@ class PlotData(plot_data_gui.Ui_window):
                     new_item.setFlags(Qt.ItemIsSelectable)
                     self.fit_result_table.setItem(ridx, cidx, new_item)
                     cidx += 1
-        self.update_plot()
+        self.update_plot_fit()
 
     def clear(self):
         print('Clearing..')

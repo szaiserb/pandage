@@ -38,6 +38,9 @@
        <height>261</height>
       </rect>
      </property>
+     <property name="selectionMode">
+      <enum>QAbstractItemView::ExtendedSelection</enum>
+     </property>
     </widget>
     <widget class="QTableWidgetEnhanced" name="parameter_table">
      <property name="geometry">
@@ -47,6 +50,9 @@
        <width>761</width>
        <height>261</height>
       </rect>
+     </property>
+     <property name="selectionMode">
+      <enum>QAbstractItemView::MultiSelection</enum>
      </property>
     </widget>
     <widget class="QWidget" name="gridLayoutWidget">
@@ -89,6 +95,9 @@
        <height>261</height>
       </rect>
      </property>
+     <property name="selectionMode">
+      <enum>QAbstractItemView::MultiSelection</enum>
+     </property>
     </widget>
     <widget class="QTableWidgetEnhanced" name="fit_result_table">
      <property name="geometry">
@@ -98,6 +107,9 @@
        <width>661</width>
        <height>261</height>
       </rect>
+     </property>
+     <property name="selectionMode">
+      <enum>QAbstractItemView::MultiSelection</enum>
      </property>
     </widget>
     <widget class="QWidget" name="gridLayoutWidget_3">
