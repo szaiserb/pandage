@@ -19,7 +19,7 @@
      <x>6</x>
      <y>-1</y>
      <width>1101</width>
-     <height>291</height>
+     <height>1001</height>
     </rect>
    </property>
    <property name="currentIndex">
@@ -49,6 +49,32 @@
       </rect>
      </property>
     </widget>
+    <widget class="QWidget" name="gridLayoutWidget">
+     <property name="geometry">
+      <rect>
+       <x>0</x>
+       <y>270</y>
+       <width>851</width>
+       <height>631</height>
+      </rect>
+     </property>
+     <layout class="QGridLayout" name="plot_layout"/>
+    </widget>
+    <widget class="QWidget" name="gridLayoutWidget_2">
+     <property name="geometry">
+      <rect>
+       <x>0</x>
+       <y>900</y>
+       <width>851</width>
+       <height>71</height>
+      </rect>
+     </property>
+     <layout class="QGridLayout" name="toolbar_layout">
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+     </layout>
+    </widget>
    </widget>
    <widget class="QWidget" name="fit_tab">
     <attribute name="title">
@@ -60,7 +86,7 @@
        <x>0</x>
        <y>0</y>
        <width>421</width>
-       <height>251</height>
+       <height>261</height>
       </rect>
      </property>
     </widget>
@@ -70,9 +96,35 @@
        <x>430</x>
        <y>0</y>
        <width>661</width>
-       <height>251</height>
+       <height>261</height>
       </rect>
      </property>
+    </widget>
+    <widget class="QWidget" name="gridLayoutWidget_3">
+     <property name="geometry">
+      <rect>
+       <x>0</x>
+       <y>900</y>
+       <width>851</width>
+       <height>71</height>
+      </rect>
+     </property>
+     <layout class="QGridLayout" name="toolbar_fit_layout">
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+     </layout>
+    </widget>
+    <widget class="QWidget" name="gridLayoutWidget_4">
+     <property name="geometry">
+      <rect>
+       <x>0</x>
+       <y>270</y>
+       <width>851</width>
+       <height>631</height>
+      </rect>
+     </property>
+     <layout class="QGridLayout" name="plot_fit_layout"/>
     </widget>
    </widget>
   </widget>
@@ -94,32 +146,6 @@
    <property name="backgroundVisible">
     <bool>false</bool>
    </property>
-  </widget>
-  <widget class="QWidget" name="gridLayoutWidget">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>290</y>
-     <width>851</width>
-     <height>631</height>
-    </rect>
-   </property>
-   <layout class="QGridLayout" name="plot_layout"/>
-  </widget>
-  <widget class="QWidget" name="gridLayoutWidget_2">
-   <property name="geometry">
-    <rect>
-     <x>9</x>
-     <y>919</y>
-     <width>851</width>
-     <height>61</height>
-    </rect>
-   </property>
-   <layout class="QGridLayout" name="toolbar_layout">
-    <property name="rightMargin">
-     <number>0</number>
-    </property>
-   </layout>
   </widget>
   <widget class="QPushButton" name="update_plot_button">
    <property name="geometry">

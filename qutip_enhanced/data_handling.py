@@ -296,6 +296,22 @@ class PlotData(plot_data_gui.Ui_window):
         self.canvas.draw()
         self.plot_layout.addWidget(self.canvas, 1, 1, 20, 20)
         self.toolbar_layout.addWidget(self.toolbar, 21, 1, 1, 20)
+
+        # Figure fit
+        self.fig_fit = Figure()
+        self.canvas_fit = FigureCanvas(self.fig_fit)
+        self.toolbar_fit = NavigationToolbar(self.canvas_fit, self.window)
+
+        self.ax_fit = self.fig_fit.add_subplot(111)
+        self.canvas_fit.draw()
+        self.plot_fit_layout.addWidget(self.canvas_fit, 1, 1, 20, 20)
+        self.toolbar_fit_layout.addWidget(self.toolbar_fit, 21, 1, 1, 20)
+
+
+        self.ax_fit = self.fig_fit.add_subplot(111)
+        self.ax_fit.plot(np.linspace(-2., 2., 100), np.linspace(-2,2.,100)**2)
+        self.canvas_fit.draw()
+
         self.update_plot_button.clicked.connect(self.update_fit_select_table_and_plot)
         # self.update_fit_result_button.clicked.connect(self.update_fit_result_table)
 
