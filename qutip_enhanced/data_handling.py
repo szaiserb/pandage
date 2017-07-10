@@ -11,11 +11,11 @@ import itertools
 from numbers import Number
 import collections
 import subprocess
-from PyQt5.QtWidgets import QWidget, QGridLayout, QListWidgetItem, QAbstractItemView, QTableWidget, QListWidget, QTabWidget, QPlainTextEdit, QFrame, QTableWidgetItem
-from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import  QListWidgetItem, QTableWidgetItem,  QMainWindow
+
+from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.uic import compileUi
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
+
 from .qtgui import plot_data_gui
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
@@ -276,12 +276,14 @@ def recompile_plotdata_ui_file():
         compileUi(uipath, f)
     reload(plot_data_gui)
 
-class PlotData(plot_data_gui.Ui_window):
-    def __init__(self, title):
-        self.window = QWidget()
-        self.setupUi(self.window)
+class PlotData(QMainWindow, plot_data_gui.Ui_window):
+
+    def __init__(self, title=None, parent=None):
+        super(PlotData, self).__init__(parent)
+        self.setupUi(self)
         self.init_gui()
-        self.window.setWindowTitle(title)
+        title = '' if title is None else title
+        self.setWindowTitle(title)
 
     x_axis_name = 'x'
 
@@ -290,7 +292,7 @@ class PlotData(plot_data_gui.Ui_window):
         # # Figure
         self.fig = Figure()
         self.canvas = FigureCanvas(self.fig)
-        self.toolbar = NavigationToolbar(self.canvas, self.window)
+        self.toolbar = NavigationToolbar(self.canvas, self)
 
         self.ax = self.fig.add_subplot(111)
         self.canvas.draw()
@@ -300,7 +302,7 @@ class PlotData(plot_data_gui.Ui_window):
         # Figure fit
         self.fig_fit = Figure()
         self.canvas_fit = FigureCanvas(self.fig_fit)
-        self.toolbar_fit = NavigationToolbar(self.canvas_fit, self.window)
+        self.toolbar_fit = NavigationToolbar(self.canvas_fit, self)
 
         self.ax_fit = self.fig_fit.add_subplot(111)
         self.canvas_fit.draw()
@@ -312,8 +314,17 @@ class PlotData(plot_data_gui.Ui_window):
         self.canvas_fit.draw()
 
         self.update_plot_button.clicked.connect(self.update_fit_select_table_and_plot)
+        self.update_plot_button.setAcceptDrops(True)
         self.update_fit_result_button.clicked.connect(self.update_fit_result_table)
         self.parameter_tab.setCurrentIndex(0)
+
+        self.parameter_table.hdf_file_dropped.connect(self.set_data)
+
+    def set_data(self, path):
+        self.clear()
+        data = Data()
+        data.init(init_from_file=path)
+        self.data=data
 
     @property
     def data(self):
@@ -465,6 +476,15 @@ class PlotData(plot_data_gui.Ui_window):
         self.parameter_table.clear()
         self.parameter_table.setColumnCount(0)
         self.parameter_table.setRowCount(0)
+        self.observation_widget.clear()
         if hasattr(self, '_data'):
             delattr(self, '_data')
+
+def show_data(path):
+    main = PlotData(title='Hello')
+    data=Data()
+    data.init(init_from_file=path)
+    main.data = data
+    main.show()
+    return main
 

@@ -7,7 +7,7 @@ import numpy as np
 import itertools
 
 
-from PyQt5.QtCore import Qt, QRegExp
+from PyQt5.QtCore import Qt, QRegExp, pyqtSignal
 from PyQt5.QtGui import QTextCharFormat, QSyntaxHighlighter, QColor, QFont
 from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem
 
@@ -333,3 +333,40 @@ class QTableWidgetEnhanced(QTableWidget):
             self.item(idx[0], idx[1]).setText('')
             self.item(idx[0], idx[1]).setData(0x0100, None)
             self.item(idx[0], idx[1]).setFlags(Qt.NoItemFlags)
+
+class QTableWidgetEnhancedDrop(QTableWidgetEnhanced):
+
+    def __init__(self, parent=None):
+        super(QTableWidgetEnhancedDrop, self).__init__(parent)
+        self.setAcceptDrops(True)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls:
+            event.accept()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls:
+            event.setDropAction(Qt.CopyAction)
+            event.accept()
+        else:
+            event.ignore()
+
+    hdf_file_dropped = pyqtSignal(str)
+
+    def dropEvent(self, event):
+        if event.mimeData().hasUrls:
+            links = []
+            for url in event.mimeData().urls():
+                links.append(str(url.toLocalFile()))
+            if len(links) != 1:
+                print('Warning: {}, {}'.format(links, len(links)))
+                event.ignore()
+            elif not links[0].endswith(".hdf"):
+                print('Warning: {}, {}'.format(links, links[0][:-4]))
+                event.ignore()
+            else:
+                self.hdf_file_dropped.emit(links[0])
+        else:
+            event.ignore()

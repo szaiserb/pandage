@@ -23,7 +23,7 @@
     </rect>
    </property>
    <property name="currentIndex">
-    <number>1</number>
+    <number>0</number>
    </property>
    <widget class="QWidget" name="plot_tab">
     <attribute name="title">
@@ -42,7 +42,7 @@
       <enum>QAbstractItemView::ExtendedSelection</enum>
      </property>
     </widget>
-    <widget class="QTableWidgetEnhanced" name="parameter_table">
+    <widget class="QTableWidgetEnhancedDrop" name="parameter_table">
      <property name="geometry">
       <rect>
        <x>0</x>
@@ -81,6 +81,10 @@
       </property>
      </layout>
     </widget>
+    <zorder>parameter_table</zorder>
+    <zorder>observation_widget</zorder>
+    <zorder>gridLayoutWidget</zorder>
+    <zorder>gridLayoutWidget_2</zorder>
    </widget>
    <widget class="QWidget" name="fit_tab">
     <attribute name="title">
@@ -146,8 +150,11 @@
      <x>873</x>
      <y>360</y>
      <width>231</width>
-     <height>621</height>
+     <height>411</height>
     </rect>
+   </property>
+   <property name="acceptDrops">
+    <bool>false</bool>
    </property>
    <property name="frameShape">
     <enum>QFrame::NoFrame</enum>
@@ -189,6 +196,11 @@
  <customwidgets>
   <customwidget>
    <class>QTableWidgetEnhanced</class>
+   <extends>QTableWidget</extends>
+   <header>qutip_enhanced/qtgui/custom_widgets.h</header>
+  </customwidget>
+  <customwidget>
+   <class>QTableWidgetEnhancedDrop</class>
    <extends>QTableWidget</extends>
    <header>qutip_enhanced/qtgui/custom_widgets.h</header>
   </customwidget>
