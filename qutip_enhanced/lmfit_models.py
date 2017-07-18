@@ -16,9 +16,41 @@ def cosine_no_decay(x, amplitude, T, x0, c):
 def cosine(x, amplitude, T, x0, c, t2):
     return cosine_no_decay_no_offset(x, amplitude, T, x0) * np.exp(-(x - x0) / t2) + c
 
-class CosineNoOffsetNoDecayModel(lmfit.Model):
+def exp_decay(x, amplitude, t1, c):
+    return amplitude*np.exp(-x*1./t1) + c
+
+def t2_decay(x, amplitude, t2, c, p):
+    return amplitude * np.exp(-(x / t2) ** p) + c
+
+class ExpDecayModel(lmfit.Model):
+
     def __init__(self, *args, **kwargs):
 
+        super(ExpDecayModel, self).__init__(exp_decay, *args, **kwargs)
+
+    def guess(self, data, x=None, **kwargs):
+        def exp_decay_estimator(y=None, x=None):
+            c = y[-1]
+            amplitude = y[0] - c
+            t1 = x[-1] / 5.
+            return amplitude, t1, c
+        amplitude, t1, c = exp_decay_estimator(y=data, x=x)
+        return lmfit.models.update_param_vals(self.make_params(amplitude=amplitude, t1=t1, c=c), self.prefix, **kwargs)
+
+class T2DecayModel(lmfit.Model):
+
+    def __init__(self, *args, **kwargs):
+
+        super(T2DecayModel, self).__init__(t2_decay, *args, **kwargs)
+
+    def guess(self, data, x=None, **kwargs):
+        m = ExpDecayModel()
+        p = m.fit(data, m.guess(data=data, x=x), x=x).result.params
+        return lmfit.models.update_param_vals(self.make_params(amplitude=p['amplitude'].value, t2=p['t1'].value, c=p['c'].value, p=1.5), self.prefix, **kwargs)
+
+
+class CosineNoOffsetNoDecayModel(lmfit.Model):
+    def __init__(self, *args, **kwargs):
 
         super(CosineNoOffsetNoDecayModel, self).__init__(cosine_no_decay_no_offset, *args, **kwargs)
 

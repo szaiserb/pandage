@@ -163,6 +163,22 @@ def ret_property_array_like_typ(name, typ):
 
     return property(ret_getter(name), setter)
 
+def ptrepack(file, folder, tempfile=None):
+    # C:\Users\yy3\AppData\Local\conda\conda\envs\py27\Scripts\ptrepack.exe -o --chunkshape=auto --propindexes --complevel=0 --complib=blosc data.hdf data_tmp.hdf
+    tempfile = 'temp.hdf' if tempfile is None else tempfile
+    ptrepack = "C:\Users\yy3\AppData\Local\conda\conda\envs\py27\Scripts\ptrepack.exe"
+    command = [ptrepack, "-o", "--chunkshape=auto", "--propindexes", "--complevel=9", "--complib=blosc", file, tempfile]
+    _ = subprocess.call(command, cwd=folder)
+    os.remove(os.path.join(folder, file))
+    os.rename(os.path.join(folder, tempfile), os.path.join(folder, file))
+
+
+def ptrepack_all(folder):
+    for root, dirs, files in os.walk(folder):
+        for file in files:
+            if file.endswith(".hdf"):
+                ptrepack(file, root)
+
 class Data:
     def __init__(self, parameter_names=None, observation_names=None, dtypes=None):
         if parameter_names is not None:
@@ -230,13 +246,7 @@ class Data:
             self._df.to_csv(filepath, index=False, compression='gzip')
         elif filepath.endswith('.hdf'):
             self._df.to_hdf(filepath, 'a', index=False, format='fixed')
-            # C:\Users\yy3\AppData\Local\conda\conda\envs\py27\Scripts\ptrepack.exe -o --chunkshape=auto --propindexes --complevel=0 --complib=blosc data.hdf data_tmp.hdf
-            tempfile = 'temp.hdf'
-            ptrepack = "C:\Users\yy3\AppData\Local\conda\conda\envs\py27\Scripts\ptrepack.exe"
-            command = [ptrepack, "-o", "--chunkshape=auto", "--propindexes", "--complevel=9", "--complib=blosc", os.path.split(filepath)[1], tempfile]
-            _ = subprocess.call(command, cwd=os.path.split(filepath)[0])
-            os.remove(filepath)
-            os.rename("{}/{}".format(os.path.split(filepath)[0], tempfile), filepath)
+            ptrepack(os.path.split(filepath)[1], os.path.split(filepath)[0])
 
     def append(self, l):
         if type(l) in [collections.OrderedDict, dict]:
@@ -285,6 +295,7 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
         self.setWindowTitle(title)
 
     x_axis_name = 'x'
+    fit_function = 'cosine'
 
     def init_gui(self):
 
@@ -433,7 +444,10 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
     def update_fit_result_table(self):
         self.fit_result_table.clear_table_contents()
         spi = list(self.ret_line_plot_data())
-        mod = lmfit_models.CosineModel()
+        if self.fit_function == 'cosine':
+            mod = lmfit_models.CosineModel()
+        elif self.fit_function == 'exp':
+            pass
         self.fit_results = []
         for i in [spi[idx] for idx in self.fit_select_table.selected_items_unique_column_indices()]:
             try:
@@ -528,15 +542,6 @@ def data_df_traces_to_nparray(l):
             # print(os.stat("{}\data.hdf".format(fn['folder'])).st_size/1e6 )
             # # out.append(fn)
     return out
-
-def ptrepack(file, folder, tempfile=None):
-        # C:\Users\yy3\AppData\Local\conda\conda\envs\py27\Scripts\ptrepack.exe -o --chunkshape=auto --propindexes --complevel=0 --complib=blosc data.hdf data_tmp.hdf
-        tempfile = 'temp.hdf' if tempfile is None else tempfile
-        ptrepack = "C:\Users\yy3\AppData\Local\conda\conda\envs\py27\Scripts\ptrepack.exe"
-        command = [ptrepack, "-o", "--chunkshape=auto", "--propindexes", "--complevel=9", "--complib=blosc", file, tempfile]
-        _ = subprocess.call(command, cwd=folder)
-        os.remove(os.path.join(folder, file))
-        os.rename(os.path.join(folder, tempfile), os.path.join(folder, file))
 
 # def ptrepack_all_hdf_files(folder):
 #     import os
