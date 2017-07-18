@@ -303,7 +303,7 @@ class Arbitrary:
             print(s, t)
 
 class Wait(Arbitrary):
-    def __init__(self, n_bins_wait, t_wait):
+    def __init__(self, t_wait, n_bins_wait=1):
         self.n_bins_wait = n_bins_wait
         self.t_wait = t_wait
 
@@ -323,7 +323,7 @@ class Wait(Arbitrary):
 
 
 class Rabi(Arbitrary):
-    def __init__(self, n_bins_rabi, t_rabi, omega, phase=0.0, control_field='mw'):
+    def __init__(self, t_rabi, omega, phase=0.0, control_field='mw', n_bins_rabi=1):
         self.n_bins_rabi = n_bins_rabi
         self.t_rabi = t_rabi
         self.phase = phase
@@ -487,7 +487,7 @@ class DD(Arbitrary):
         if self.number_of_pi_pulses == 0:
             out = ['wait'] + ['wait']
         else:
-            out = list(np.insert(['wait'] * self.n_tau, range(1, self.n_tau), [['mw'] * self.number_of_pi_pulses]))
+            out = list(np.insert(['wait'] * self.n_wait, range(1, self.n_wait), [['mw'] * self.number_of_pi_pulses]))
 
         return getattr(self, '_sequence', [[i] for i in out])
 
@@ -511,19 +511,11 @@ class DD(Arbitrary):
                 idxmw += 1
         return getattr(self, '_fields_full', out)
 
-    def tau_list(self):
-        name = self.dd_type
-        if name[-6:] == '_uhrig' in name:
-            return self.uhrig_taus
-        else:
-            tau = self.total_tau / self.n_tau
-            return np.array([tau] + [2 * tau for i in range(self.number_of_pi_pulses - 1)] + [tau])
-
     @property
     def times_full(self):
         tl = self.tau_list()
         if self.number_of_pi_pulses == 0:
-            out = self.tau_list()
+            out = tl
         else:
             out = np.insert(tl, range(1, len(tl)), [[0.5 * self.rabi_period] * self.number_of_pi_pulses])
         return getattr(self, '_times_full', out)
@@ -536,11 +528,15 @@ class DD(Arbitrary):
         return __PHASES_DD__[name]
 
     @property
-    def n_tau(self):
+    def n_wait(self):
         if self.number_of_pi_pulses == 0:
             return 2
         else:
             return self.number_of_pi_pulses + 1
+
+    @property
+    def n_tau(self):
+        return self.n_wait - 1
 
     def set_total_tau(self, **kwargs):
         if self.dd_type[-6:] == '_uhrig':
@@ -551,8 +547,16 @@ class DD(Arbitrary):
             else:
                 tau = kwargs['total_tau'] / self.n_tau
         if self.time_digitization is not None:
-            tau = np.around(tau / self.time_digitization) * self.time_digitization
+            tau = 2*np.around((tau/2.) / self.time_digitization) * self.time_digitization
         self.total_tau = self.n_tau * tau
+
+    def tau_list(self):
+        name = self.dd_type
+        if name[-6:] == '_uhrig' in name:
+            return self.uhrig_taus
+        else:
+            tau = self.total_tau / self.n_tau
+            return np.array([tau/2.] + [tau for _ in range(self.number_of_pi_pulses - 1)] + [tau/2.])
 
     @property
     def number_of_pi_pulses(self):
@@ -560,6 +564,7 @@ class DD(Arbitrary):
 
     @property
     def number_of_pulses(self):
+        raise Exception('THIS IS BULLSHIT, THIS SEQUENCE EXCLUDES THE Pi/2 pulses, i.e. number of pulses = number of pi pulses')
         return self.number_of_pi_pulses + 2
 
     @property

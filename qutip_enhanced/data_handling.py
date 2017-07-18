@@ -230,14 +230,13 @@ class Data:
             self._df.to_csv(filepath, index=False, compression='gzip')
         elif filepath.endswith('.hdf'):
             self._df.to_hdf(filepath, 'a', index=False, format='fixed')
-            try:
-                tempfile = 'temp.hdf'
-                command = ["ptrepack", "-o", "--chunkshape=auto", "--propindexes", "--complevel=9", "--complib=blosc", os.path.split(filepath)[1], tempfile]
-                _ = subprocess.call(command, cwd=os.path.split(filepath)[0])
-                os.remove(filepath)
-                os.rename("{}/{}".format(os.path.split(filepath)[0], tempfile), filepath)
-            except WindowsError:
-                pass
+            # C:\Users\yy3\AppData\Local\conda\conda\envs\py27\Scripts\ptrepack.exe -o --chunkshape=auto --propindexes --complevel=0 --complib=blosc data.hdf data_tmp.hdf
+            tempfile = 'temp.hdf'
+            ptrepack = "C:\Users\yy3\AppData\Local\conda\conda\envs\py27\Scripts\ptrepack.exe"
+            command = [ptrepack, "-o", "--chunkshape=auto", "--propindexes", "--complevel=9", "--complib=blosc", os.path.split(filepath)[1], tempfile]
+            _ = subprocess.call(command, cwd=os.path.split(filepath)[0])
+            os.remove(filepath)
+            os.rename("{}/{}".format(os.path.split(filepath)[0], tempfile), filepath)
 
     def append(self, l):
         if type(l) in [collections.OrderedDict, dict]:
@@ -480,11 +479,90 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
         if hasattr(self, '_data'):
             delattr(self, '_data')
 
-def show_data(path):
-    main = PlotData(title='Hello')
-    data=Data()
-    data.init(init_from_file=path)
-    main.data = data
-    main.show()
-    return main
+def cpd():
+    out = PlotData()
+    out.show()
+    return out
 
+def list_nuc_folders_and_points(folder, drop_none=True):
+    r = []
+    subdirs = [x[0] for x in os.walk(folder)]
+    for subdir in subdirs:
+        files = os.walk(subdir).next()[2]
+        r.append(dict())
+        r[-1]['folder'] = subdir
+        if 'data.hdf' in files:
+            try:
+                d = Data()
+                d.init(init_from_file=r"{}\data.hdf".format(subdir))
+                d.save()
+                r[-1]['n'] = len(d.df)
+            except:
+                if drop_none:
+                    del r[-1]
+                else:
+                    r[-1]['n'] = None
+        else:
+            if drop_none:
+                del r[-1]
+            else:
+                r[-1]['n'] = None
+    return r
+
+def list_nuc_folders_with_less_than_n_points(l, n=np.inf):
+    out = []
+    for fn in l:
+        if fn['n'] is not None and fn['n'] < n:
+            out.append(fn)
+    return out
+
+def data_df_traces_to_nparray(l):
+
+    out = []
+    for fn in l:
+        if fn['n'] is not None:
+            d = Data()
+            d.init(init_from_file=r"{}\data.hdf".format(fn['folder']))
+            d.df.trace = d.df.trace.apply(lambda x: np.array(x))
+            d.save(r"{}\data2.hdf".format(fn['folder']))
+            # print(os.stat("{}\data.hdf".format(fn['folder'])).st_size/1e6 )
+            # # out.append(fn)
+    return out
+
+def ptrepack(file, folder, tempfile=None):
+        # C:\Users\yy3\AppData\Local\conda\conda\envs\py27\Scripts\ptrepack.exe -o --chunkshape=auto --propindexes --complevel=0 --complib=blosc data.hdf data_tmp.hdf
+        tempfile = 'temp.hdf' if tempfile is None else tempfile
+        ptrepack = "C:\Users\yy3\AppData\Local\conda\conda\envs\py27\Scripts\ptrepack.exe"
+        command = [ptrepack, "-o", "--chunkshape=auto", "--propindexes", "--complevel=9", "--complib=blosc", file, tempfile]
+        _ = subprocess.call(command, cwd=folder)
+        os.remove(os.path.join(folder, file))
+        os.rename(os.path.join(folder, tempfile), os.path.join(folder, file))
+
+# def ptrepack_all_hdf_files(folder):
+#     import os
+#     for root, dirs, files in os.walk(folder):
+#         for file in files:
+#             if file.endswith(".hdf"):
+#                 print(os.path.join(root, file))
+#
+#     subdirs = [x[0] for x in os.walk(folder)]
+#     for subdir in subdirs:
+#         files = os.walk(subdir).next()[2]
+#         for f
+#         if 'data.hdf' in files:
+#             try:
+#                 d = Data()
+#                 d.init(init_from_file=r"{}\data.hdf".format(subdir))
+#                 d.save()
+#                 r[-1]['n'] = len(d.df)
+#             except:
+#                 if drop_none:
+#                     del r[-1]
+#                 else:
+#                     r[-1]['n'] = None
+#         else:
+#             if drop_none:
+#                 del r[-1]
+#             else:
+#                 r[-1]['n'] = None
+#     return r

@@ -145,4 +145,4 @@ def plot_state(dml, var=None, qubit_names=None, vertical_lines_at=None):
     fig.set_size_inches(24, 12)
     return fig, arr
 
-from qutip_enhanced.data_handling import PlotData
+# from qutip_enhanced.data_handling import PlotData
