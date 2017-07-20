@@ -578,6 +578,9 @@ def hdf_files_in_subfolders_with_less_than_n_points(folder, n):
 def move_folder(folder_list_dict=None, destination_folder=None):
     import shutil
     for i in folder_list_dict:
-        src = i['root']
-        dst = os.path.join(destination_folder, os.path.basename(i['root']))
-        shutil.move(src, dst)
+        try:
+            src = i['root']
+            dst = os.path.join(destination_folder, os.path.basename(i['root']))
+            shutil.move(src, dst)
+        except:
+            print("Folder {} could not be moved. Lets hope it has tbc in its name".format(i['root']))
