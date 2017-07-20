@@ -2,10 +2,11 @@
 from __future__ import print_function, absolute_import, division
 __metaclass__ = type
 
+import numpy as np
 import lmfit.models
 import lmfit.lineshapes
 import itertools
-import numpy as np
+
 
 def cosine_no_decay_no_offset(x, amplitude, T, x0):
     return amplitude * np.cos(2 * np.pi * (x - x0) / float(T))

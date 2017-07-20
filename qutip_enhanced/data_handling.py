@@ -203,7 +203,8 @@ class Data:
             self.observation_names = observation_names
         if dtypes is not None:
             self.dtypes = dtypes
-        self.init(iff=iff)
+        if iff is not None:
+            self.init(iff=iff)
 
     parameter_names = ret_property_array_like_types('parameter_names',[str, unicode])
     observation_names = ret_property_array_like_types('observation_names', [str, unicode])
@@ -380,7 +381,7 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
     def set_data(self, path):
         self.clear()
         data = Data()
-        data.init(init_from_file=path)
+        data.init(iff=path)
         self.data=data
 
     @property
