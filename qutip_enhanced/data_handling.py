@@ -88,6 +88,11 @@ def check_type(val, name, typ):
     else:
         raise Exception("Property {} must be {} but is {}".format(name, typ, type(val)))
 
+def check_types(val, name, types):
+    if any([issubclass(type(val), typ) for typ in types]):
+        return val
+    else:
+        raise Exception("Property {} must be in {} but is {}".format(name, types, type(val)))
 
 def check_range(val, name, start, stop):
     if start <= val <= stop:
@@ -114,6 +119,11 @@ def check_array_like_typ(val, name, typ):
         val = np.array(val)
     return val
 
+def check_array_like_types(val, name, types):
+    val = [check_types(i, name + '_i', types) for i in check_array_like(val, name)]
+    if types[0] in [float, int, Number]: #This assumes, that if type[0] is numeric, all items are numeric
+        val = np.array(val)
+    return val
 
 def check_list_element(val, name, l):
     if val in l:
@@ -163,6 +173,12 @@ def ret_property_array_like_typ(name, typ):
 
     return property(ret_getter(name), setter)
 
+def ret_property_array_like_types(name, types):
+    def setter(self, val):
+        setattr(self, '_' + name, check_array_like_types(val, name, types))
+
+    return property(ret_getter(name), setter)
+
 def ptrepack(file, folder, tempfile=None):
     # C:\Users\yy3\AppData\Local\conda\conda\envs\py27\Scripts\ptrepack.exe -o --chunkshape=auto --propindexes --complevel=0 --complib=blosc data.hdf data_tmp.hdf
     tempfile = 'temp.hdf' if tempfile is None else tempfile
@@ -180,16 +196,17 @@ def ptrepack_all(folder):
                 ptrepack(file, root)
 
 class Data:
-    def __init__(self, parameter_names=None, observation_names=None, dtypes=None):
+    def __init__(self, parameter_names=None, observation_names=None, dtypes=None, iff=None):
         if parameter_names is not None:
             self.parameter_names = parameter_names
         if observation_names is not None:
             self.observation_names = observation_names
         if dtypes is not None:
             self.dtypes = dtypes
+        self.init(iff=iff)
 
-    parameter_names = ret_property_array_like_typ('parameter_names', str)
-    observation_names = ret_property_array_like_typ('observation_names', str)
+    parameter_names = ret_property_array_like_types('parameter_names',[str, unicode])
+    observation_names = ret_property_array_like_types('observation_names', [str, unicode])
 
     @property
     def dtypes(self):
@@ -211,12 +228,42 @@ class Data:
     def number_of_variables(self):
         return len(self.variables)
 
-    def init(self, init_from_file=None, last_parameter='x_idx'):
+    def backwards_compatibility_last_parameter(self, cn):
+        for n in ['tau', 'point', 'phi', 'x2', 'x1']:  # order of x2, x1, x0.. is important
+            if n in cn:
+                next_n = cn[cn.index(n) + 1]
+                if next_n == 'trace' or '_idx' in next_n:
+                    return n
+                else:
+                    raise Exception('Incompatibility Error: {}'.format(cn))
+        else:
+            return None
+
+    def get_last_parameter(self, df):
+        cn = list(df.columns)
+        bclp = self.backwards_compatibility_last_parameter(cn)
+        if bclp is not None:
+            last_parameter = bclp
+        else:
+            l_idx = [cni for cni in cn if cni.endswith('_idx')]
+            if len(l_idx) == 0:
+                raise Exception('Error: Could not figure out last_parameter, thus parameter_names and observation_names could not be determined: {}'.format(cn))
+            l = [i[:-4] for i in l_idx]
+            if all(np.array(cn[:2 * len(l_idx)]) == l + l_idx):
+                last_parameter = l_idx[-1]
+            else:
+                raise Exception('Error: Could not figure out last_parameter, thus parameter_names and observation_names could not be determined: {}'.format(cn))
+        return last_parameter
+
+    def init(self, init_from_file=None, iff=None, last_parameter=None):
+        init_from_file = iff if iff is not None else init_from_file
         if init_from_file is not None:
             if init_from_file.endswith('.hdf'):
                 df = pd.read_hdf(init_from_file)
             elif init_from_file.endswith('.csv'):
                 df = pd.read_csv(init_from_file, compression='gzip')
+            if last_parameter is None:
+                last_parameter = self.get_last_parameter(df)
             self._df = df[pd.notnull(df)]
             if False in [hasattr(self, i) for i in ['_parameter_names', '_observation_names', '_dtypes']]:
                 lpi = list(self.df.columns.values).index(last_parameter) + 1
@@ -498,76 +545,38 @@ def cpd():
     out.show()
     return out
 
-def list_nuc_folders_and_points(folder, drop_none=True):
-    r = []
-    subdirs = [x[0] for x in os.walk(folder)]
-    for subdir in subdirs:
-        files = os.walk(subdir).next()[2]
-        r.append(dict())
-        r[-1]['folder'] = subdir
-        if 'data.hdf' in files:
-            try:
-                d = Data()
-                d.init(init_from_file=r"{}\data.hdf".format(subdir))
-                d.save()
-                r[-1]['n'] = len(d.df)
-            except:
-                if drop_none:
-                    del r[-1]
-                else:
-                    r[-1]['n'] = None
-        else:
-            if drop_none:
-                del r[-1]
-            else:
-                r[-1]['n'] = None
-    return r
+def subfolders_with_hdf(folder):
+    l = []
+    for root, dirs, files in os.walk(folder):
+        for file in files:
+            if file.endswith(".hdf"):
+                l.append(root)
+    return l
 
-def list_nuc_folders_with_less_than_n_points(l, n=np.inf):
-    out = []
-    for fn in l:
-        if fn['n'] is not None and fn['n'] < n:
-            out.append(fn)
-    return out
+def number_of_points_of_hdf_files_in_subfolders(folder):
+    l = subfolders_with_hdf(folder)
+    out_openable = []
+    out_failed = []
+    for subdir in l:
+        for root, dirs, files in os.walk(subdir):
+            for file in files:
+                if file.endswith(".hdf"):
+                    try:
+                        d = Data(iff=os.path.join(root, file))
+                        out_openable.append({'root': root, 'file': file, 'points': len(d.df)})
+                    except:
+                        out_failed.append({'root': root, 'file': file})
+    return out_openable, out_failed
 
-def data_df_traces_to_nparray(l):
+def hdf_files_in_subfolders_with_less_than_n_points(folder, n):
+    out_openable, out_failed = number_of_points_of_hdf_files_in_subfolders(folder)
+    out_smaller = [i for i in out_openable if i['points'] < n]
+    out_larger_equal = [i for i in out_openable if i['points'] >= n]
+    return out_smaller, out_larger_equal, out_failed
 
-    out = []
-    for fn in l:
-        if fn['n'] is not None:
-            d = Data()
-            d.init(init_from_file=r"{}\data.hdf".format(fn['folder']))
-            d.df.trace = d.df.trace.apply(lambda x: np.array(x))
-            d.save(r"{}\data2.hdf".format(fn['folder']))
-            # print(os.stat("{}\data.hdf".format(fn['folder'])).st_size/1e6 )
-            # # out.append(fn)
-    return out
-
-# def ptrepack_all_hdf_files(folder):
-#     import os
-#     for root, dirs, files in os.walk(folder):
-#         for file in files:
-#             if file.endswith(".hdf"):
-#                 print(os.path.join(root, file))
-#
-#     subdirs = [x[0] for x in os.walk(folder)]
-#     for subdir in subdirs:
-#         files = os.walk(subdir).next()[2]
-#         for f
-#         if 'data.hdf' in files:
-#             try:
-#                 d = Data()
-#                 d.init(init_from_file=r"{}\data.hdf".format(subdir))
-#                 d.save()
-#                 r[-1]['n'] = len(d.df)
-#             except:
-#                 if drop_none:
-#                     del r[-1]
-#                 else:
-#                     r[-1]['n'] = None
-#         else:
-#             if drop_none:
-#                 del r[-1]
-#             else:
-#                 r[-1]['n'] = None
-#     return r
+def move_folder(folder_list_dict=None, destination_folder=None):
+    import shutil
+    for i in folder_list_dict:
+        src = i['root']
+        dst = os.path.join(destination_folder, os.path.basename(i['root']))
+        shutil.move(src, dst)
