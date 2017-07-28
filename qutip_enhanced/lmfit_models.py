@@ -17,11 +17,16 @@ def cosine_no_decay(x, amplitude, T, x0, c):
 def cosine(x, amplitude, T, x0, c, t2):
     return cosine_no_decay_no_offset(x, amplitude, T, x0) * np.exp(-(x - x0) / t2) + c
 
+def abs_cosine(x, amplitude, T, x0, c, t2):
+    return np.abs(cosine_no_decay_no_offset(x, amplitude, T, x0) * np.exp(-(x - x0) / t2)) + c
+
 def exp_decay(x, amplitude, t1, c):
     return amplitude*np.exp(-x*1./t1) + c
 
 def t2_decay(x, amplitude, t2, c, p):
     return amplitude * np.exp(-(x / t2) ** p) + c
+
+
 
 class ExpDecayModel(lmfit.Model):
 
@@ -86,6 +91,11 @@ class CosineNoDecayModel(lmfit.Model):
             p['x0'].value = ((p['x0'] / p['T'] + 0.5) % 1) * p['T']
             p = m.fit(y_temp, m.guess(data=y_temp, x=x), x=x).result.params
         return lmfit.models.update_param_vals(self.make_params(amplitude=p['amplitude'].value, T=p['T'].value, x0=p['x0'].value, c=c), self.prefix, **kwargs)
+
+
+class AbsCosineModel(lmfit.Model):
+    def __init__(self, *args, **kwargs):
+        super(AbsCosineModel, self).__init__(abs_cosine, *args, **kwargs)
 
 class CosineModel(lmfit.Model):
     def __init__(self, *args, **kwargs):

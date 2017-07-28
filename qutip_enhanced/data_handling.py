@@ -211,6 +211,8 @@ class Data:
 
     @property
     def dtypes(self):
+        if not hasattr(self, '_dtypes'):
+            self._dtypes = dict([(key, 'float') for key in self.observation_names])
         return self._dtypes
 
     @dtypes.setter
@@ -344,6 +346,7 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
 
     x_axis_name = 'x'
     fit_function = 'cosine'
+    show_legend = False
 
     def init_gui(self):
 
@@ -452,13 +455,23 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
                 plot_data.append(dict(condition_dict_reduced=condition_dict_reduced, observation_name=observation_name.text(), x=getattr(dfxy, self.x_axis_name), y=getattr(dfxy, observation_name.text())))
         return plot_data
 
+    def plot_label(self, condition_dict_reduced, observation_name=None, add_condition_names=False, add_observation_name=False):
+        if add_condition_names:
+            raise NotImplementedError
+        if add_observation_name:
+            raise NotImplementedError
+        return ", ".join([str(i) for i in condition_dict_reduced.values()])
+
     def update_plot(self):
         self.fig.clear()
         self.ax = self.fig.add_subplot(111)
         for idx, pdi in enumerate(self.ret_line_plot_data()):
             self.ax.plot(pdi['x'], pdi['y'], '-',
-                         label='NONE',  # '{}\n{}\n{}'.format(self.setpoint1_v.itemData(self.setpoint1_v.currentIndex()), self.setpoint2_v.itemData(self.setpoint2_v.currentIndex()), self.ddy.currentText() )
+                         # label='NONE',  # '{}\n{}\n{}'.format(self.setpoint1_v.itemData(self.setpoint1_v.currentIndex()), self.setpoint2_v.itemData(self.setpoint2_v.currentIndex()), self.ddy.currentText() )
+                         label=self.plot_label(pdi['condition_dict_reduced'])
                          )
+        if self.show_legend:
+            self.fig_legend = self.ax.legend(shadow=True, fontsize='small')
         self.canvas.draw()
 
     def update_plot_fit(self):

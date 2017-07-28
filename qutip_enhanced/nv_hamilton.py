@@ -8,6 +8,28 @@ np.set_printoptions(suppress=True, linewidth=500, threshold=np.nan)
 
 from qutip_enhanced.qutip_enhanced import *
 
+gamma = {'e': -2.80249536e4, '13c': 10.705, '14n': +3.0766, '15n': -4.3156}
+
+def hft_13c_dd(location):
+    """
+    Calculates 13C hyperfine tensor for pure dipolar coupling at position location.
+    location must be inserted according to module coordinates.
+    For very close nuclei this gets wrong as contact interaction then plays a role.
+
+    :param location: dic
+    example: {'rho': 1e-9, 'elev': np.pi / 2, 'azim': 0}
+    :return: hyperfine tensor in amtrix notation
+    """
+    loc_cart = coordinates.Coord().coord_unit(location, 'cart')
+    rho = coordinates.Coord().coord(location, 'sph')['rho']
+    x, y, z = [loc_cart[i] for i in ['x', 'y', 'z']]
+    prefactor = mu_0 / (4.0 * pi) * h * gamma['e'] * 1e6 * gamma['13c'] * 1e6 / rho ** 3  # given in Hertz
+    prefactor_mhz = prefactor * 1e-6  # given in MHz
+    mat = np.matrix([[1 - 3 * x * x, -3 * x * y, -3 * x * z],
+                     [-3 * x * y, 1 - 3 * y * y, -3 * y * z],
+                     [-3 * x * z, -3 * y * z, 1 - 3 * z * z]])
+    return prefactor_mhz * mat
+
 class NVHam(object):
     """
     Hamiltonian describing a single NV + nuclear spins.
@@ -60,7 +82,7 @@ class NVHam(object):
 
 
     j = {'14n': 1, '15n': .5, 'e': 1, '13c': .5}
-    _gamma = {'e': -2.80249536e4, '13c': 10.705, '14n': +3.0766, '15n': -4.3156} # gyromagnetic ratios given in 1/2pi MHz/T, i.e. f = gamma*B
+    _gamma = gamma # gyromagnetic ratios given in 1/2pi MHz/T, i.e. f = gamma*B
     _qp = {'14n': -4.945745, '15n': 0.0, '13c': 0}
     _hf_para_n = {'14n': -2.165, '15n': +3.03}
     _hf_perp_n = {'14n': -2.7, '15n': +3.65}
@@ -173,21 +195,8 @@ class NVHam(object):
         """
         return self.calc_zeeman(self.gamma['13c'], 1 / 2.0)
 
-    def hft_13c_dd(self, location={'rho': 1e-9, 'elev': np.pi / 2, 'azim': 0}):
-        """
-        Calculates 13C hyperfine tensor for pure dipolar coupling at position location. 
-        location must be inserted according to module coordinates. 
-        For very close nuclei this gets wrong as contact interaction then plays a role.
-        """
-        loc_cart = coordinates.Coord().coord_unit(location, 'cart')
-        rho = coordinates.Coord().coord(location, 'sph')['rho']
-        x, y, z = [loc_cart[i] for i in ['x', 'y', 'z']]
-        prefactor = mu_0 / (4.0 * pi) * h * self.gamma['e'] * 1e6 * self.gamma['13c'] * 1e6 / rho ** 3  # given in Hertz
-        prefactor_mhz = prefactor * 1e-6  # given in MHz
-        mat = np.matrix([[1 - 3 * x * x, -3 * x * y, -3 * x * z],
-                            [-3 * x * y, 1 - 3 * y * y, -3 * y * z],
-                            [-3 * x * z, -3 * y * z, 1 - 3 * z * z]])
-        return prefactor_mhz * mat
+    def hft_13c_dd(self, *args, **kwargs):
+        return hft_13c_dd(*args, **kwargs)
 
     def h_hf(self, hft, nsd, nslvl_l):
         """
