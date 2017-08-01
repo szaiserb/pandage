@@ -26,8 +26,6 @@ def exp_decay(x, amplitude, t1, c):
 def t2_decay(x, amplitude, t2, c, p):
     return amplitude * np.exp(-(x / t2) ** p) + c
 
-
-
 class ExpDecayModel(lmfit.Model):
 
     def __init__(self, *args, **kwargs):
@@ -42,7 +40,7 @@ class ExpDecayModel(lmfit.Model):
             return amplitude, t1, c
         amplitude, t1, c = exp_decay_estimator(y=data, x=x)
         return lmfit.models.update_param_vals(self.make_params(amplitude=amplitude, t1=t1, c=c), self.prefix, **kwargs)
-
+lmfit.models
 class T2DecayModel(lmfit.Model):
 
     def __init__(self, *args, **kwargs):
