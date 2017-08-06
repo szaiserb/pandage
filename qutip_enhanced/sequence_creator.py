@@ -26,12 +26,40 @@ class pd(dict):
         self.ddp['kdd8'] = np.concatenate([phasexy + self.ddp['knillpi'] for phasexy in self.ddp['xy8']])
         self.ddp['kdd16'] = np.concatenate([phasexy + self.ddp['knillpi'] for phasexy in self.ddp['xy16']])
 
+    def parse_ddtype(self, ddtype):
+        """
+
+        :param ddtype: str
+            full description of used dynamical decoupling sequence, individual parameters separated by "_"
+            examples:
+
+                1. kdd4
+                    kdd4 sequence, 20 pi-pulses
+
+                2. hahn_90: repeat hahn echo once (as first argument is missing), shift the single done pi-pulse by 90 degrees
+
+                3. 3_kdd4_90: repeat a kdd4 sequence 3 times, shift phase of every pi-pulse by 90 degrees
+        :return:
+        """
+        if type(ddtype) is not str:
+            raise Exception('Error:{}, {}'.format(type(ddtype), ddtype))
+        pl = ddtype.split("_")
+        if len(pl) == 1:
+            pl = [1, pl[0], 0]
+        elif len(pl) == 2:
+            try:
+                pl[0] = int(pl[0])
+                pl.append(0.0)
+            except:
+                pl = [1] + pl
+                pl[2] = float(pl[2])
+        elif len(pl) == 3:
+            pl[0] = int(pl[0])
+            pl[2] = float(pl[2])
+        return pl[0], pl[1], pl[2]
 
     def __getitem__(self, i):
-        if type(i) is not str:
-            raise Exception('Error:{}, {}'.format(type(i), i))
-        ii = i.split("_")
-        bs = ii[-1]
+        n, bs, offset_phase = self.parse_ddtype(i)
         if 'cpmg' in bs:
             if len(bs) == 4:
                 raise Exception('Error: {} does not tell how many pi-pulses you want. Valid would be 5_cpmg8'.format(i))
@@ -39,10 +67,9 @@ class pd(dict):
                 bp = np.array(int(bs[4:]) * [0])
         else:
             bp = self.ddp[bs]
-        if len(ii) == 2:
-            bp = np.tile(bp, int(ii[0]))
+        bp = np.tile(bp, n)
+        bp += np.deg2rad(offset_phase)
         return bp
-
 
 __PHASES_DD__ = pd()
 

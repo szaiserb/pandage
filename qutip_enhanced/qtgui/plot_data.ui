@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1115</width>
-    <height>994</height>
+    <width>1324</width>
+    <height>999</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -81,10 +81,24 @@
       </property>
      </layout>
     </widget>
+    <widget class="QPushButton" name="update_plot_button">
+     <property name="geometry">
+      <rect>
+       <x>860</x>
+       <y>270</y>
+       <width>231</width>
+       <height>51</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>UpdatePlot</string>
+     </property>
+    </widget>
     <zorder>parameter_table</zorder>
     <zorder>observation_widget</zorder>
     <zorder>gridLayoutWidget</zorder>
     <zorder>gridLayoutWidget_2</zorder>
+    <zorder>update_plot_button</zorder>
    </widget>
    <widget class="QWidget" name="fit_tab">
     <attribute name="title">
@@ -142,6 +156,19 @@
      </property>
      <layout class="QGridLayout" name="plot_fit_layout"/>
     </widget>
+    <widget class="QPushButton" name="update_fit_result_button">
+     <property name="geometry">
+      <rect>
+       <x>860</x>
+       <y>270</y>
+       <width>231</width>
+       <height>51</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>UpdateFit</string>
+     </property>
+    </widget>
    </widget>
   </widget>
   <widget class="QPlainTextEdit" name="info">
@@ -150,7 +177,7 @@
      <x>873</x>
      <y>360</y>
      <width>231</width>
-     <height>411</height>
+     <height>531</height>
     </rect>
    </property>
    <property name="acceptDrops">
@@ -166,30 +193,30 @@
     <bool>false</bool>
    </property>
   </widget>
-  <widget class="QPushButton" name="update_plot_button">
+  <widget class="QPushButton" name="open_code_button">
    <property name="geometry">
     <rect>
      <x>870</x>
-     <y>290</y>
-     <width>91</width>
-     <height>51</height>
+     <y>902</y>
+     <width>241</width>
+     <height>41</height>
     </rect>
    </property>
    <property name="text">
-    <string>UpdatePlot</string>
+    <string>Measurement Code</string>
    </property>
   </widget>
-  <widget class="QPushButton" name="update_fit_result_button">
+  <widget class="QPushButton" name="open_explorer_button">
    <property name="geometry">
     <rect>
-     <x>970</x>
-     <y>290</y>
-     <width>131</width>
-     <height>51</height>
+     <x>870</x>
+     <y>950</y>
+     <width>241</width>
+     <height>41</height>
     </rect>
    </property>
    <property name="text">
-    <string>UpdateFit</string>
+    <string>Open Explorer Window</string>
    </property>
   </widget>
  </widget>

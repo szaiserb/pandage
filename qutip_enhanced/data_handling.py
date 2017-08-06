@@ -3,7 +3,7 @@ from __future__ import print_function, absolute_import, division
 
 __metaclass__ = type
 
-import os, sys
+import os, sys, subprocess
 
 import numpy as np
 import pandas as pd
@@ -196,15 +196,15 @@ def ptrepack_all(folder):
                 ptrepack(file, root)
 
 class Data:
-    def __init__(self, parameter_names=None, observation_names=None, dtypes=None, iff=None):
+    def __init__(self, parameter_names=None, observation_names=None, dtypes=None, **kwargs):
         if parameter_names is not None:
             self.parameter_names = parameter_names
         if observation_names is not None:
             self.observation_names = observation_names
         if dtypes is not None:
             self.dtypes = dtypes
-        if iff is not None:
-            self.init(iff=iff)
+        if len(kwargs)>0:
+            self.init(**kwargs)
 
     parameter_names = ret_property_array_like_types('parameter_names',[str, unicode])
     observation_names = ret_property_array_like_types('observation_names', [str, unicode])
@@ -258,24 +258,39 @@ class Data:
                 raise Exception('Error: Could not figure out last_parameter, thus parameter_names and observation_names could not be determined: {}'.format(cn))
         return last_parameter
 
-    def init(self, init_from_file=None, iff=None, last_parameter=None):
+    def init(self, init_from_file=None, iff=None, last_parameter=None, df=None):
         init_from_file = iff if iff is not None else init_from_file
-        if init_from_file is not None:
-            if init_from_file.endswith('.hdf'):
-                df = pd.read_hdf(init_from_file)
-            elif init_from_file.endswith('.csv'):
-                df = pd.read_csv(init_from_file, compression='gzip')
-            if last_parameter is None:
-                last_parameter = self.get_last_parameter(df)
+        if init_from_file is not None or df is not None:
+            if init_from_file is not None:
+                if init_from_file.endswith('.hdf'):
+                    store = pd.HDFStore(init_from_file)
+                    if hasattr(store, 'df'):
+                        df = store['df']
+                        for key in ["parameter_names", 'observation_names', 'dtypes']:
+                            attr_name = "_{}".format(key)
+                            if hasattr(store.get_storer('df').attrs, key):
+                                setattr(self, attr_name, getattr(store.get_storer('df').attrs, key))
+                            else:
+                                if hasattr(self, attr_name):
+                                    delattr(self, attr_name)
+                    else:
+                        df = store.get('/a')
+                    store.close()
+                    self.hdf_filepath = init_from_file
+                elif init_from_file.endswith('.csv'):
+                    df = pd.read_csv(init_from_file, compression='gzip')
+
             self._df = df[pd.notnull(df)]
             if False in [hasattr(self, i) for i in ['_parameter_names', '_observation_names', '_dtypes']]:
+                if last_parameter is None:
+                    last_parameter = self.get_last_parameter(df)
                 lpi = list(self.df.columns.values).index(last_parameter) + 1
-            if not hasattr(self, '_parameter_names'):
-                self.parameter_names = list(self.df.columns[:lpi])
-            if not hasattr(self, '_observation_names'):
-                self.observation_names = list(self.df.columns[lpi:])
-            if not hasattr(self, '_dtypes'):
-                self._dtypes = list(self.df.dtypes[lpi:])
+                if not hasattr(self, '_parameter_names'):
+                    self.parameter_names = list(self.df.columns[:lpi])
+                if not hasattr(self, '_observation_names'):
+                    self.observation_names = list(self.df.columns[lpi:])
+                if not hasattr(self, '_dtypes'):
+                    self._dtypes = list(self.df.dtypes[lpi:])
         else:
             self._df = pd.DataFrame(columns=self.variables)
 
@@ -295,8 +310,13 @@ class Data:
         if filepath.endswith('.csv'):
             self._df.to_csv(filepath, index=False, compression='gzip')
         elif filepath.endswith('.hdf'):
-            self._df.to_hdf(filepath, 'a', index=False, format='fixed')
+            store = pd.HDFStore(filepath)
+            store.put('df', self._df, table=True)
+            for key in ["parameter_names", 'observation_names', 'dtypes']:
+                setattr(store.get_storer('df').attrs, key, getattr(self, key))
+            store.close()
             ptrepack(os.path.split(filepath)[1], os.path.split(filepath)[0])
+            self.hdf_filepath = filepath
 
     def append(self, l):
         if type(l) in [collections.OrderedDict, dict]:
@@ -326,6 +346,11 @@ class Data:
     def dict_access(self, d, df=None):
         df = self.df if df is None else df
         return df[functools.reduce(np.logical_and, [df[key] == val for key, val in d.items()])]
+
+    def iterator(self, column_names):
+        for p in itertools.product(*[getattr(self.df, cn).unique() for cn in column_names]):
+            d = dict([i for i in zip(column_names, p)])
+            yield d, self.dict_access(d)
 
 def recompile_plotdata_ui_file():
     fold = "{}/qtgui".format(os.path.dirname(__file__))
@@ -379,9 +404,12 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
         self.update_fit_result_button.clicked.connect(self.update_fit_result_table)
         self.parameter_tab.setCurrentIndex(0)
 
-        self.parameter_table.hdf_file_dropped.connect(self.set_data)
+        self.parameter_table.hdf_file_dropped.connect(self.set_data_from_path)
 
-    def set_data(self, path):
+        self.open_code_button.clicked.connect(self.open_measurement_code)
+        self.open_explorer_button.clicked.connect(self.open_explorer)
+
+    def set_data_from_path(self, path):
         self.clear()
         data = Data()
         data.init(iff=path)
@@ -393,6 +421,7 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
 
     @data.setter
     def data(self, val):
+        self.data_path = None
         if not hasattr(self, '_data'):
             self._data = val
             self.parameter_table.setColumnCount(len(self.parameter_names_reduced()))
@@ -536,6 +565,18 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
                     cidx += 1
         self.update_plot_fit()
 
+    def open_measurement_code(self):
+        if hasattr(self.data, 'hdf_filepath'):
+            subprocess.Popen(r"start {}/meas_code.py".format(os.path.dirname(self.data.hdf_filepath)), shell=True)
+        else:
+            print('No filepath.')
+
+    def open_explorer(self):
+        if hasattr(self.data, 'hdf_filepath'):
+            subprocess.Popen("explorer {}".format(os.path.abspath(os.path.dirname(self.data.hdf_filepath))), shell=True)
+        else:
+            print('No filepath.')
+
     def clear(self):
         print('Clearing..')
         self.fit_result_table.clearSelection()
@@ -590,10 +631,13 @@ def hdf_files_in_subfolders_with_less_than_n_points(folder, n):
 
 def move_folder(folder_list_dict=None, destination_folder=None):
     import shutil
+    failed=0
     for i in folder_list_dict:
         try:
             src = i['root']
             dst = os.path.join(destination_folder, os.path.basename(i['root']))
             shutil.move(src, dst)
         except:
+            failed +=1
             print("Folder {} could not be moved. Lets hope it has tbc in its name".format(i['root']))
+    print("Successfully moved: {}. Failed: {}".format(len(folder_list_dict)- failed, failed))
