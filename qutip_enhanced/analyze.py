@@ -50,16 +50,97 @@ def propagate_test_states(gates, test_states):
             out[key] = val * test_states * val.dag()
     return out
 
-def single_quantum_transition(states):
+# def single_quantum_transition(states):
+#     """
+#     list of single quantum transitions. higher quantum number is always first item
+#     """
+#     out = []
+#     for s in itertools.product(itertools.product(*states), itertools.product(*states)):
+#         delta = np.array(s[0]) - np.array(s[1])
+#         if sum(np.abs(delta) == 1) == 1 and sum(delta) == 1:
+#             out.append([s[0], s[1]])
+#     return out
+
+def single_quantum_transition_hf_spins(states_list, hf_spin_list='all'):
     """
-    list of single quantum transitions. higher quantum number is always first item
+    :param states_list:
+        example; states_list = [[0,1], [0,1], [0,1]] for e.g. two electron states [+1,0], two 14n states [+1,0], 13c
+    :param hf_spin_list:
+        example: hf_spin_list = [0]
+        Gives all spins, that have a hyperfine coupling to multiple other spins and thus change their hyperfine frequencies
+    :return:
+        example: NOTE: only the electron transitions are listed, as only spin[0] is a hf_spin
+        [[(0, 0, 0), (1, 0, 0)],
+         [(0, 0, 1), (1, 0, 1)],
+         [(0, 1, 0), (1, 1, 0)],
+         [(0, 1, 1), (1, 1, 1)]]
     """
+    if hf_spin_list is 'all':
+        hf_spin_list = range(len(states_list))
+    non_hf_spins = [i for i in range(len(states_list)) if i not in hf_spin_list]
+    states_list_non_hf_spins = [state for idx, state in enumerate(states_list) if idx not in hf_spin_list]
+
     out = []
-    for s in itertools.product(itertools.product(*states), itertools.product(*states)):
-        delta = np.array(s[0]) - np.array(s[1])
-        if sum(np.abs(delta) == 1) == 1 and sum(delta) == 1:
-            out.append([s[0], s[1]])
+    for nhfl in itertools.product(*states_list_non_hf_spins):
+        state_list_sub = states_list[:]
+        for idx, state in zip(non_hf_spins, nhfl):
+            state_list_sub[idx] = [state]
+        for s in itertools.product(*state_list_sub):
+            for sn in hf_spin_list:
+                if s[sn] + 1 in state_list_sub[sn]:
+                    ts = list(s)
+                    ts[sn] += 1
+                    out.append([s, tuple(ts)])
     return out
+
+def single_quantum_transitions_non_hf_spins(states_list, hf_spin_list='all'):
+    """
+    :param states_list:
+        example; states_list = [[0,1], [0,1], [0,1]] for e.g. two electron states [+1,0], two 14n states [+1,0], 13c
+    :param hf_spin_list:
+        example: hf_spin_list = [0]
+        Gives all spins, that have a hyperfine coupling to multiple other spins and thus change their hyperfine frequencies
+    :return:
+        example: NOTE: only the electron transitions are listed, as only spin[0] is a hf_spin
+    [[(0, 0, 0), (0, 1, 0)],
+     [(0, 0, 0), (0, 0, 1)],
+     [(1, 0, 0), (1, 1, 0)],
+     [(1, 0, 0), (1, 0, 1)]]
+    """
+    if hf_spin_list is 'all':
+        hf_spin_list = range(len(states_list))
+    non_hf_spins = [i for i in range(len(states_list)) if i not in hf_spin_list]
+    states_list_hf_spins = [states_list[i] for i in hf_spin_list]
+    out = []
+    for nhfl in itertools.product(*states_list_hf_spins):
+        state_list_sub = states_list[:]
+        for hf_spin, state in zip(hf_spin_list, nhfl):
+            state_list_sub[hf_spin] = [state]
+        for sn in non_hf_spins:
+            for i in [k for k in non_hf_spins if k != sn]:
+                state_list_sub[i] = [state_list_sub[i][0]]
+            for s in itertools.product(*state_list_sub):
+                if s[sn] + 1 in states_list[sn]:
+                    ts = list(s)
+                    ts[sn] += 1
+                    out.append([s, tuple(ts)])
+    return out
+
+def flipped_spin_numbers(transition):
+    """
+    :param transition: example [(0, 0, 0), (0, 1, 0)]
+    :return: int
+        for above example, 1 is returned
+    """
+    l = []
+    for i in range(len(transition[0])):
+        if (transition[1][i] - transition[0][i]) == 1:
+            l.append(i)
+    return l
+
+def single_quantum_transition(states_list, hf_spin_list='all'):
+    return single_quantum_transition_hf_spins(states_list=states_list, hf_spin_list=hf_spin_list) + \
+           single_quantum_transitions_non_hf_spins(states_list=states_list, hf_spin_list=hf_spin_list)
 
 def state_num2name(state, name_list):
     return tuple([name_list[i][val] for i, val in enumerate(state)])
@@ -88,7 +169,8 @@ def get_transition_frequency(h, **kwargs):
 
     def t(s0, s1):
         return h_diag[m_list.index(s1)] - h_diag[m_list.index(s0)]
-
+    if 'transition' in kwargs:
+        return t(*kwargs['transition'])
     if 's0' in kwargs and 's1' in kwargs:
         return t(kwargs['s0'], kwargs['s1'])
     else:

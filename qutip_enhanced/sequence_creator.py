@@ -330,9 +330,10 @@ class Arbitrary:
             print(s, t)
 
 class Wait(Arbitrary):
-    def __init__(self, t_wait, n_bins_wait=1):
+    def __init__(self, t_wait, time_digitization=1/12e3, n_bins_wait=1):
         self.n_bins_wait = n_bins_wait
-        self.t_wait = t_wait
+        self.time_digitization=time_digitization
+        self.t_wait = np.around(t_wait/(self.n_bins_wait*self.time_digitization))*self.n_bins_wait*self.time_digitization
 
     column_dict = {'wait': [0]}
 
