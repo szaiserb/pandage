@@ -7,7 +7,6 @@ import lmfit.models
 import lmfit.lineshapes
 import itertools
 
-
 def cosine_no_decay_no_offset(x, amplitude, T, x0):
     return amplitude * np.cos(2 * np.pi * (x - x0) / float(T))
 
@@ -26,6 +25,83 @@ def exp_decay(x, amplitude, t1, c):
 def t2_decay(x, amplitude, t2, c, p):
     return amplitude * np.exp(-(x / t2) ** p) + c
 
+def double_gaussian(x, amplitude_1, amplitude_2, center_1, center_2, sigma_1, sigma_2, c):
+    return amplitude_1 * np.exp(-0.5 * ((x - center_1) / sigma_1) ** 2) + amplitude_2 * np.exp(-0.5 * ((x - center_2) / sigma_2) ** 2) + c
+
+def guess_from_peak(y, x, negative, ampscale=1.0, sigscale=1.0):
+    """Estimate amp, cen, sigma for a peak, create params."""
+    if x is None:
+        return 1.0, 0.0, 1.0
+    maxy, miny = max(y), min(y)
+    maxx, minx = max(x), min(x)
+    imaxy = lmfit.models.index_of(y, maxy)
+    cen = x[imaxy]
+    amp = (maxy - miny)*3.0
+    sig = (maxx-minx)/6.0
+
+    halfmax_vals = np.where(y > (maxy+miny)/2.0)[0]
+    if negative:
+        # imaxy = lmfit.models.index_of(y, miny)
+        amp = -(maxy - miny)*3.0
+        halfmax_vals = np.where(y < (maxy+miny)/2.0)[0]
+    if len(halfmax_vals) > 2:
+        sig = (x[halfmax_vals[-1]] - x[halfmax_vals[0]])/2.0
+        cen = x[halfmax_vals].mean()
+    amp = amp*sig*ampscale
+    sig = sig*sigscale
+    return amp, cen, sig
+
+
+# class DoubleGaussianModel(lmfit.Model):
+#     def __init__(self, *args, **kwargs):
+#
+#         super(DoubleGaussianModel, self).__init__(double_gaussian, *args, **kwargs)
+#
+#     def guess(self, data, x=None, negative=False, **kwargs):
+#         def DoubleGaussianEstimator(x=None, y=None):
+#             # c = y[0]
+#             # y = y-c
+#             c = 0.45
+#             center = (x * y).sum() / y.sum()
+#             ylow = y[x < center]
+#             yhigh = y[x > center]
+#             a1, cen1, sig1 = guess_from_peak(y[x < center], x=x[x < center], negative=negative)
+#             a2, cen2, sig2 = guess_from_peak(y[x > center], x=x[x > center], negative=negative)
+#             print(a1, a2, cen1, cen2, sig1, sig2)
+#             # x01 = x[ylow.argmax()]
+#             # x02 = x[len(ylow) + yhigh.argmax()]
+#             # a1 = ylow.max()
+#             # a2 = yhigh.max()
+#             # w1 = w2 = np.abs((center+0j) ** 0.5)
+#             return a1, a2, cen1, cen2, sig1, sig2, c
+#
+#         amplitude_1, amplitude_2, center_1, center_2, sigma_1, sigma_2, c = DoubleGaussianEstimator(x=x, y=data)
+#         return lmfit.models.update_param_vals(self.make_params(amplitude_1=amplitude_1, amplitude_2=amplitude_2, center_1=center_1, center_2=center_2, sigma_1=sigma_1, sigma_2=sigma_2, c=c), self.prefix, **kwargs)
+
+class CosineNoOffsetNoDecayModel(lmfit.Model):
+    def __init__(self, *args, **kwargs):
+
+        super(CosineNoOffsetNoDecayModel, self).__init__(cosine_no_decay_no_offset, *args, **kwargs)
+
+    def guess(self, data, x=None, **kwargs):
+        def CosineNoOffsetNoDecayEstimator(y=None, x=None):
+            y = np.array(y)
+            x = np.array(x)
+            a = 2**0.5 * np.sqrt( (y**2).sum() )
+            # better to do estimation of period from
+            Y = np.fft.fft(y)
+            N = len(Y)
+            D = float(x[1] - x[0])
+            i = abs(Y[1:int(N/2+1)]).argmax()+1
+            T = (N * D) / i
+            x0 = 0
+            return a, T, x0
+        amplitude, T, x0 = CosineNoOffsetNoDecayEstimator(y=data, x=x)
+        if amplitude < 0:
+            amplitude *= -1
+            x0 = ((x0 / T + 0.5) % 1) * T
+        return lmfit.models.update_param_vals(self.make_params(amplitude=amplitude, T=T, x0=x0), self.prefix, **kwargs)
+
 class ExpDecayModel(lmfit.Model):
 
     def __init__(self, *args, **kwargs):
@@ -40,7 +116,8 @@ class ExpDecayModel(lmfit.Model):
             return amplitude, t1, c
         amplitude, t1, c = exp_decay_estimator(y=data, x=x)
         return lmfit.models.update_param_vals(self.make_params(amplitude=amplitude, t1=t1, c=c), self.prefix, **kwargs)
-lmfit.models
+
+
 class T2DecayModel(lmfit.Model):
 
     def __init__(self, *args, **kwargs):

@@ -341,16 +341,22 @@ class Data:
             l = [l]
         for idx, kwargs in enumerate(l):
             for obs, val in kwargs.items():
+                if obs not in self.observation_names:
+                    raise Exception('Error: {}'.format(l))
                 self._df.set_value(len(self._df) - 1 - len(l) + idx + 1, obs, val)
 
     def dict_access(self, d, df=None):
         df = self.df if df is None else df
         return df[functools.reduce(np.logical_and, [df[key] == val for key, val in d.items()])]
 
+    def column_product(self, column_names):
+        return itertools.product(*[getattr(self.df, cn).unique() for cn in column_names])
+
     def iterator(self, column_names):
-        for p in itertools.product(*[getattr(self.df, cn).unique() for cn in column_names]):
-            d = dict([i for i in zip(column_names, p)])
-            yield d, self.dict_access(d)
+        for idx, p in enumerate(self.column_product(column_names=column_names)):
+            d = collections.OrderedDict([i for i in zip(column_names, p)])
+            d_idx = collections.OrderedDict([(cn, np.argwhere(getattr(self.df, cn).unique() == p)[0, 0]) for cn, p in zip(column_names, p)])
+            yield d, d_idx, idx, self.dict_access(d)
 
 def recompile_plotdata_ui_file():
     fold = "{}/qtgui".format(os.path.dirname(__file__))
