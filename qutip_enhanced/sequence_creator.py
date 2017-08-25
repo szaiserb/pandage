@@ -3,14 +3,10 @@ from __future__ import print_function, absolute_import, division
 __metaclass__ = type
 
 import numpy as np
-import pandas as pd
-import numbers
-from . import coordinates
-import itertools
 import more_itertools
 import lmfit.lineshapes
 import collections
-import sys, traceback
+import traceback
 
 
 class pd(dict):
@@ -129,7 +125,8 @@ class DDParameters:
             else:
                 tau = kwargs['total_tau'] / self.n_tau
         if self.time_digitization is not None:
-            tau = np.around(tau / self.time_digitization) * self.time_digitization
+            tau = np.around(tau / self.time_digitization, out=tau)
+            tau *= self.time_digitization
         self.total_tau = self.n_tau * tau
 
     @property
@@ -182,6 +179,7 @@ class DDParameters:
 
 class Arbitrary:
 
+
     @property
     def controls(self):
         if hasattr(self, '_controls'):
@@ -210,7 +208,8 @@ class Arbitrary:
     def mask(self, name):
         out = np.zeros((len(self.sequence), self.n_columns), dtype=bool)
         for i in self.locations(name):
-            out[i, self.column_dict[name]] = np.ones(len(self.column_dict[name]), dtype=bool)
+            # out[i, self.column_dict[name]] = np.ones(len(self.column_dict[name]), dtype=bool)
+            out[i, self.column_dict[name]] += True
         return out
 
     @property
@@ -253,19 +252,22 @@ class Arbitrary:
 
     def split_all_max(self, time_digitization):
         old_times_full = self.times_full
+        old_sequence = self.sequence
+        old_fields_full = self.fields_full
         if not np.allclose(old_times_full, round2float(old_times_full, time_digitization), time_digitization * 1e-4):
             raise Exception('length mus {} is not valid for the current sample_frequency {}'.format(old_times_full, 12e3))
-        n_split = (self.times_full / time_digitization).astype(int)
+        n_split = (old_times_full / time_digitization).astype(int)
         n_rows = int(sum(old_times_full) / time_digitization)
         if not float(n_rows).is_integer():
             raise Exception('Error: {}, {}, {}'.format(self.T, time_digitization, n_rows))
         n_split_cs = np.cumsum(np.hstack([[0], n_split]))
-        times_full = time_digitization * np.ones(n_rows)
+        times_full = np.ones(n_rows)
+        times_full *= time_digitization
         fields_full = np.empty([n_rows, self.n_columns])
         sequence = []
         for idx in range(self.n_bins):
-            fields_full[n_split_cs[idx]:n_split_cs[idx + 1], :] = self.fields_full[idx, :]
-            sequence.append(self.sequence[idx] * n_split[idx])
+            fields_full[n_split_cs[idx]:n_split_cs[idx + 1], :] = old_fields_full[idx, :]
+            sequence.append(old_sequence[idx] * n_split[idx])
         self._times_full = times_full
         self._fields_full = fields_full
         self._sequence = sequence
@@ -364,12 +366,11 @@ class Arbitrary:
             print(s, t)
 
 class Wait(Arbitrary):
-    def __init__(self, t_wait, time_digitization=1/12e3, n_bins_wait=1):
+    def __init__(self, t_wait, time_digitization=1/12e3, n_bins_wait=1, control='wait'):
+        self.column_dict = {control: [0]}
         self.n_bins_wait = n_bins_wait
         self.time_digitization=time_digitization
         self.t_wait = np.around(t_wait/(self.n_bins_wait*self.time_digitization))*self.n_bins_wait*self.time_digitization
-
-    column_dict = {'wait': [0]}
 
     @property
     def sequence(self):
@@ -398,11 +399,13 @@ class Rabi(Arbitrary):
         return getattr(self, '_sequence', [[self.control_field]] * self.n_bins_rabi)
 
     def omega_list(self):
-        return np.ones([self.n_bins_rabi]) * self.omega
+        out = np.ones([self.n_bins_rabi])
+        out *= self.omega
+        return out
 
     def set_time_digitization(self, val):
-        if not np.allclose(self.t_rabi, round2float(self.t_rabi, val), val*1e-6):
-            raise Exception('Error: {}, {}, {}'.format(val, self.t_rabi, float(self.t_rabi/val)))
+        # if not np.allclose(self.t_rabi, round2float(self.t_rabi, val), val*1e-6):
+        #     raise Exception('Error: {}, {}, {}'.format(val, self.t_rabi, float(self.t_rabi/val)))
         self.time_digitization = val
 
     @property
@@ -727,22 +730,68 @@ class Z(Arbitrary):
         self.times_full = np.array(times_l)
         self.sequence = [[i] for i in self.controls]
 
+class PList(collections.MutableSequence):
+
+    def __init__(self, list_owner):
+        self.oktypes = (Arbitrary)
+        self.list_owner = list_owner
+        self._list = list()
+
+    @property
+    def list(self):
+        return self._list
+
+    @list.setter
+    def list(self, val):
+        """
+        inefficient, calls script_queue_changed multiple times. In practice not relevant.
+        """
+        self._list = val
+        self.list_owner.p_list_changed()
+
+    def set_parent(self, v):
+        v.parent = self.list_owner
+
+    def __len__(self): return len(self.list)
+
+    def __getitem__(self, i): return self.list[i]
+
+    def __delitem__(self, i):
+        del self.list[i]
+        self.list_owner.p_list_changed()
+
+    def __setitem__(self, i, v):
+        raise NotImplementedError
+
+    def insert(self, i, v):  #  needed for append
+        if i != len(self.list):
+            raise Exception('Only appending and popping items allowed')
+        self.list.insert(i, v)
+        self.list_owner.p_list_changed()
+
+    def __str__(self):
+        return str(self.list)
+
+    def __repr__(self):
+        return str(self.list)
+
 class Concatenated(Arbitrary):
     def __init__(self, p_list, controls):
-        self.p_list = p_list
         self._controls = controls
+        self._p_list = PList(self)
+        self._p_list.list = p_list
         self.check_control_length()
 
     @property
     def p_list(self):
         return self._p_list
 
-    @p_list.setter
-    def p_list(self, val):
-        for p in val:
-            if not issubclass(type(p), Arbitrary):
-                raise Exception('Error: type of p is {}'.type(p))
-        self._p_list = val
+    def p_list_changed(self):
+        self.set_sequence()
+        self.set_column_dict()
+        self.set_n_column()
+        self.set_fields_full()
+        self.set_times_full()
 
     def set_p_list(self, times_full, fields_full):
         """
@@ -757,38 +806,44 @@ class Concatenated(Arbitrary):
             self.p_list[idx]._fields_full = fields_full[nbcs[idx]:nbcs[idx+1], list(itertools.chain(*[cd[c] for c in self.p_list[idx].controls]))]
             self.p_list[idx]._times_full = times_full[nbcs[idx]:nbcs[idx+1]]
 
+    def set_sequence(self):
+        self._sequence = list(itertools.chain(*[i.sequence for i in self.p_list]))
+
     @property
     def sequence(self):
-        return getattr(self, '_sequence', list(itertools.chain(*[i.sequence for i in self.p_list])))
+        return self._sequence
 
     def check_control_length(self):
         for c in self.controls:
             if len(set([len(p.column_dict[c]) for p in self.p_list if c in p.column_dict])) != 1:
                 raise Exception("Error. column_dict: {}".format(self.column_dict))
 
+    def set_column_dict(self):
+        n_cc = {}
+        for c in self.controls:
+            for p in self.p_list:
+                if c in p.column_dict:
+                    if c in n_cc and n_cc[c] != len(p.column_dict[c]):
+                        raise Exception('Error: Control {} has different column length on different items of p_list'.format(c))
+                    else:
+                        n_cc[c] = len(p.column_dict[c])
+        out = collections.OrderedDict()
+        idx = 0
+        for c in self.controls:
+            out[c] = list(np.arange(n_cc[c]) + idx)
+            idx += n_cc[c]
+        self._column_dict = out
+
     @property
     def column_dict(self):
-        if hasattr(self, '_column_dict'):
-            return self._column_dict
-        else:
-            n_cc = {}
-            for c in self.controls:
-                for p in self.p_list:
-                    if c in p.column_dict:
-                        if c in n_cc and n_cc[c] != len(p.column_dict[c]):
-                            raise Exception('Error: Control {} has different column length on different items of p_list'.format(c))
-                        else:
-                            n_cc[c] = len(p.column_dict[c])
-            out = collections.OrderedDict()
-            idx = 0
-            for c in self.controls:
-                out[c] = list(np.arange(n_cc[c]) + idx)
-                idx += n_cc[c]
-            return out
+        return self._column_dict
+
+    def set_n_column(self):
+        self._n_columns = len(list(itertools.chain(*self.column_dict.values())))
 
     @property
     def n_columns(self):
-        return len(list(itertools.chain(*self.column_dict.values())))
+        return self._n_columns
 
     def extend_fields_full(self, n):
         fields_full = np.zeros([self.p_list[n].n_bins, self.n_columns])
@@ -797,13 +852,195 @@ class Concatenated(Arbitrary):
                 fields_full[:, self.column_dict[c]] = self.p_list[n].fields_full[:, self.p_list[n].column_dict[c]]
         return fields_full
 
+    def set_fields_full(self):
+        # self._fields_full = np.concatenate(
+        out = np.empty((self.n_bins, self.n_columns))
+        nbcs = np.cumsum(([0] + [i.n_bins for i in self.p_list]))
+        for i in range(len(self.p_list)):
+            for c in self.controls:
+                if c in self.p_list[i].column_dict:
+                    out[nbcs[i]:nbcs[i+1], self.column_dict[c]] = self.p_list[i].fields_full[:, self.p_list[i].column_dict[c]]
+            # out[nbcs[i]:nbcs[i+1], :] = self.extend_fields_full(i)
+            # [self.extend_fields_full(i) for i in range(len(self.p_list))]
+        # )
+        self._fields_full = out
     @property
     def fields_full(self):
-        return getattr(self, '_fields_full', np.concatenate([self.extend_fields_full(i) for i in range(len(self.p_list))]))
+        return self._fields_full
+
+    def set_times_full(self):
+        self._times_full = np.concatenate([i.times_full for i in self.p_list])
 
     @property
     def times_full(self):
-        return getattr(self, '_times_full', np.concatenate([i.times_full for i in self.p_list]))
+        return self._times_full
+
+# class DD2(Concatenated):
+#     """
+#     NOTES:
+#         1. tau is time between centers of (pi -) pulses
+#         2. preceeding and following tau/2 not included for better rounding. To
+#            To include them and have desired time_digitization=t0, here set time_digitization to 2*t0 and append and prepend Wait(tau/2, time_digitization=t0)
+#         3. fid and hahn echo are not included, for reason see 2.)
+#     """
+#     def __init__(self, dd_type, pulse_list, tau_arr, time_digitization=None):
+#         self.set_dd_type(dd_type)
+#         self.time_digitization = time_digitization
+#         self.pulse_list
+#         self.set_tau(tau)
+#         super(DDConcatenated, self).__init__(self.generate_p_list(), ['mw'])
+#
+#     @property
+#     def dd_type(self):
+#         return self._dd_type
+#
+#     @property
+#     def phases(self):
+#         return self._phases
+#
+#     def set_dd_type(self, val):
+#         if 'uhrig' in val or 'fid' in val or 'hahn' in val:
+#             raise NotImplementedError
+#         self._dd_type = val
+#         self._phases = __PHASES_DD__[self.dd_type]
+#
+#     @property
+#     def p_list_pulses(self):
+#         return self._p_list_pulses
+#
+#     def set_p_list_pulses(self, val):
+#         if len(val) != len(__PHASES_DD__[self.dd_type]):
+#             raise Exception('Error: {}, {}, {}'.format(len(val), val, self.dd_type))
+#         if len(set(val)) != len(val):
+#             raise Exception("Error: {}".format(val))
+#         for idx, pulse in enumerate(val):
+#             if self.time_digitization is not None and pulse.time_digitization != self.time_digitization:
+#                 raise Exception("Error: {}, {}".format(pulse.time_digitization, self.time_digitization))
+#             pulse.phase += self.phases[idx]
+#         self._p_list_pulses = val
+#
+#     @property
+#     def tau(self):
+#         return self._tau
+#
+#     def set_tau(self, val):
+#         if self.time_digitization is not None:
+#             val = np.around(val / self.time_digitization) * self.time_digitization
+#         self._tau = val
+#
+#     @property
+#     def n_tau(self):
+#         return self.number_of_pi_pulses - 1
+#
+#     @property
+#     def number_of_pi_pulses(self):
+#         return len(self.phases)
+#
+#     @property
+#     def pulse_durations(self):
+#         return np.array([self.p_list_pulses[i].T for i in range(len(self.phases))])
+#
+#     @property
+#     def pulse_durations_per_tau(self):
+#         return (self.pulse_durations[:-1] + self.pulse_durations[1:])/2.
+#
+#     @property
+#     def effective_tau_list(self):
+#         return -(self.pulse_durations_per_tau-self.tau)
+#
+#     @property
+#     def p_list_tau(self):
+#         return [Rabi(t_rabi=t_wait,
+#                      time_digitization=self.time_digitization,
+#                      omega=0.0,
+#                      control_field='mw') for t_wait in self.effective_tau_list]
+#
+#     def generate_p_list(self):
+#         return list(more_itertools.interleave_longest(self.p_list_pulses, self.p_list_tau))
+
+# class DDConcatenated(Concatenated):
+#     """
+#     THIS IS VERSATILE BUT SLOW
+#     NOTES:
+#         1. tau is time between centers of (pi -) pulses
+#         2. preceeding and following tau/2 not included for better rounding. To
+#            To include them and have desired time_digitization=t0, here set time_digitization to 2*t0 and append and prepend Wait(tau/2, time_digitization=t0)
+#         3. fid and hahn echo are not included, for reason see 2.)
+#     """
+#     def __init__(self, dd_type, p_list_pulses, tau, time_digitization=None):
+#         self.set_dd_type(dd_type)
+#         self.time_digitization = time_digitization
+#         self.set_p_list_pulses(p_list_pulses)
+#         self.set_tau(tau)
+#         super(DDConcatenated, self).__init__(self.generate_p_list(), ['mw'])
+#
+#     @property
+#     def dd_type(self):
+#         return self._dd_type
+#
+#     @property
+#     def phases(self):
+#         return self._phases
+#
+#     def set_dd_type(self, val):
+#         if 'uhrig' in val or 'fid' in val or 'hahn' in val:
+#             raise NotImplementedError
+#         self._dd_type = val
+#         self._phases = __PHASES_DD__[self.dd_type]
+#
+#     @property
+#     def p_list_pulses(self):
+#         return self._p_list_pulses
+#
+#     def set_p_list_pulses(self, val):
+#         if len(val) != len(__PHASES_DD__[self.dd_type]):
+#             raise Exception('Error: {}, {}, {}'.format(len(val), val, self.dd_type))
+#         if len(set(val)) != len(val):
+#             raise Exception("Error: {}".format(val))
+#         for idx, pulse in enumerate(val):
+#             if self.time_digitization is not None and pulse.time_digitization != self.time_digitization:
+#                 raise Exception("Error: {}, {}".format(pulse.time_digitization, self.time_digitization))
+#             pulse.phase += self.phases[idx]
+#         self._p_list_pulses = val
+#
+#     @property
+#     def tau(self):
+#         return self._tau
+#
+#     def set_tau(self, val):
+#         if self.time_digitization is not None:
+#             val = np.around(val / self.time_digitization) * self.time_digitization
+#         self._tau = val
+#
+#     @property
+#     def n_tau(self):
+#         return self.number_of_pi_pulses - 1
+#
+#     @property
+#     def number_of_pi_pulses(self):
+#         return len(self.phases)
+#
+#     @property
+#     def pulse_durations(self):
+#         return np.array([self.p_list_pulses[i].T for i in range(len(self.phases))])
+#
+#     @property
+#     def pulse_durations_per_tau(self):
+#         pulse_durations = self.pulse_durations
+#         return (pulse_durations[:-1] + pulse_durations[1:])/2.
+#
+#     @property
+#     def effective_tau_list(self):
+#         return -(self.pulse_durations_per_tau-self.tau)
+#
+#     @property
+#     def p_list_tau(self):
+#         return [Wait(t_wait=t_wait,
+#                      time_digitization=self.time_digitization,
+#                      control='wait') for t_wait in self.effective_tau_list]
+#
+#     def generate_p_list(self):
+#         return list(more_itertools.interleave_longest(self.p_list_pulses, self.p_list_tau))
 
 class DDConcatenated(Concatenated):
     """
@@ -814,11 +1051,11 @@ class DDConcatenated(Concatenated):
            To include them and have desired time_digitization=t0, here set time_digitization to 2*t0 and append and prepend Wait(tau/2, time_digitization=t0)
         3. fid and hahn echo are not included, for reason see 2.)
     """
-    def __init__(self, dd_type, p_list_pulses, tau, time_digitization=None):
+    def __init__(self, dd_type, p_list_pulses, tau_list, time_digitization=None):
         self.set_dd_type(dd_type)
         self.time_digitization = time_digitization
         self.set_p_list_pulses(p_list_pulses)
-        self.set_tau(tau)
+        self.set_tau_list(tau_list)
         super(DDConcatenated, self).__init__(self.generate_p_list(), ['mw'])
 
     @property
@@ -851,13 +1088,20 @@ class DDConcatenated(Concatenated):
         self._p_list_pulses = val
 
     @property
-    def tau(self):
-        return self._tau
+    def tau_list(self):
+        return self._tau_list
 
-    def set_tau(self, val):
+    def set_tau_list(self, val):
+        if len(val) == 1:
+            v = np.ones(self.n_tau)
+            v *= val
+            val = v
+        elif len(val) != self.n_tau:
+            raise Exception('Error: {}, {}'.format(val, self.n_tau))
         if self.time_digitization is not None:
-            val = np.around(val / self.time_digitization) * self.time_digitization
-        self._tau = val
+            val = np.around(val / self.time_digitization,  out=val)
+            val *= self.time_digitization
+        self._tau_list = val
 
     @property
     def n_tau(self):
@@ -873,39 +1117,66 @@ class DDConcatenated(Concatenated):
 
     @property
     def pulse_durations_per_tau(self):
-        return (self.pulse_durations[:-1] + self.pulse_durations[1:])/2.
+        pulse_durations = self.pulse_durations
+        return (pulse_durations[:-1] + pulse_durations[1:])/2.
 
     @property
     def effective_tau_list(self):
-        return -(self.pulse_durations_per_tau-self.tau)
+        return self.tau_list - self.pulse_durations_per_tau
 
     @property
     def p_list_tau(self):
         return [Rabi(t_rabi=t_wait,
-                     time_digitization=self.time_digitization,
                      omega=0.0,
+                     time_digitization=self.time_digitization,
                      control_field='mw') for t_wait in self.effective_tau_list]
 
     def generate_p_list(self):
         return list(more_itertools.interleave_longest(self.p_list_pulses, self.p_list_tau))
 
 if __name__ == '__main__':
+
     from qutip_enhanced import *
-    reload(sc)
+    # reload(sc)
     import time
-    dd_type = '10_kdd4'
-    t0 = time.time()
+    dd_type = '1000_kdd4'
+    # t0 = time.time()
+    # self = sc.DDConcatenated(dd_type=dd_type,
+    #                          p_list_pulses=[sc.Rabi(t_rabi=0.025,
+    #                                                 omega=1 / 0.05,
+    #                                                 time_digitization=1/12e3,
+    #                                                 control_field='mw')
+    #                                         for _ in range(len(sc.__PHASES_DD__[dd_type]))],
+    #                          tau=0.1,
+    #                          time_digitization=1/12e3,
+    #                          )
+    # time_digitization = 1/12e3
+    # # self.split_all_max(time_digitization)
+    #
+    # print(time.time()-t0)
+    def run():
+        self = sc.DDConcatenated(dd_type=dd_type,
+                                 p_list_pulses=[sc.Rabi(t_rabi=0.025,
+                                                        omega=1 / 0.05,
+                                                        time_digitization=1 / 12e3,
+                                                        control_field='mw')
+                                                for _ in range(len(sc.__PHASES_DD__[dd_type]))],
+                                 tau_list=[0.1],
+                                 time_digitization=1 / 12e3,
+                                 )
+        time_digitization = 1 / 12e3
+        self.split_all_max(time_digitization)
+
+    import cProfile
+    cProfile.run('run()')
+
+    dd_type = '1_kdd4'
     self = sc.DDConcatenated(dd_type=dd_type,
                              p_list_pulses=[sc.Rabi(t_rabi=0.025,
                                                     omega=1 / 0.05,
-                                                    time_digitization=1/12e3,
+                                                    time_digitization=1 / 12e3,
                                                     control_field='mw')
                                             for _ in range(len(sc.__PHASES_DD__[dd_type]))],
-                             tau=0.1,
-                             time_digitization=1/12e3,
+                             tau_list=[0.1],
+                             time_digitization=1 / 12e3,
                              )
-    time_digitization = 1/12e3
-    self.split_all_max(time_digitization)
-
-    print(time.time()-t0)
-    # self.pulse_list[2].phase

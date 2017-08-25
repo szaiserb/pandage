@@ -13,7 +13,7 @@ import collections
 import subprocess
 from PyQt5.QtWidgets import  QListWidgetItem, QTableWidgetItem,  QMainWindow
 
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt
 from PyQt5.uic import compileUi
 
 from .qtgui import plot_data_gui
@@ -182,7 +182,7 @@ def ret_property_array_like_types(name, types):
 def ptrepack(file, folder, tempfile=None):
     # C:\Users\yy3\AppData\Local\conda\conda\envs\py27\Scripts\ptrepack.exe -o --chunkshape=auto --propindexes --complevel=0 --complib=blosc data.hdf data_tmp.hdf
     tempfile = 'temp.hdf' if tempfile is None else tempfile
-    ptrepack = "C:\Users\yy3\AppData\Local\conda\conda\envs\py27\Scripts\ptrepack.exe"
+    ptrepack = r"C:\Users\yy3\AppData\Local\conda\conda\envs\py27\Scripts\ptrepack.exe"
     command = [ptrepack, "-o", "--chunkshape=auto", "--propindexes", "--complevel=9", "--complib=blosc", file, tempfile]
     _ = subprocess.call(command, cwd=folder)
     os.remove(os.path.join(folder, file))
@@ -206,8 +206,8 @@ class Data:
         if len(kwargs)>0:
             self.init(**kwargs)
 
-    parameter_names = ret_property_array_like_types('parameter_names',[str, unicode])
-    observation_names = ret_property_array_like_types('observation_names', [str, unicode])
+    parameter_names = ret_property_array_like_types('parameter_names',[str])
+    observation_names = ret_property_array_like_types('observation_names', [str])
 
     @property
     def dtypes(self):
@@ -647,3 +647,42 @@ def move_folder(folder_list_dict=None, destination_folder=None):
             failed +=1
             print("Folder {} could not be moved. Lets hope it has tbc in its name".format(i['root']))
     print("Successfully moved: {}. Failed: {}".format(len(folder_list_dict)- failed, failed))
+
+# from PyQt5.QtWidgets import QTableWidgetItem, QAbstractItemView, QMenu, QAction,
+# from PyQt5.QtCore import Qt
+# from PyQt5.QtGui import QCursor
+#
+#
+#
+# # def renameSlot(self, event):
+# #     print "renaming slot called"
+# #     # get the selected row and column
+# #     row = self.tableWidget.rowAt(event.pos().y())
+# #     col = self.tableWidget.columnAt(event.pos().x())
+# #     # get the selected cell
+# #     cell = self.tableWidget.item(row, col)
+# #     # get the text inside selected cell (if any)
+# #     cellText = cell.text()
+# #     # get the widget inside selected cell (if any)
+# #     widget = self.tableWidget.cellWidget(row, col)
+#
+#
+# self = pi3d
+# table = pi3d.script_queue_table
+# table.clearSelection()
+# table.setColumnWidth(0, 400)
+# table.setColumnWidth(1, 342)
+# table.clear()
+# table.setColumnCount(2)
+# table.setRowCount(len(self.script_queue))
+# table.setHorizontalHeaderLabels(['Script name', 'parameters'])
+# table.setSelectionBehavior(QAbstractItemView.SelectRows)
+# table.setSelectionMode(QAbstractItemView.SingleSelection)
+# table.setEnabled(True)
+# for ridx, i in enumerate(self.script_queue):
+#     for cidx, attr_name in enumerate(['name', 'pd']):
+#         new_item = QTableWidgetItem(str(getattr(i, attr_name)))
+#         table.setItem(ridx, cidx, new_item)
+# self.table
+#
+
