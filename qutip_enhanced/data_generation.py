@@ -15,6 +15,7 @@ from . import data_handling
 import qutip_enhanced.analyze as qta; reload(qta)
 import os
 import itertools
+import collections
 
 
 class DataGeneration:
@@ -35,7 +36,7 @@ class DataGeneration:
 
     @parameters.setter
     def parameters(self, val):
-        self._parameters = itertools.OrderedDict((data_handling.check_type(k, 'key', str), data_handling.check_array_like(v, 'val')) for k, v in data_handling.check_type(val, 'parameters', OrderedDict).items())
+        self._parameters = collections.OrderedDict((data_handling.check_type(k, 'key', str), data_handling.check_array_like(v, 'val')) for k, v in data_handling.check_type(val, 'parameters', collections.OrderedDict).items())
         self.plot_type = 'scatter'
         if len(self._parameters.items()[-1][1]) > 2:
             self.plot_type = 'line'
@@ -115,9 +116,9 @@ class DataGeneration:
         while len(self.iterator_list) > 0:
             self.pv_l = [self.iterator_list.pop(0) for _ in range(min(self.number_of_simultaneous_measurements, len(self.iterator_list)))]
             self.pidx_l = [self.iterator_idx_list.pop(0) for _ in range(min(self.number_of_simultaneous_measurements, len(self.iterator_idx_list)))]
-            self.current_parameters_dict_list = [itertools.OrderedDict([(key, pv[i]) for i, key in enumerate(self.parameters.keys())]) for pv in self.pv_l]
-            self.current_indices_dict_list = [itertools.OrderedDict([("{}_idx".format(key), pidx[i]) for i, key in enumerate(self.parameters.keys())]) for pidx in self.pidx_l]
-            l = [itertools.OrderedDict(i.items() + j.items()) for i, j in zip(self.current_parameters_dict_list, self.current_indices_dict_list)]
+            self.current_parameters_dict_list = [collections.OrderedDict([(key, pv[i]) for i, key in enumerate(self.parameters.keys())]) for pv in self.pv_l]
+            self.current_indices_dict_list = [collections.OrderedDict([("{}_idx".format(key), pidx[i]) for i, key in enumerate(self.parameters.keys())]) for pidx in self.pidx_l]
+            l = [collections.OrderedDict(i.items() + j.items()) for i, j in zip(self.current_parameters_dict_list, self.current_indices_dict_list)]
             self.data.append(l)
             self.update_current_str()
             yield l
