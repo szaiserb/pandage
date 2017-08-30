@@ -3,6 +3,8 @@ from __future__ import print_function, absolute_import, division
 __metaclass__ = type
 
 import numpy as np
+import itertools
+from .qutip_enhanced import coordinates
 import more_itertools
 import lmfit.lineshapes
 import collections
