@@ -1124,10 +1124,9 @@ class DDDegen(Arbitrary):
         self.tau = tau
         self.sample_frequency = sample_frequency
         s = self.sample_frequency*self.tau
-        if s - np.around(s) != 0:
-            raise Exception('Error: {},{}'.format(self.sample_frequency, self.tau))
-
         self._sequence = ['mw']*self.total_length_smpl
+        self.set_fields_full()
+        self.set_times_full()
 
     # class sequence
     #     overwrite getitem and len, dont let anything add, init is just number of desired bins and control (e.g. 'mw')
@@ -1146,13 +1145,11 @@ class DDDegen(Arbitrary):
 
     @property
     def length_smpl_per_pi(self):
-        return self.sample_frequency*self.n_pi*self.tau
+        return int(np.around(self.sample_frequency*self.tau))
 
     @property
     def total_length_smpl(self):
         out = self.length_smpl_per_pi*self.n_pi
-        if out-np.around(out) != 0:
-            raise Exception('Error: {}'.format(out))
         return int(out)
 
     # @property
@@ -1165,7 +1162,7 @@ class DDDegen(Arbitrary):
     #     return out
 
     def set_times_full(self):
-        self._time_full = np.ones(self.total_length_smpl)/self.sample_frequency
+        self._times_full = np.ones(self.total_length_smpl)/self.sample_frequency
 
     def set_fields_full(self):
         #amplitudes
@@ -1191,7 +1188,7 @@ class DDDegen(Arbitrary):
         np.sin(p[:, 1], out=p[:, 1])
         p = np.repeat(p, self.length_smpl_per_pi, axis=0)
 
-        self._fields_full =  1/self.rabi_period*(p.T*x).T
+        self._fields_full = 1/self.rabi_period*(p.T*x).T
 
 
     @property
