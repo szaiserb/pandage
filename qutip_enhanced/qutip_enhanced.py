@@ -141,6 +141,12 @@ def qsum(ql):
         sum_ql += qobj
     return sum_ql
 
+def qmul(ql):
+    sum_ql = ql[0]
+    for qobj in ql[1:]:
+        sum_ql *= qobj
+    return sum_ql
+
 def do_zero(h):
     dims = h.dims
     h = h.data.todense()

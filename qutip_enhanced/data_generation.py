@@ -7,6 +7,7 @@ if sys.version_info.major == 2:
 else:
     from importlib import reload
 
+import numpy as np
 import errno
 import shutil
 import traceback
@@ -65,6 +66,8 @@ class DataGeneration:
         self.iterator_list_done = [tuple(itld[i]) for i in range((len(itld)))]
         self.iterator_idx_list_done = [tuple(itidxld[i]) for i in range((len(itidxld)))]
 
+
+
     def set_iterator_list(self):
         self.iterator_list = list(itertools.product(*self.parameters.values()))
         self.iterator_idx_list = list(itertools.product(*[range(len(i)) for i in self.parameters.values()]))
@@ -74,6 +77,10 @@ class DataGeneration:
                 self.iterator_idx_list.remove(idx)
             except:
                 pass
+
+    @property
+    def progress(self):
+        return getattr(self, '_progress', 0)
 
     def init_data(self, init_from_file=None, iff=None):
         init_from_file = iff if iff is not None else init_from_file
@@ -109,11 +116,12 @@ class DataGeneration:
         self.set_iterator_list()
 
     def iterator(self):
-        if hasattr(self, 'pv_l'):
-            self.iterator_list_done.extend(self.pv_l)
-        if hasattr(self, 'pidx_l'):
-            self.iterator_idx_list_done.extend(self.pidx_l)
         while len(self.iterator_list) > 0:
+            if hasattr(self, 'pv_l'):
+                self.iterator_list_done.extend(self.pv_l)
+            if hasattr(self, 'pidx_l'):
+                self.iterator_idx_list_done.extend(self.pidx_l)
+            self._progress = len(self.iterator_list_done) / np.prod([len(i) for i in self.parameters.values()])
             self.pv_l = [self.iterator_list.pop(0) for _ in range(min(self.number_of_simultaneous_measurements, len(self.iterator_list)))]
             self.pidx_l = [self.iterator_idx_list.pop(0) for _ in range(min(self.number_of_simultaneous_measurements, len(self.iterator_idx_list)))]
             self.current_parameters_dict_list = [collections.OrderedDict([(key, pv[i]) for i, key in enumerate(self.parameters.keys())]) for pv in self.pv_l]
@@ -122,6 +130,8 @@ class DataGeneration:
             self.data.append(l)
             self.update_current_str()
             yield l
+        self._progress = len(self.iterator_list_done) / np.prod([len(i) for i in self.parameters.values()])
+
 
     def reinit(self):
         self.start_time = datetime.datetime.now()

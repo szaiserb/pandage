@@ -2,11 +2,11 @@
 from __future__ import print_function, absolute_import, division
 
 __metaclass__ = type
-
-from qutip_enhanced import *
+import numpy as np
+from qutip import basis, tensor, ket2dm, sigmax, sigmay, sigmaz, expect
 import itertools
 
-import numpy as np
+
 
 import matplotlib.pyplot as plt
 

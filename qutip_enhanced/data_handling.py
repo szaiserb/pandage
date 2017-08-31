@@ -182,10 +182,11 @@ def ret_property_array_like_types(name, types):
 def ptrepack(file, folder, tempfile=None):
     # C:\Users\yy3\AppData\Local\conda\conda\envs\py27\Scripts\ptrepack.exe -o --chunkshape=auto --propindexes --complevel=0 --complib=blosc data.hdf data_tmp.hdf
     tempfile = 'temp.hdf' if tempfile is None else tempfile
-    ptrepack = r"C:\Users\yy3\AppData\Local\conda\conda\envs\py27\Scripts\ptrepack.exe"
+    ptrepack = r"{}\Scripts\ptrepack.exe".format(os.path.dirname(sys.executable))
     command = [ptrepack, "-o", "--chunkshape=auto", "--propindexes", "--complevel=9", "--complib=blosc", file, tempfile]
     _ = subprocess.call(command, cwd=folder)
     os.remove(os.path.join(folder, file))
+    print(file, folder, tempfile)
     os.rename(os.path.join(folder, tempfile), os.path.join(folder, file))
 
 

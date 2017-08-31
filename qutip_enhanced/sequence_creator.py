@@ -9,7 +9,7 @@ import more_itertools
 import lmfit.lineshapes
 import collections
 import traceback
-
+from .qutip_enhanced import coordinates
 
 class pd(dict):
 
@@ -575,28 +575,6 @@ class DDAlpha(Arbitrary):
         out[self.locations('wait')[-1]] /= 2
         return getattr(self, '_times_full', out)
 
-class DDDegen(Arbitrary):
-    def __init__(self, dd_type=None, rabi_period=None, n_samples=None, **kwargs):
-        self.dd_type = dd_type
-        self.rabi_period = rabi_period
-        self.n_samples = n_samples
-        self.set_total_tau(**kwargs)
-
-    column_dict = collections.OrderedDict([('mw', [0, 1])])
-
-    @property
-    def sequence(self):
-        return getattr(self, '_sequence', [['mw']] * self.n_bins_wait)
-
-    @property
-    def fields_full(self):
-        ol = self.omega_list()
-        return getattr(self, '_fields_full', np.array([ol * np.cos(self.phase), ol * np.sin(self.phase)]).T)
-
-    @property
-    def times_full(self):
-        return getattr(self, '_times_full', np.array([self.t_rabi / self.n_bins_rabi] * self.n_bins_rabi))
-
 class DD(Arbitrary):
     def __init__(self, dd_type=None, rabi_period=None, time_digitization=None, **kwargs):
         self.dd_type = dd_type
@@ -1126,6 +1104,8 @@ class DDConcatenated(Concatenated):
     def effective_tau_list(self):
         return self.tau_list - self.pulse_durations_per_tau
 
+
+
     @property
     def p_list_tau(self):
         return [Rabi(t_rabi=t_wait,
@@ -1135,6 +1115,113 @@ class DDConcatenated(Concatenated):
 
     def generate_p_list(self):
         return list(more_itertools.interleave_longest(self.p_list_pulses, self.p_list_tau))
+
+
+class DDDegen(Arbitrary):
+    def __init__(self, dd_type=None, rabi_period=None, tau=None, sample_frequency=12e3):
+        self.dd_type = dd_type
+        self.rabi_period = rabi_period
+        self.tau = tau
+        self.sample_frequency = sample_frequency
+        s = self.sample_frequency*self.tau
+        if s - np.around(s) != 0:
+            raise Exception('Error: {},{}'.format(self.sample_frequency, self.tau))
+
+        self._sequence = ['mw']*self.total_length_smpl
+
+    # class sequence
+    #     overwrite getitem and len, dont let anything add, init is just number of desired bins and control (e.g. 'mw')
+
+    @property
+    def sequence(self):
+        return getattr(self, '_sequence')
+
+    @property
+    def n_pi(self):
+        return len(__PHASES_DD__[self.dd_type])
+
+    @property
+    def t_pi(self):
+        return .5*self.rabi_period
+
+    @property
+    def length_smpl_per_pi(self):
+        return self.sample_frequency*self.n_pi*self.tau
+
+    @property
+    def total_length_smpl(self):
+        out = self.length_smpl_per_pi*self.n_pi
+        if out-np.around(out) != 0:
+            raise Exception('Error: {}'.format(out))
+        return int(out)
+
+    # @property
+    # def phase_segment_smpl(self):
+    #     out = np.arange(self.n_pi+1)
+    #     s = self.tau * self.sample_frequency
+    #     if s != np.around(s):
+    #         raise Exception("Error: {}, {}, {}".format(s, self.tau, self.sample_frequency))
+    #     out *= int()
+    #     return out
+
+    def set_times_full(self):
+        self._time_full = np.ones(self.total_length_smpl)/self.sample_frequency
+
+    def set_fields_full(self):
+        #amplitudes
+        x = np.arange(self.total_length_smpl, dtype=float)
+        x *= self.n_pi
+        x /= self.total_length_smpl
+        np.mod(x, 1, out=x)
+        x = x-.5
+        x = np.abs(x)
+        x=x/self.t_pi
+        x = x*self.tau
+        x = -1*x
+        x = x+1
+        np.maximum(x, 0, out=x)
+        x *= np.pi/2.
+        np.sin(x, out=x)
+        np.power(x, 2, out=x)
+
+        #phases
+        p = __PHASES_DD__[self.dd_type].reshape(-1, 1)
+        p = np.repeat(p, 2, axis=1)
+        np.cos(p[:,0], out=p[:, 0])
+        np.sin(p[:, 1], out=p[:, 1])
+        p = np.repeat(p, self.length_smpl_per_pi, axis=0)
+
+        self._fields_full =  1/self.rabi_period*(p.T*x).T
+
+    def scaling_due_to_phases(self):
+
+        return out
+
+    def normalized_amplitudes_xy(self):
+        pass
+
+    # class DDDegen(Arbitrary):
+    #     def __init__(self, dd_type=None, rabi_period=None, n_samples=None, **kwargs):
+    #         self.dd_type = dd_type
+    #         self.rabi_period = rabi_period
+    #         self.n_samples = n_samples
+    #         self.set_total_tau(**kwargs)
+    #
+    #     column_dict = collections.OrderedDict([('mw', [0, 1])])
+    #
+    #     @property
+    #     def sequence(self):
+    #         return getattr(self, '_sequence', [['mw']] * self.n_bins_wait)
+    #
+    #     @property
+    #     def fields_full(self):
+    #         ol = self.omega_list()
+    #         return getattr(self, '_fields_full', np.array([ol * np.cos(self.phase), ol * np.sin(self.phase)]).T)
+    #
+    #     @property
+    #     def times_full(self):
+    #         return getattr(self, '_times_full', np.array([self.t_rabi / self.n_bins_rabi] * self.n_bins_rabi))
+    #
 
 if __name__ == '__main__':
 
@@ -1156,29 +1243,41 @@ if __name__ == '__main__':
     # # self.split_all_max(time_digitization)
     #
     # print(time.time()-t0)
-    def run():
-        self = sc.DDConcatenated(dd_type=dd_type,
-                                 p_list_pulses=[sc.Rabi(t_rabi=0.025,
-                                                        omega=1 / 0.05,
-                                                        time_digitization=1 / 12e3,
-                                                        control_field='mw')
-                                                for _ in range(len(sc.__PHASES_DD__[dd_type]))],
-                                 tau_list=[0.1],
-                                 time_digitization=1 / 12e3,
-                                 )
-        time_digitization = 1 / 12e3
-        self.split_all_max(time_digitization)
+    # def run():
+    #     self = sc.DDConcatenated(dd_type=dd_type,
+    #                              p_list_pulses=[sc.Rabi(t_rabi=0.025,
+    #                                                     omega=1 / 0.05,
+    #                                                     time_digitization=1 / 12e3,
+    #                                                     control_field='mw')
+    #                                             for _ in range(len(sc.__PHASES_DD__[dd_type]))],
+    #                              tau_list=[0.1],
+    #                              time_digitization=1 / 12e3,
+    #                              )
+    #     time_digitization = 1 / 12e3
+    #     self.split_all_max(time_digitization)
+    #
+    # import cProfile
+    # cProfile.run('run()')
+    #
+    # dd_type = '1_kdd4'
+    # self = sc.DDConcatenated(dd_type=dd_type,
+    #                          p_list_pulses=[sc.Rabi(t_rabi=0.025,
+    #                                                 omega=1 / 0.05,
+    #                                                 time_digitization=1 / 12e3,
+    #                                                 control_field='mw')
+    #                                         for _ in range(len(sc.__PHASES_DD__[dd_type]))],
+    #                          tau_list=[0.1],
+    #                          time_digitization=1 / 12e3,
+    #                          )
 
-    import cProfile
-    cProfile.run('run()')
+from qutip_enhanced import *
+reload(sc)
+d = sc.DDDegen(dd_type='20_hahn', rabi_period=0.05, tau = 0.1, sample_frequency=12e3)
+import matplotlib.pyplot as plt
+c = d.set_fields_full()
+# plt.plot(d.set_fields_full())
 
-    dd_type = '1_kdd4'
-    self = sc.DDConcatenated(dd_type=dd_type,
-                             p_list_pulses=[sc.Rabi(t_rabi=0.025,
-                                                    omega=1 / 0.05,
-                                                    time_digitization=1 / 12e3,
-                                                    control_field='mw')
-                                            for _ in range(len(sc.__PHASES_DD__[dd_type]))],
-                             tau_list=[0.1],
-                             time_digitization=1 / 12e3,
-                             )
+# import time
+# t0 = time.time()
+# y = d.amplitudes()
+# print(time.time()-t0)
