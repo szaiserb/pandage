@@ -1193,12 +1193,14 @@ class DDDegen(Arbitrary):
 
         self._fields_full =  1/self.rabi_period*(p.T*x).T
 
-    def scaling_due_to_phases(self):
 
-        return out
+    @property
+    def times_full(self):
+        return self._times_full
 
-    def normalized_amplitudes_xy(self):
-        pass
+    @property
+    def fields_full(self):
+        return self._fields_full
 
     # class DDDegen(Arbitrary):
     #     def __init__(self, dd_type=None, rabi_period=None, n_samples=None, **kwargs):
