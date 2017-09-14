@@ -94,11 +94,56 @@
       <string>UpdatePlot</string>
      </property>
     </widget>
+    <widget class="QComboBox" name="x_axis_parameter_comboBox">
+     <property name="geometry">
+      <rect>
+       <x>860</x>
+       <y>350</y>
+       <width>231</width>
+       <height>22</height>
+      </rect>
+     </property>
+     <property name="editable">
+      <bool>false</bool>
+     </property>
+     <property name="maxVisibleItems">
+      <number>30</number>
+     </property>
+     <property name="frame">
+      <bool>true</bool>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label">
+     <property name="geometry">
+      <rect>
+       <x>860</x>
+       <y>330</y>
+       <width>231</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>10</pointsize>
+      </font>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::Panel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+     <property name="text">
+      <string>x-axis parameter</string>
+     </property>
+    </widget>
     <zorder>parameter_table</zorder>
     <zorder>observation_widget</zorder>
     <zorder>gridLayoutWidget</zorder>
     <zorder>gridLayoutWidget_2</zorder>
     <zorder>update_plot_button</zorder>
+    <zorder>x_axis_parameter_comboBox</zorder>
+    <zorder>label</zorder>
    </widget>
    <widget class="QWidget" name="fit_tab">
     <attribute name="title">
@@ -175,9 +220,9 @@
    <property name="geometry">
     <rect>
      <x>873</x>
-     <y>360</y>
+     <y>410</y>
      <width>231</width>
-     <height>531</height>
+     <height>481</height>
     </rect>
    </property>
    <property name="acceptDrops">

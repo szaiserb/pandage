@@ -1269,12 +1269,12 @@ if __name__ == '__main__':
     #                          time_digitization=1 / 12e3,
     #                          )
 
-from qutip_enhanced import *
-reload(sc)
-d = sc.DDDegen(dd_type='20_hahn', rabi_period=0.05, tau = 0.1, sample_frequency=12e3)
-import matplotlib.pyplot as plt
-c = d.set_fields_full()
-# plt.plot(d.set_fields_full())
+# from qutip_enhanced import *
+# reload(sc)
+# d = sc.DDDegen(dd_type='20_hahn', rabi_period=0.05, tau = 0.1, sample_frequency=12e3)
+# import matplotlib.pyplot as plt
+# c = d.set_fields_full()
+# # plt.plot(d.set_fields_full())
 
 # import time
 # t0 = time.time()

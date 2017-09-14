@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'D:\Python\qutip_enhanced\qutip_enhanced/qtgui/plot_data.ui'
+# Form implementation generated from reading ui file 'd:\dropbox\dokumente\pi3\code\python\qutip_enhanced\qutip_enhanced/qtgui/plot_data.ui'
 #
 # Created by: PyQt5 UI code generator 5.6
 #
@@ -42,11 +42,27 @@ class Ui_window(object):
         self.update_plot_button = QtWidgets.QPushButton(self.plot_tab)
         self.update_plot_button.setGeometry(QtCore.QRect(860, 270, 231, 51))
         self.update_plot_button.setObjectName("update_plot_button")
+        self.x_axis_parameter_comboBox = QtWidgets.QComboBox(self.plot_tab)
+        self.x_axis_parameter_comboBox.setGeometry(QtCore.QRect(860, 350, 231, 22))
+        self.x_axis_parameter_comboBox.setEditable(False)
+        self.x_axis_parameter_comboBox.setMaxVisibleItems(30)
+        self.x_axis_parameter_comboBox.setFrame(True)
+        self.x_axis_parameter_comboBox.setObjectName("x_axis_parameter_comboBox")
+        self.label = QtWidgets.QLabel(self.plot_tab)
+        self.label.setGeometry(QtCore.QRect(860, 330, 231, 21))
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.label.setFont(font)
+        self.label.setFrameShape(QtWidgets.QFrame.Panel)
+        self.label.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.label.setObjectName("label")
         self.parameter_table.raise_()
         self.observation_widget.raise_()
         self.gridLayoutWidget.raise_()
         self.gridLayoutWidget_2.raise_()
         self.update_plot_button.raise_()
+        self.x_axis_parameter_comboBox.raise_()
+        self.label.raise_()
         self.parameter_tab.addTab(self.plot_tab, "")
         self.fit_tab = QtWidgets.QWidget()
         self.fit_tab.setObjectName("fit_tab")
@@ -79,7 +95,7 @@ class Ui_window(object):
         self.update_fit_result_button.setObjectName("update_fit_result_button")
         self.parameter_tab.addTab(self.fit_tab, "")
         self.info = QtWidgets.QPlainTextEdit(window)
-        self.info.setGeometry(QtCore.QRect(873, 360, 231, 531))
+        self.info.setGeometry(QtCore.QRect(873, 410, 231, 481))
         self.info.setAcceptDrops(False)
         self.info.setFrameShape(QtWidgets.QFrame.NoFrame)
         self.info.setReadOnly(True)
@@ -100,6 +116,7 @@ class Ui_window(object):
         _translate = QtCore.QCoreApplication.translate
         window.setWindowTitle(_translate("window", "Form"))
         self.update_plot_button.setText(_translate("window", "UpdatePlot"))
+        self.label.setText(_translate("window", "x-axis parameter"))
         self.parameter_tab.setTabText(self.parameter_tab.indexOf(self.plot_tab), _translate("window", "Plot"))
         self.update_fit_result_button.setText(_translate("window", "UpdateFit"))
         self.parameter_tab.setTabText(self.parameter_tab.indexOf(self.fit_tab), _translate("window", "Fit"))

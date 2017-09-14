@@ -376,7 +376,6 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
         title = '' if title is None else title
         self.setWindowTitle(title)
 
-    x_axis_name = 'x'
     fit_function = 'cosine'
     show_legend = False
 
@@ -416,6 +415,8 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
         self.open_code_button.clicked.connect(self.open_measurement_code)
         self.open_explorer_button.clicked.connect(self.open_explorer)
 
+        self.x_axis_parameter_comboBox.currentIndexChanged.connect(self.init_stuff)
+
     def set_data_from_path(self, path):
         self.clear()
         data = Data()
@@ -436,14 +437,37 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
             self.set_observations()
         else:
             self._data = val
+        self.x_axis_parameter_comboBox.addItems(self.parameter_names_reduced())
+        self.x_axis_parameter = self.x_axis_parameter_default()
+        self.init_stuff()
+
+    def init_stuff(self):
         self.set_parameters()
         self.plot_all_if_none()
         self.update_fit_select_table_and_plot()
 
+    @property
+    def x_axis_parameter(self):
+        return str(self.x_axis_parameter_comboBox.currentText())
+
+    @x_axis_parameter.setter
+    def x_axis_parameter(self, val):
+        self.x_axis_parameter_comboBox.setCurrentText(val)
+
+    @property
+    def parameter_with_largest_dim(self):
+        return self.data.parameter_names[np.argmax([len(getattr(self.data.df, p).unique()) for p in self.data.parameter_names])]
+
+    def x_axis_parameter_default(self):
+        if 'x' in self.data.parameter_names:
+            return 'x'
+        else:
+            return getattr(self, '_x_axis_parameter', self.parameter_with_largest_dim)
+
     def plot_all_if_none(self):
         if len(self.parameter_table.selectedItems()) == 0:
             column_names = self.parameter_names_reduced()[1:]
-            column_names.remove(self.x_axis_name)
+            column_names.remove(self.x_axis_parameter)
             for cn in column_names:
                 self.parameter_table.selectColumn(self.parameter_table.column_index(cn))
         if len(self.observation_widget.selectedItems()) == 0:
@@ -452,8 +476,10 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
     def set_parameters(self):
         for column_name in  self.parameter_names_reduced():
             self.parameter_table.append_to_column_parameters(column_name, getattr(self.data.df, column_name).unique())
-            if column_name == self.x_axis_name:
+            if column_name == self.x_axis_parameter:
                 self.parameter_table.set_column_flags(column_name, Qt.NoItemFlags)
+            else:
+                self.parameter_table.set_column_flags('x', Qt.ItemIsSelectable | Qt.ItemIsEnabled)
 
     def set_observations(self):
         for obs in self.observation_names_reduced():
@@ -475,7 +501,7 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
         if all([len(i) == 0 for i in out]):
             return []
         for idx, item, name in zip(range(len(out)), out, self.parameter_names_reduced()):
-            if name == self.x_axis_name:
+            if name == self.x_axis_parameter:
                 out[idx] = ['__all__']
             elif len(item) == 0:
                 out[idx] = ['__average__']
@@ -488,7 +514,7 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
             for observation_name in self.observation_widget.selectedItems():
                 dfxy = self.ret_line_plot_data_single(condition_dict, observation_name.text())
                 condition_dict_reduced = collections.OrderedDict([(key, val) for key, val in condition_dict.items() if val not in ['__average__', '__all__']])
-                plot_data.append(dict(condition_dict_reduced=condition_dict_reduced, observation_name=observation_name.text(), x=getattr(dfxy, self.x_axis_name), y=getattr(dfxy, observation_name.text())))
+                plot_data.append(dict(condition_dict_reduced=condition_dict_reduced, observation_name=observation_name.text(), x=getattr(dfxy, self.x_axis_parameter), y=getattr(dfxy, observation_name.text())))
         return plot_data
 
     def plot_label(self, condition_dict_reduced, observation_name=None, add_condition_names=False, add_observation_name=False):
