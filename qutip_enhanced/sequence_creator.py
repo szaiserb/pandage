@@ -87,10 +87,26 @@ class list_repeat(list):
                 traceback.print_exception(exc_type, exc_value, exc_tb)
         return super(list_repeat, self).__getitem__(0)
 
-def xy2aphi(xy):
-    norm = np.array([np.linalg.norm(xy, axis=1)]).transpose()
-    phi = np.arctan2(xy[:, 1:2], xy[:, 0:1])
-    return np.concatenate([norm, phi], axis=1)
+# def xy2aphi(xy):
+#     norm = np.array([np.linalg.norm(xy, axis=1)]).transpose()
+#     phi = np.arctan2(xy[:, 1:2], xy[:, 0:1])
+#     return np.concatenate([norm, phi], axis=1)
+
+def xy2aphi(xy, out=None):
+    import time
+    t0 = time.time()
+    out = np.empty(xy.shape) if out is None else out
+    print(time.time()-t0)
+    out[:,0] = xy[:, 0] ** 2
+    print(time.time() - t0)
+    out[:, 0] += xy[:, 1] ** 2
+    print(time.time() - t0)
+    np.sqrt(out[:, 0], out=out[:, 0])
+    print(time.time() - t0)
+    out[:, 1] = np.arctan2(xy[:, 1], xy[:, 0])
+    print(time.time() - t0)
+    return out
+
 
 def round2float(arr, val):
     return np.around(arr/val) * val
@@ -253,6 +269,7 @@ class Arbitrary:
         self._sequence = list(itertools.chain(*[[item] * n if idx in locations else [item] for idx, item in enumerate(self.sequence)]))
 
     def split_all_max(self, time_digitization):
+        print('This might be slow, rounding and probably also numpy.allclose are veeery slow. making sure in advance that everything is correct and not having to round might be better')
         old_times_full = self.times_full
         old_sequence = self.sequence
         old_fields_full = self.fields_full
@@ -372,7 +389,11 @@ class Wait(Arbitrary):
         self.column_dict = {control: [0]}
         self.n_bins_wait = n_bins_wait
         self.time_digitization=time_digitization
-        self.t_wait = np.around(t_wait/(self.n_bins_wait*self.time_digitization))*self.n_bins_wait*self.time_digitization
+        self.set_t_wait(t_wait)
+
+    def set_t_wait(self, val):
+
+        self.t_wait = np.around(wait / (self.n_bins_wait * self.time_digitization)) * self.n_bins_wait * self.time_digitization
 
     @property
     def sequence(self):
@@ -1123,13 +1144,9 @@ class DDDegen(Arbitrary):
         self.rabi_period = rabi_period
         self.tau = tau
         self.sample_frequency = sample_frequency
-        s = self.sample_frequency*self.tau
         self._sequence = ['mw']*self.total_length_smpl
         self.set_fields_full()
         self.set_times_full()
-
-    # class sequence
-    #     overwrite getitem and len, dont let anything add, init is just number of desired bins and control (e.g. 'mw')
 
     @property
     def sequence(self):
@@ -1151,15 +1168,6 @@ class DDDegen(Arbitrary):
     def total_length_smpl(self):
         out = self.length_smpl_per_pi*self.n_pi
         return int(out)
-
-    # @property
-    # def phase_segment_smpl(self):
-    #     out = np.arange(self.n_pi+1)
-    #     s = self.tau * self.sample_frequency
-    #     if s != np.around(s):
-    #         raise Exception("Error: {}, {}, {}".format(s, self.tau, self.sample_frequency))
-    #     out *= int()
-    #     return out
 
     def set_times_full(self):
         self._times_full = np.ones(self.total_length_smpl)/self.sample_frequency
@@ -1199,84 +1207,61 @@ class DDDegen(Arbitrary):
     def fields_full(self):
         return self._fields_full
 
-    # class DDDegen(Arbitrary):
-    #     def __init__(self, dd_type=None, rabi_period=None, n_samples=None, **kwargs):
-    #         self.dd_type = dd_type
-    #         self.rabi_period = rabi_period
-    #         self.n_samples = n_samples
-    #         self.set_total_tau(**kwargs)
-    #
-    #     column_dict = collections.OrderedDict([('mw', [0, 1])])
-    #
-    #     @property
-    #     def sequence(self):
-    #         return getattr(self, '_sequence', [['mw']] * self.n_bins_wait)
-    #
-    #     @property
-    #     def fields_full(self):
-    #         ol = self.omega_list()
-    #         return getattr(self, '_fields_full', np.array([ol * np.cos(self.phase), ol * np.sin(self.phase)]).T)
-    #
-    #     @property
-    #     def times_full(self):
-    #         return getattr(self, '_times_full', np.array([self.t_rabi / self.n_bins_rabi] * self.n_bins_rabi))
-    #
-
-if __name__ == '__main__':
-
-    from qutip_enhanced import *
-    # reload(sc)
-    import time
-    dd_type = '1000_kdd4'
-    # t0 = time.time()
-    # self = sc.DDConcatenated(dd_type=dd_type,
-    #                          p_list_pulses=[sc.Rabi(t_rabi=0.025,
-    #                                                 omega=1 / 0.05,
-    #                                                 time_digitization=1/12e3,
-    #                                                 control_field='mw')
-    #                                         for _ in range(len(sc.__PHASES_DD__[dd_type]))],
-    #                          tau=0.1,
-    #                          time_digitization=1/12e3,
-    #                          )
-    # time_digitization = 1/12e3
-    # # self.split_all_max(time_digitization)
-    #
-    # print(time.time()-t0)
-    # def run():
-    #     self = sc.DDConcatenated(dd_type=dd_type,
-    #                              p_list_pulses=[sc.Rabi(t_rabi=0.025,
-    #                                                     omega=1 / 0.05,
-    #                                                     time_digitization=1 / 12e3,
-    #                                                     control_field='mw')
-    #                                             for _ in range(len(sc.__PHASES_DD__[dd_type]))],
-    #                              tau_list=[0.1],
-    #                              time_digitization=1 / 12e3,
-    #                              )
-    #     time_digitization = 1 / 12e3
-    #     self.split_all_max(time_digitization)
-    #
-    # import cProfile
-    # cProfile.run('run()')
-    #
-    # dd_type = '1_kdd4'
-    # self = sc.DDConcatenated(dd_type=dd_type,
-    #                          p_list_pulses=[sc.Rabi(t_rabi=0.025,
-    #                                                 omega=1 / 0.05,
-    #                                                 time_digitization=1 / 12e3,
-    #                                                 control_field='mw')
-    #                                         for _ in range(len(sc.__PHASES_DD__[dd_type]))],
-    #                          tau_list=[0.1],
-    #                          time_digitization=1 / 12e3,
-    #                          )
-
-# from qutip_enhanced import *
-# reload(sc)
-# d = sc.DDDegen(dd_type='20_hahn', rabi_period=0.05, tau = 0.1, sample_frequency=12e3)
-# import matplotlib.pyplot as plt
-# c = d.set_fields_full()
-# # plt.plot(d.set_fields_full())
-
-# import time
-# t0 = time.time()
-# y = d.amplitudes()
-# print(time.time()-t0)
+# if __name__ == '__main__':
+#
+#     from qutip_enhanced import *
+#     # reload(sc)
+#     import time
+#     dd_type = '1000_kdd4'
+#     # t0 = time.time()
+#     # self = sc.DDConcatenated(dd_type=dd_type,
+#     #                          p_list_pulses=[sc.Rabi(t_rabi=0.025,
+#     #                                                 omega=1 / 0.05,
+#     #                                                 time_digitization=1/12e3,
+#     #                                                 control_field='mw')
+#     #                                         for _ in range(len(sc.__PHASES_DD__[dd_type]))],
+#     #                          tau=0.1,
+#     #                          time_digitization=1/12e3,
+#     #                          )
+#     # time_digitization = 1/12e3
+#     # # self.split_all_max(time_digitization)
+#     #
+#     # print(time.time()-t0)
+#     # def run():
+#     #     self = sc.DDConcatenated(dd_type=dd_type,
+#     #                              p_list_pulses=[sc.Rabi(t_rabi=0.025,
+#     #                                                     omega=1 / 0.05,
+#     #                                                     time_digitization=1 / 12e3,
+#     #                                                     control_field='mw')
+#     #                                             for _ in range(len(sc.__PHASES_DD__[dd_type]))],
+#     #                              tau_list=[0.1],
+#     #                              time_digitization=1 / 12e3,
+#     #                              )
+#     #     time_digitization = 1 / 12e3
+#     #     self.split_all_max(time_digitization)
+#     #
+#     # import cProfile
+#     # cProfile.run('run()')
+#     #
+#     # dd_type = '1_kdd4'
+#     # self = sc.DDConcatenated(dd_type=dd_type,
+#     #                          p_list_pulses=[sc.Rabi(t_rabi=0.025,
+#     #                                                 omega=1 / 0.05,
+#     #                                                 time_digitization=1 / 12e3,
+#     #                                                 control_field='mw')
+#     #                                         for _ in range(len(sc.__PHASES_DD__[dd_type]))],
+#     #                          tau_list=[0.1],
+#     #                          time_digitization=1 / 12e3,
+#     #                          )
+#
+# # from qutip_enhanced import *
+# # reload(sc)
+# # d = sc.DDDegen(dd_type='20_hahn', rabi_period=0.05, tau = 0.1, sample_frequency=12e3)
+# # import matplotlib.pyplot as plt
+# # c = d.set_fields_full()
+# # # plt.plot(d.set_fields_full())
+#
+# # import time
+# # t0 = time.time()
+# # y = d.amplitudes()
+# # print(time.time()-t0)

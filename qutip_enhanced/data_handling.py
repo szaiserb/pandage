@@ -415,13 +415,13 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
         self.open_code_button.clicked.connect(self.open_measurement_code)
         self.open_explorer_button.clicked.connect(self.open_explorer)
 
-        self.x_axis_parameter_comboBox.currentIndexChanged.connect(self.init_stuff)
+        self.x_axis_parameter_comboBox.currentIndexChanged.connect(self.update_parameter_table)
 
     def set_data_from_path(self, path):
         self.clear()
         data = Data()
         data.init(iff=path)
-        self.data=data
+        self.data = data
 
     @property
     def data(self):
@@ -434,17 +434,28 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
             self._data = val
             self.parameter_table.setColumnCount(len(self.parameter_names_reduced()))
             self.parameter_table.setHorizontalHeaderLabels(self.parameter_names_reduced())
-            self.set_observations()
+            self.update_observations_table()
         else:
             self._data = val
-        self.x_axis_parameter_comboBox.addItems(self.parameter_names_reduced())
+        self.update_x_axis_parameter_comboBox()
         self.x_axis_parameter = self.x_axis_parameter_default()
-        self.init_stuff()
-
-    def init_stuff(self):
-        self.set_parameters()
+        self.update_parameter_table()
         self.plot_all_if_none()
         self.update_fit_select_table_and_plot()
+
+    def update_parameter_table(self):
+        for column_name in  self.parameter_names_reduced():
+            self.parameter_table.append_to_column_parameters(column_name, getattr(self.data.df, column_name).unique())
+            if column_name == self.x_axis_parameter:
+                self.parameter_table.set_column_flags(column_name, Qt.NoItemFlags)
+
+    def update_observations_table(self):
+        for obs in self.observation_names_reduced():
+            self.observation_widget.addItem(QListWidgetItem(obs))
+
+    def update_x_axis_parameter_comboBox(self):
+        self.x_axis_parameter_comboBox.clear()
+        self.x_axis_parameter_comboBox.addItems(self.parameter_names_reduced())
 
     @property
     def x_axis_parameter(self):
@@ -462,7 +473,7 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
         if 'x' in self.data.parameter_names:
             return 'x'
         else:
-            return getattr(self, '_x_axis_parameter', self.parameter_with_largest_dim)
+            return self.parameter_with_largest_dim
 
     def plot_all_if_none(self):
         if len(self.parameter_table.selectedItems()) == 0:
@@ -472,18 +483,6 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
                 self.parameter_table.selectColumn(self.parameter_table.column_index(cn))
         if len(self.observation_widget.selectedItems()) == 0:
             self.observation_widget.item(0).setSelected(True)
-
-    def set_parameters(self):
-        for column_name in  self.parameter_names_reduced():
-            self.parameter_table.append_to_column_parameters(column_name, getattr(self.data.df, column_name).unique())
-            if column_name == self.x_axis_parameter:
-                self.parameter_table.set_column_flags(column_name, Qt.NoItemFlags)
-            else:
-                self.parameter_table.set_column_flags('x', Qt.ItemIsSelectable | Qt.ItemIsEnabled)
-
-    def set_observations(self):
-        for obs in self.observation_names_reduced():
-            self.observation_widget.addItem(QListWidgetItem(obs))
 
     def parameter_names_reduced(self):
         return [i for i in self.data.parameter_names if not '_idx' in i]
@@ -525,7 +524,10 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
         return ", ".join([str(i) for i in condition_dict_reduced.values()])
 
     def update_plot(self):
-        self.fig.clear()
+        try:
+            self.fig.clear()
+        except:
+            pass
         self.ax = self.fig.add_subplot(111)
         for idx, pdi in enumerate(self.ret_line_plot_data()):
             self.ax.plot(pdi['x'], pdi['y'], '-',
@@ -675,41 +677,7 @@ def move_folder(folder_list_dict=None, destination_folder=None):
             print("Folder {} could not be moved. Lets hope it has tbc in its name".format(i['root']))
     print("Successfully moved: {}. Failed: {}".format(len(folder_list_dict)- failed, failed))
 
-# from PyQt5.QtWidgets import QTableWidgetItem, QAbstractItemView, QMenu, QAction,
-# from PyQt5.QtCore import Qt
-# from PyQt5.QtGui import QCursor
-#
-#
-#
-# # def renameSlot(self, event):
-# #     print "renaming slot called"
-# #     # get the selected row and column
-# #     row = self.tableWidget.rowAt(event.pos().y())
-# #     col = self.tableWidget.columnAt(event.pos().x())
-# #     # get the selected cell
-# #     cell = self.tableWidget.item(row, col)
-# #     # get the text inside selected cell (if any)
-# #     cellText = cell.text()
-# #     # get the widget inside selected cell (if any)
-# #     widget = self.tableWidget.cellWidget(row, col)
-#
-#
-# self = pi3d
-# table = pi3d.script_queue_table
-# table.clearSelection()
-# table.setColumnWidth(0, 400)
-# table.setColumnWidth(1, 342)
-# table.clear()
-# table.setColumnCount(2)
-# table.setRowCount(len(self.script_queue))
-# table.setHorizontalHeaderLabels(['Script name', 'parameters'])
-# table.setSelectionBehavior(QAbstractItemView.SelectRows)
-# table.setSelectionMode(QAbstractItemView.SingleSelection)
-# table.setEnabled(True)
-# for ridx, i in enumerate(self.script_queue):
-#     for cidx, attr_name in enumerate(['name', 'pd']):
-#         new_item = QTableWidgetItem(str(getattr(i, attr_name)))
-#         table.setItem(ridx, cidx, new_item)
-# self.table
-#
+if __name__ == '__main__':
+    from qutip_enhanced import *
+    self = dh.cpd()
 
