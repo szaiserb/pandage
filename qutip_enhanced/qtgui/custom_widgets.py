@@ -10,8 +10,15 @@ import itertools
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, QMenu, QAction
 from PyQt5.QtGui import QCursor
+from PyQt5.QtCore import pyqtSignal
 
 class QTableWidgetEnhanced(QTableWidget):
+
+    clear_table_contents_signal = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super(QTableWidgetEnhanced, self).__init__(parent)
+        self.clear_table_contents_signal.connect(self.clear_table_contents_for_signal)
 
     def column_data(self, column_name):
 
@@ -76,6 +83,9 @@ class QTableWidgetEnhanced(QTableWidget):
         return list(set([i.row() for i in self.selectedItems()]))
 
     def clear_table_contents(self):
+        self.clear_table_contents_signal.emit()
+
+    def clear_table_contents_for_signal(self):
         for idx in itertools.product(range(self.rowCount()), range(self.columnCount())):
             self.clearSelection()
             self.item(idx[0], idx[1]).setText('')
@@ -118,8 +128,6 @@ class QTableWidgetEnhancedDrop(QTableWidgetEnhanced):
                 self.hdf_file_dropped.emit(links[0])
         else:
             event.ignore()
-
-
 
 class QTableWidgetEnhancedContextMenu(QTableWidgetEnhanced):
 

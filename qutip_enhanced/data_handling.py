@@ -13,7 +13,7 @@ import collections
 import subprocess
 from PyQt5.QtWidgets import  QListWidgetItem, QTableWidgetItem,  QMainWindow
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.uic import compileUi
 
 from .qtgui import plot_data_gui
@@ -377,10 +377,25 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
         title = '' if title is None else title
         self.setWindowTitle(title)
 
+    init_parameter_table_signal = pyqtSignal()
+    update_parameter_table_signal = pyqtSignal()
+    select_parameter_table_column_signal = pyqtSignal(str)
+    update_observations_table_signal = pyqtSignal()
+    select_observation_table_item_signal = pyqtSignal(int)
+    update_x_axis_parameter_comboBox_signal = pyqtSignal()
+    update_plot_signal = pyqtSignal()
+    update_plot_fit_signal = pyqtSignal()
+
     fit_function = 'cosine'
     show_legend = False
 
     def init_gui(self):
+
+        for name in ['init_parameter_table', 'update_parameter_table', 'select_parameter_table_column',
+                     'update_observations_table', 'select_observation_table_item',
+                     'update_x_axis_parameter_comboBox', 'update_plot',
+                     'update_plot_fit']:
+            getattr(getattr(self, "{}_signal".format(name)), 'connect')(getattr(self, name))
 
         # # Figure
         self.fig = Figure()
@@ -418,6 +433,7 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
 
         self.x_axis_parameter_comboBox.currentIndexChanged.connect(self.update_parameter_table)
 
+
     def set_data_from_path(self, path):
         self.clear()
         data = Data()
@@ -433,16 +449,19 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
         self.data_path = None
         if not hasattr(self, '_data'):
             self._data = val
-            self.parameter_table.setColumnCount(len(self.parameter_names_reduced()))
-            self.parameter_table.setHorizontalHeaderLabels(self.parameter_names_reduced())
-            self.update_observations_table()
+            self.init_parameter_table_signal.emit()
+            self.update_observations_table_signal.emit()
         else:
             self._data = val
-        self.update_x_axis_parameter_comboBox()
+        self.update_x_axis_parameter_comboBox_signal.emit()
         self.x_axis_parameter = self.x_axis_parameter_default()
-        self.update_parameter_table()
-        self.plot_all_if_none()
+        self.update_parameter_table_signal.emit()
+        self.select_all_plots_if_none()
         self.update_fit_select_table_and_plot()
+
+    def init_parameter_table(self):
+        self.parameter_table.setColumnCount(len(self.parameter_names_reduced()))
+        self.parameter_table.setHorizontalHeaderLabels(self.parameter_names_reduced())
 
     def update_parameter_table(self):
         for column_name in  self.parameter_names_reduced():
@@ -450,9 +469,15 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
             if column_name == self.x_axis_parameter:
                 self.parameter_table.set_column_flags(column_name, Qt.NoItemFlags)
 
+    def select_parameter_table_column(self, cn):
+        self.parameter_table.selectColumn(self.parameter_table.column_index(cn))
+
     def update_observations_table(self):
         for obs in self.observation_names_reduced():
             self.observation_widget.addItem(QListWidgetItem(obs))
+
+    def select_observation_table_item(self, i):
+        self.observation_widget.item(i).setSelected(True)
 
     def update_x_axis_parameter_comboBox(self):
         self.x_axis_parameter_comboBox.clear()
@@ -476,14 +501,15 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
         else:
             return self.parameter_with_largest_dim
 
-    def plot_all_if_none(self):
+    def select_all_plots_if_none(self):
         if len(self.parameter_table.selectedItems()) == 0:
             column_names = self.parameter_names_reduced()[1:]
             column_names.remove(self.x_axis_parameter)
             for cn in column_names:
-                self.parameter_table.selectColumn(self.parameter_table.column_index(cn))
+                self.select_parameter_table_column_signal.emit(cn)
         if len(self.observation_widget.selectedItems()) == 0:
-            self.observation_widget.item(0).setSelected(True)
+            self.select_observation_table_item_signal.emit(0)
+
 
     def parameter_names_reduced(self):
         return [i for i in self.data.parameter_names if not '_idx' in i]
@@ -567,7 +593,7 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
         self.fit_select_table.set_columns(len(cpd.keys()), cpd.keys())
         for column_name, parameters in cpd.items():
             self.fit_select_table.append_to_column_parameters(column_name, parameters)
-        self.update_plot()
+        self.update_plot_signal.emit()
 
     def update_fit_result_table(self):
         self.fit_result_table.clear_table_contents()
@@ -601,7 +627,7 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
                     new_item.setFlags(Qt.ItemIsSelectable)
                     self.fit_result_table.setItem(ridx, cidx, new_item)
                     cidx += 1
-        self.update_plot_fit()
+        self.update_plot_fit_signal.emit()
 
     def open_measurement_code(self):
         if hasattr(self.data, 'hdf_filepath'):
@@ -616,7 +642,6 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
             print('No filepath.')
 
     def clear(self):
-        print('Clearing..')
         self.fit_result_table.clearSelection()
         self.fit_result_table.clear()
         self.fit_result_table.setColumnCount(0)
