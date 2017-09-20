@@ -207,8 +207,8 @@ class Data:
         if len(kwargs)>0:
             self.init(**kwargs)
 
-    parameter_names = ret_property_array_like_types('parameter_names',[str])
-    observation_names = ret_property_array_like_types('observation_names', [str])
+    parameter_names = ret_property_array_like_types('parameter_names',[str, unicode])
+    observation_names = ret_property_array_like_types('observation_names', [str, unicode])
 
     @property
     def dtypes(self):
