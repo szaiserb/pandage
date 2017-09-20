@@ -183,7 +183,6 @@ class CosineModel(lmfit.Model):
             p['x0'].value = ((p['x0'] / p['T'] + 0.5) % 1) * p['T']
         return lmfit.models.update_param_vals(self.make_params(amplitude=p['amplitude'].value, T=p['T'].value, x0=p['x0'].value, c=p['c'].value, t2=10 * max(x)), self.prefix, **kwargs)
 
-
 class CosineMultiDetModel(lmfit.Model):
     def __init__(self, hyperfine_list, *args, **kwargs):
 
@@ -204,6 +203,46 @@ class CosineMultiDetModel(lmfit.Model):
             return amplitude * sum(rabi(d - f0, x) for d in delta_l) + c
 
         super(CosineMultiDetModel, self).__init__(cosine_multi_det_lmfit, *args, **kwargs)
+
+    def guess(self, data, x=None, **kwargs):
+        p = CosineModel().guess(data, x=x)
+        return lmfit.models.update_param_vals(self.make_params(amplitude=p['amplitude'].value, T=p['T'].value, x0=p['x0'].value, c=p['c'].value, t2=p['t2'].value, f0=0.0), self.prefix, **kwargs)
+
+
+
+#     y_offset = self.results.mean()
+#     x = self.tau
+#     y = self.results - y_offset
+#     try:
+#         p = pi3d.Fit.Fit(x, y, pi3d.Fit.CosinusNoOffset, pi3d.Fit.CosinusNoOffsetEstimator)
+#     except:
+#         return None
+#     if p[0] < 0:
+#         p[0] = -p[0]
+#         p[2] = ((p[2] / p[1] + 0.5) % 1) * p[1]
+#         p = pi3d.Fit.Fit(x, y, pi3d.Fit.CosinusNoOffset, p)
+#     p = (p[0], p[1], p[2], y_offset)
+#     p = pi3d.Fit.Fit(x, self.results, pi3d.Fit.Cosinus, p)
+#     while (p[2] > 0.5 * p[1]):
+#         p[2] -= p[1]
+#     p = pi3d.Fit.Fit(x, self.results, pi3d.Fit.Cosinus, p)
+#     p = list(p)
+#     p.append(10 * max(x))
+#     p = pi3d.Fit.Fit(x, self.results, pi3d.Fit.Cosinus_dec, p)
+#     pp = list(p)
+#     pp.append(self.centerfreq)
+#     import Fitmodule
+#
+#     d = dict(zip(['a', 'T', 'x0', 'c', 't2', 'f0'], pp))
+#     fitresult, fitparams = Fitmodule.Fit(x, self.results, pi3d.Fit.CosineMultiDetLmFit, d)
+#     self.rabi_contrast = 200 * fitparams['a'] / fitparams['c']
+#     self.rabi_period = fitparams['T'] * 1e3
+#     self.rabi_decay = fitparams['t2']
+#     self.rabi_offset = fitparams['x0'] * 1e3
+#     self.plot_results_data.set_data('fit', fitresult)
+# self.plot_results.plot(('x', 'fit'), style='line', color='red')
+# self.plot_results.request_redraw()
+
 
 if __name__ == '__main__':
     fp = "D:\data/NuclearOPs\CNOT_KDD\cnot_kdd/20170411-h13m43s31_cnot_kdd/20170411-h14m04s25_kdd_data.hdf"

@@ -361,8 +361,9 @@ class Data:
 
 def recompile_plotdata_ui_file():
     fold = "{}/qtgui".format(os.path.dirname(__file__))
-    uipath = r"{}/plot_data.ui".format(fold)
-    pypath = r"{}/plot_data_gui.py".format(fold)
+    name = "plot_data"
+    uipath = r"{}/{}.ui".format(fold, name)
+    pypath = r"{}/{}_gui.py".format(fold, name)
     with open(pypath, 'w') as f:
         compileUi(uipath, f)
     reload(plot_data_gui)
@@ -536,6 +537,7 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
                          )
         if self.show_legend:
             self.fig_legend = self.ax.legend(shadow=True, fontsize='small')
+        self.fig.tight_layout()
         self.canvas.draw()
 
     def update_plot_fit(self):
@@ -548,6 +550,7 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
             y = r.eval(params=r.params, x=x)
             self.ax_fit.plot(x,y, '-', color=color)
             self.ax_fit.plot(x, r.data, 'o', color=color, markersize=3.5)
+            self.fig_fit.tight_layout()
             self.canvas_fit.draw()
 
     def update_fit_select_table_and_plot(self):
