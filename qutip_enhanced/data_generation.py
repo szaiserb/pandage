@@ -17,7 +17,7 @@ import qutip_enhanced.analyze as qta; reload(qta)
 import os
 import itertools
 import collections
-
+from PyQt5.QtCore import pyqtSignal
 
 class DataGeneration:
 
@@ -161,9 +161,13 @@ class DataGeneration:
                 raise
         return save_dir_tmp
 
+
     def save(self):
         fpp = "{}/".format(self.save_dir)
-        self.pld.fig.savefig("{}plot.png".format(fpp))
+        try:
+            self.pld.fig.savefig("{}plot.png".format(fpp))
+        except:
+            pass
         if self.file_notes != '':
             with open("{}notes.dat".format(fpp), "w") as text_file:
                 text_file.write(self.file_notes)

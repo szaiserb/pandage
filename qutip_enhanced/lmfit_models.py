@@ -208,8 +208,6 @@ class CosineMultiDetModel(lmfit.Model):
         p = CosineModel().guess(data, x=x)
         return lmfit.models.update_param_vals(self.make_params(amplitude=p['amplitude'].value, T=p['T'].value, x0=p['x0'].value, c=p['c'].value, t2=p['t2'].value, f0=0.0), self.prefix, **kwargs)
 
-
-
 #     y_offset = self.results.mean()
 #     x = self.tau
 #     y = self.results - y_offset

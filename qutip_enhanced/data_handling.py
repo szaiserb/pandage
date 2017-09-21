@@ -385,6 +385,8 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
     update_x_axis_parameter_comboBox_signal = pyqtSignal()
     update_plot_signal = pyqtSignal()
     update_plot_fit_signal = pyqtSignal()
+    set_x_axis_parameter_default_signal = pyqtSignal()
+    select_all_plots_if_none_signal = pyqtSignal()
 
     fit_function = 'cosine'
     show_legend = False
@@ -394,7 +396,8 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
         for name in ['init_parameter_table', 'update_parameter_table', 'select_parameter_table_column',
                      'update_observations_table', 'select_observation_table_item',
                      'update_x_axis_parameter_comboBox', 'update_plot',
-                     'update_plot_fit']:
+                     'update_plot_fit', 'set_x_axis_parameter_default',
+                     'select_all_plots_if_none']:
             getattr(getattr(self, "{}_signal".format(name)), 'connect')(getattr(self, name))
 
         # # Figure
@@ -454,10 +457,12 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
         else:
             self._data = val
         self.update_x_axis_parameter_comboBox_signal.emit()
-        self.x_axis_parameter = self.x_axis_parameter_default()
+        self.set_x_axis_parameter_default_signal.emit()
         self.update_parameter_table_signal.emit()
-        self.select_all_plots_if_none()
+        self.select_all_plots_if_none_signal.emit()
         self.update_fit_select_table_and_plot()
+
+
 
     def init_parameter_table(self):
         self.parameter_table.setColumnCount(len(self.parameter_names_reduced()))
@@ -482,6 +487,9 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
     def update_x_axis_parameter_comboBox(self):
         self.x_axis_parameter_comboBox.clear()
         self.x_axis_parameter_comboBox.addItems(self.parameter_names_reduced())
+
+    def set_x_axis_parameter_default(self):
+        self.x_axis_parameter = self.x_axis_parameter_default()
 
     @property
     def x_axis_parameter(self):
