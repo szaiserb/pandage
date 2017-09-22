@@ -377,27 +377,82 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
         title = '' if title is None else title
         self.setWindowTitle(title)
 
+    update_x_axis_parameter_value_comboBox_signal = pyqtSignal(str)
+    update_x_axis_parameter_list_comboBox_signal = pyqtSignal()
+
     init_parameter_table_signal = pyqtSignal()
     update_parameter_table_signal = pyqtSignal()
     select_parameter_table_column_signal = pyqtSignal(str)
     update_observations_table_signal = pyqtSignal()
     select_observation_table_item_signal = pyqtSignal(int)
-    update_x_axis_parameter_comboBox_signal = pyqtSignal()
+    update_fit_select_table_and_plot_signal = pyqtSignal()
     update_plot_signal = pyqtSignal()
     update_plot_fit_signal = pyqtSignal()
-    set_x_axis_parameter_default_signal = pyqtSignal()
+
     select_all_plots_if_none_signal = pyqtSignal()
 
     fit_function = 'cosine'
     show_legend = False
 
+
+    #################################################################################################
+    # x_axis_parameter
+    #################################################################################################
+    @property
+    def x_axis_parameter(self):
+        return self._x_axis_parameter
+
+    @x_axis_parameter.setter
+    def x_axis_parameter(self, val):
+        if getattr(self, 'x_axis_parameter', None) != val:
+            if val in self.x_axis_parameter_list:
+                self._x_axis_parameter = val
+                self.update_x_axis_parameter_value_comboBox_signal.emit(val)
+            else:
+                raise Exception('Error: {}, {}'.format(val, self.x_axis_parameter_list))
+
+    def update_x_axis_parameter_value_comboBox(self, val):
+        self.x_axis_parameter_comboBox.setCurrentText(val)
+
+    @property
+    def x_axis_parameter_list(self):
+        return self._x_axis_parameter_list
+
+    @x_axis_parameter_list.setter
+    def x_axis_parameter_list(self, val):
+        if not isinstance(val, list):
+            raise Exception("Error: {}, {}".format(type(val), val))
+        if not hasattr(self, '_x_axis_parameter_list') or val != self._x_axis_parameter_list:
+            self._x_axis_parameter_list = val
+            self.update_x_axis_parameter_list_comboBox_signal.emit()
+
+    @property
+    def parameter_with_largest_dim(self):
+        return self.data.parameter_names[np.argmax([len(getattr(self.data.df, p).unique()) for p in self.data.parameter_names])]
+
+    def update_x_axis_parameter_list_comboBox(self):
+        self.x_axis_parameter_comboBox.blockSignals(True)
+        self.x_axis_parameter_comboBox.clear() # if there is something to clear, currentIndexChanged is triggered, value is "". This causes an error.
+        self.x_axis_parameter_comboBox.addItems(self.x_axis_parameter_list) #currentIndexChanged is triggered, value is first item (e.g. sweeps)
+        self.x_axis_parameter_comboBox.blockSignals(False)
+        if 'x' in self.x_axis_parameter_list:
+            self.x_axis_parameter = 'x'
+        else:
+            try:
+                self.x_axis_parameter = self.parameter_with_largest_dim
+            except:
+                self.x_axis_parameter = self.x_axis_parameter_list[-1]
+
+    def update_x_axis_parameteter_from_comboBox(self, integervalue):
+        self.x_axis_parameter = str(self.x_axis_parameter_comboBox.currentText())
+
     def init_gui(self):
 
         for name in ['init_parameter_table', 'update_parameter_table', 'select_parameter_table_column',
                      'update_observations_table', 'select_observation_table_item',
-                     'update_x_axis_parameter_comboBox', 'update_plot',
-                     'update_plot_fit', 'set_x_axis_parameter_default',
-                     'select_all_plots_if_none']:
+                     'update_x_axis_parameter_value_comboBox', 'update_x_axis_parameter_list_comboBox',
+                     'update_plot', 'update_plot_fit', 'select_all_plots_if_none'
+                     ]:
             getattr(getattr(self, "{}_signal".format(name)), 'connect')(getattr(self, name))
 
         # # Figure
@@ -433,15 +488,16 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
 
         self.open_code_button.clicked.connect(self.open_measurement_code)
         self.open_explorer_button.clicked.connect(self.open_explorer)
+        self.parameter_table.itemSelectionChanged.connect(self.update_selected_plot_items)
 
-        self.x_axis_parameter_comboBox.currentIndexChanged.connect(self.update_parameter_table)
-
+        self.x_axis_parameter_comboBox.currentIndexChanged.connect(self.update_x_axis_parameteter_from_comboBox)
 
     def set_data_from_path(self, path):
         self.clear()
         data = Data()
         data.init(iff=path)
         self.data = data
+        self.data_path = path
 
     @property
     def data(self):
@@ -450,29 +506,37 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
     @data.setter
     def data(self, val):
         self.data_path = None
-        if not hasattr(self, '_data'):
-            self._data = val
-            self.init_parameter_table_signal.emit()
-            self.update_observations_table_signal.emit()
+        self.x_axis_parameter_list = self.parameter_names_reduced(val)
+        l = []
+        if hasattr(self, '_data'):
+            if self.data.parameter_names != val.parameter_names:
+                l.append('init_parameter_table')
+            if self.data.observation_names != val.observation_names:
+                l.append('update_observations_table')
+            if self.parameter_names_reduced(self.data) != self.parameter_names_reduced(val):
+                l.append('update_x_axis_parameter_list_comboBox')
         else:
-            self._data = val
-        self.update_x_axis_parameter_comboBox_signal.emit()
-        self.set_x_axis_parameter_default_signal.emit()
+            l = ['init_parameter_table', 'update_observations_table']
+        self._data = val
+        for idx, n in enumerate(l):
+            getattr(self, "{}_signal".format(n)).emit()
         self.update_parameter_table_signal.emit()
         self.select_all_plots_if_none_signal.emit()
-        self.update_fit_select_table_and_plot()
-
-
+        self.update_fit_select_table_and_plot_signal.emit()
 
     def init_parameter_table(self):
+        self.parameter_table.blockSignals(True)
         self.parameter_table.setColumnCount(len(self.parameter_names_reduced()))
         self.parameter_table.setHorizontalHeaderLabels(self.parameter_names_reduced())
+        self.parameter_table.blockSignals(False)
 
     def update_parameter_table(self):
+        self.parameter_table.blockSignals(True)
         for column_name in  self.parameter_names_reduced():
             self.parameter_table.append_to_column_parameters(column_name, getattr(self.data.df, column_name).unique())
             if column_name == self.x_axis_parameter:
                 self.parameter_table.set_column_flags(column_name, Qt.NoItemFlags)
+        self.parameter_table.blockSignals(False)
 
     def select_parameter_table_column(self, cn):
         self.parameter_table.selectColumn(self.parameter_table.column_index(cn))
@@ -484,31 +548,6 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
     def select_observation_table_item(self, i):
         self.observation_widget.item(i).setSelected(True)
 
-    def update_x_axis_parameter_comboBox(self):
-        self.x_axis_parameter_comboBox.clear()
-        self.x_axis_parameter_comboBox.addItems(self.parameter_names_reduced())
-
-    def set_x_axis_parameter_default(self):
-        self.x_axis_parameter = self.x_axis_parameter_default()
-
-    @property
-    def x_axis_parameter(self):
-        return str(self.x_axis_parameter_comboBox.currentText())
-
-    @x_axis_parameter.setter
-    def x_axis_parameter(self, val):
-        self.x_axis_parameter_comboBox.setCurrentText(val)
-
-    @property
-    def parameter_with_largest_dim(self):
-        return self.data.parameter_names[np.argmax([len(getattr(self.data.df, p).unique()) for p in self.data.parameter_names])]
-
-    def x_axis_parameter_default(self):
-        if 'x' in self.data.parameter_names:
-            return 'x'
-        else:
-            return self.parameter_with_largest_dim
-
     def select_all_plots_if_none(self):
         if len(self.parameter_table.selectedItems()) == 0:
             column_names = self.parameter_names_reduced()[1:]
@@ -519,8 +558,9 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
             self.select_observation_table_item_signal.emit(0)
 
 
-    def parameter_names_reduced(self):
-        return [i for i in self.data.parameter_names if not '_idx' in i]
+    def parameter_names_reduced(self, data=None):
+        data = self.data if data is None else data
+        return [i for i in data.parameter_names if not '_idx' in i]
 
     def observation_names_reduced(self):
         return [i for i in self.data.observation_names if not i in ['trace', 'start_time', 'end_time', 'thresholds']]
@@ -530,7 +570,7 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
         # TODO: wont work for dates as can not be averaged
         return out.groupby([key for key, val in condition_dict.items() if val != '__average__']).agg({observation_name: np.mean}).reset_index()
 
-    def selected_plot_items(self):
+    def update_selected_plot_items(self):
         out = [[i for i in self.parameter_table.selected_table_items(column_name)] for column_name in self.parameter_names_reduced()]
         if all([len(i) == 0 for i in out]):
             return []
@@ -539,11 +579,11 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
                 out[idx] = ['__all__']
             elif len(item) == 0:
                 out[idx] = ['__average__']
-        return itertools.product(*out)
+        self.selected_plot_items = list(itertools.product(*out))
 
     def ret_line_plot_data(self):
         plot_data = []
-        for p in self.selected_plot_items():
+        for p in self.selected_plot_items:
             condition_dict = collections.OrderedDict([(ni, pi) for ni, pi in zip(self.parameter_names_reduced(), p)])
             for observation_name in self.observation_widget.selectedItems():
                 dfxy = self.ret_line_plot_data_single(condition_dict, observation_name.text())
@@ -590,7 +630,7 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
     def update_fit_select_table_and_plot(self):
         self.fit_select_table.clear_table_contents()
         cpd = collections.OrderedDict()
-        spt = list(self.selected_plot_items())
+        spt = list(self.selected_plot_items)
         for column_idx, column_name in enumerate(self.parameter_names_reduced()):
             cpd[column_name] = []
             for pi in spt:

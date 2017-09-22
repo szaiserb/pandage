@@ -12,14 +12,20 @@ import errno
 import shutil
 import traceback
 import datetime
+import zipfile
 from . import data_handling
 import qutip_enhanced.analyze as qta; reload(qta)
 import os
 import itertools
 import collections
+from PyQt5.QtWidgets import QWidget
 from PyQt5.QtCore import pyqtSignal
 
-class DataGeneration:
+class DataGeneration(QWidget):
+
+    def __init__(self, parent=None):
+        super(DataGeneration, self).__init__(parent)
+        self.update_current_str_signal.connect(self.update_current_str)
 
     current_idx_str = data_handling.ret_property_typecheck('current_idx_str', str) #######
     current_parameter_str = data_handling.ret_property_typecheck('current_parameter_str', str) #######
@@ -30,6 +36,8 @@ class DataGeneration:
     file_notes = data_handling.ret_property_typecheck('file_notes', str)
     meas_code = data_handling.ret_property_typecheck('meas_code', str)
     state = data_handling.ret_property_list_element('state', ['idle', 'run'])
+
+    update_current_str_signal = pyqtSignal()
 
     @property
     def parameters(self):
@@ -128,7 +136,9 @@ class DataGeneration:
             self.current_indices_dict_list = [collections.OrderedDict([("{}_idx".format(key), pidx[i]) for i, key in enumerate(self.parameters.keys())]) for pidx in self.pidx_l]
             l = [collections.OrderedDict(i.items() + j.items()) for i, j in zip(self.current_parameters_dict_list, self.current_indices_dict_list)]
             self.data.append(l)
-            self.update_current_str()
+            import time
+            time.sleep(1)
+            self.update_current_str_signal.emit()
             yield l
         self._progress = len(self.iterator_list_done) / np.prod([len(i) for i in self.parameters.values()])
 
@@ -161,6 +171,17 @@ class DataGeneration:
                 raise
         return save_dir_tmp
 
+    def save_qutip_enhanced(self, destination_dir):
+        src = r'D:\Python\qutip_enhanced\qutip_enhanced'
+        f = r'{}/qutip_enhanced.zip'.format(destination_dir)
+        if not os.path.isfile(f):
+            zf = zipfile.ZipFile(f, 'a')
+            for root, dirs, files in os.walk(src):
+                if not '__pycach__' in root:
+                    for file in files:
+                        if not any([file.endswith(i) for i in ['.pyc', '.orig']]):
+                            zf.write(os.path.join(root, file), os.path.join(root.replace(os.path.commonprefix([root, src]), ""), file))
+            zf.close()
 
     def save(self):
         fpp = "{}/".format(self.save_dir)
