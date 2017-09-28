@@ -20,7 +20,8 @@ from .qtgui import plot_data_gui
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
-import matplotlib.image as img
+# import matplotlib.image as img
+import matplotlib.pyplot as plt
 import functools
 if sys.version_info.major == 2:
     import __builtin__
@@ -304,9 +305,6 @@ class Data:
         if value is not None:
             raise Exception("You must not change the data!")
 
-    def load(self, filepath):
-        pass
-
     def save(self, filepath):
         if filepath.endswith('.csv'):
             self._df.to_csv(filepath, index=False, compression='gzip')
@@ -337,18 +335,34 @@ class Data:
         else:
             self._df = self._df.append(df_append, ignore_index=True)
 
-    def set_observations(self, l):
+    def parse_l(self, l):
+        if type(l) in [collections.OrderedDict, dict]:
+            l = [l]
+        return l
+
+    def dict_access(self, l, df=None):
+        df = self.df if df is None else df
+        if len(l) == 0:
+            raise Exception('Nope!')
+        else:
+            l = self.parse_l(l)
+            return df[functools.reduce(np.logical_or, [functools.reduce(np.logical_and, [df[key] == val for key, val in d.items()]) for d in l])]
+
+    def dict_delete(self, l, df=None):
+        df = self.df if df is None else df
+        if len(l) > 0:
+            df.drop(self.dict_access(l=l, df=df).index, inplace=True)
+            df.reset_index(inplace=True)
+
+    def set_observations(self, l, start_idx=None):
+        start_idx= len(self._df) - 1 if start_idx is None else start_idx
         if type(l) in [collections.OrderedDict, dict]:
             l = [l]
         for idx, kwargs in enumerate(l):
             for obs, val in kwargs.items():
                 if obs not in self.observation_names:
                     raise Exception('Error: {}'.format(l))
-                self._df.set_value(len(self._df) - 1 - len(l) + idx + 1, obs, val)
-
-    def dict_access(self, d, df=None):
-        df = self.df if df is None else df
-        return df[functools.reduce(np.logical_and, [df[key] == val for key, val in d.items()])]
+                self._df.set_value(start_idx - len(l) + idx + 1, obs, val)
 
     def column_product(self, column_names):
         return itertools.product(*[getattr(self.df, cn).unique() for cn in column_names])
@@ -448,10 +462,16 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
 
     def init_gui(self):
 
-        for name in ['init_parameter_table', 'update_parameter_table', 'select_parameter_table_column',
-                     'update_observations_table', 'select_observation_table_item',
-                     'update_x_axis_parameter_value_comboBox', 'update_x_axis_parameter_list_comboBox',
-                     'update_plot', 'update_plot_fit', 'select_all_plots_if_none'
+        for name in ['init_parameter_table',
+                     'update_parameter_table',
+                     'select_parameter_table_column',
+                     'update_observations_table',
+                     'select_observation_table_item',
+                     'update_x_axis_parameter_value_comboBox',
+                     'update_x_axis_parameter_list_comboBox',
+                     'update_plot', 'update_plot_fit',
+                     'select_all_plots_if_none',
+                     'update_fit_select_table_and_plot'
                      ]:
             getattr(getattr(self, "{}_signal".format(name)), 'connect')(getattr(self, name))
 
@@ -480,6 +500,7 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
         self.canvas_fit.draw()
 
         self.update_plot_button.clicked.connect(self.update_fit_select_table_and_plot)
+        self.update_fit_select_table_and_plot_signal.connect(self.update_fit_select_table_and_plot)
         self.update_plot_button.setAcceptDrops(True)
         self.update_fit_result_button.clicked.connect(self.update_fit_result_table)
         self.parameter_tab.setCurrentIndex(0)
@@ -520,6 +541,9 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
         self._data = val
         for idx, n in enumerate(l):
             getattr(self, "{}_signal".format(n)).emit()
+        self.new_measurement_arrived()
+
+    def new_measurement_arrived(self):
         self.update_parameter_table_signal.emit()
         self.select_all_plots_if_none_signal.emit()
         self.update_fit_select_table_and_plot_signal.emit()
@@ -556,7 +580,6 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
                 self.select_parameter_table_column_signal.emit(cn)
         if len(self.observation_widget.selectedItems()) == 0:
             self.select_observation_table_item_signal.emit(0)
-
 
     def parameter_names_reduced(self, data=None):
         data = self.data if data is None else data
@@ -705,6 +728,19 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
         self.observation_widget.clear()
         if hasattr(self, '_data'):
             delattr(self, '_data')
+
+    def save_plot(self, filepath):
+        plt.ioff()
+        fig, ax = plt.subplots(1,1)
+        cn = self.parameter_names_reduced()[1:]
+        cn.remove(self.x_axis_parameter)
+        for d, d_idx, idx, df_sub in self.data.iterator(cn):
+            dfagg = df_sub.groupby([self.x_axis_parameter]).agg({'result_0': np.mean}).reset_index()
+            ax.plot(dfagg.x, dfagg.result_0)
+        fig.tight_layout()
+        fig.savefig(filepath)
+        plt.ion()
+        # self.pld.fig.savefig(filepath)
 
 def cpd():
     out = PlotData()

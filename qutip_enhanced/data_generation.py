@@ -12,6 +12,7 @@ import errno
 import shutil
 import traceback
 import datetime
+import time
 import zipfile
 from . import data_handling
 import qutip_enhanced.analyze as qta; reload(qta)
@@ -19,13 +20,17 @@ import os
 import itertools
 import collections
 from PyQt5.QtWidgets import QWidget
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import pyqtSignal, QObject
+import datetime
 
-class DataGeneration(QWidget):
+class DataGeneration(QObject):
 
     def __init__(self, parent=None):
         super(DataGeneration, self).__init__(parent)
         self.update_current_str_signal.connect(self.update_current_str)
+        self.date_of_creation = datetime.datetime.now()
+        self.remeasure_items = None
+        self.remeasure_indices = None
 
     current_idx_str = data_handling.ret_property_typecheck('current_idx_str', str) #######
     current_parameter_str = data_handling.ret_property_typecheck('current_parameter_str', str) #######
@@ -38,10 +43,17 @@ class DataGeneration(QWidget):
     state = data_handling.ret_property_list_element('state', ['idle', 'run'])
 
     update_current_str_signal = pyqtSignal()
+    show_gui_signal = pyqtSignal()
+    close_gui_signal = pyqtSignal()
 
     @property
     def parameters(self):
-        return self._parameters
+        try:
+            return self._parameters
+        except Exception:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
+
 
     @parameters.setter
     def parameters(self, val):
@@ -52,14 +64,22 @@ class DataGeneration(QWidget):
 
     @property
     def observation_names(self):
-        raise NotImplementedError
+        try:
+            raise NotImplementedError
+        except Exception:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
 
     @property
     def number_of_simultaneous_measurements(self):
-        if hasattr(self, '_number_of_simultaneous_measurements'):
-            return self._number_of_simultaneous_measurements
-        else:
-            return 1
+        try:
+            if hasattr(self, '_number_of_simultaneous_measurements'):
+                return self._number_of_simultaneous_measurements
+            else:
+                return 1
+        except Exception:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
 
     @number_of_simultaneous_measurements.setter
     def number_of_simultaneous_measurements(self, val):
@@ -74,6 +94,42 @@ class DataGeneration(QWidget):
         self.iterator_list_done = [tuple(itld[i]) for i in range((len(itld)))]
         self.iterator_idx_list_done = [tuple(itidxld[i]) for i in range((len(itidxld)))]
 
+    @property
+    def data(self):
+        try:
+            if hasattr(self, '_pld'):
+                return self.pld.data
+            else:
+                return self._data
+        except Exception:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
+
+    @data.setter
+    def data(self, val):
+        if hasattr(self, '_pld'):
+            self.pld.data = val
+        else:
+            self._data = val
+
+    @property
+    def pld(self):
+        try:
+            return self._pld
+        except Exception:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
+
+    @pld.setter
+    def pld(self, val):
+        if hasattr(val, '_data'):
+            raise Exception('Error!')
+        self._pld = val
+        if hasattr(self, '_data'):
+            self.pld.data = self._data
+            del self._data
+        self.show_gui_signal.connect(self.show_gui)
+        self.close_gui_signal.connect(self.close_gui)
 
 
     def set_iterator_list(self):
@@ -88,27 +144,36 @@ class DataGeneration(QWidget):
 
     @property
     def progress(self):
-        return getattr(self, '_progress', 0)
+        try:
+            return getattr(self, '_progress', 0)
+        except Exception:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
 
-    def init_data(self, init_from_file=None, iff=None):
+    def init_data(self, init_from_file=None, iff=None, move_folder=True):
         init_from_file = iff if iff is not None else init_from_file
+        self.init_from_file = init_from_file
         self.data = data_handling.Data(
             parameter_names=self.parameters.keys() + [self.parameters.keys()[i]+'_idx' for i in range(len(self.parameters.keys()))],
             observation_names=self.observation_names,
             dtypes=self.dtypes
         )
         self.data.init(init_from_file=init_from_file)
-        if hasattr(self, 'pld'):
-            self.pld.data = self.data
-        if init_from_file is not None:
+        if init_from_file is not None and move_folder:
+            # TODO: might be useful to use shutil.copy2 followed by shutil.rmtree to copy metadata (e.g. creation date)
             folder = os.path.split(init_from_file)[0]
             os.rename(folder, folder+'_tbc')
             shutil.move(folder+'_tbc', self.save_dir)
 
+    def move_init_from_file_folder_back(self):
+        # TODO: might be useful to use shutil.copy2 followed by shutil.rmtree to copy metadata (e.g. creation date)
+        if self.init_from_file is not None:
+            initial_folder = os.path.split(self.init_from_file)[0]
+            current_folder = os.path.join(self.save_dir, "{}_tbc".format(os.path.split(initial_folder)[-1]))
+            shutil.move(current_folder, initial_folder)
+
     def init_gui(self, title):
         self.pld = data_handling.PlotData(title)
-        if hasattr(self, 'data'):
-            self.pld.data = self.data
         self.pld.show()
 
     def update_current_str(self):
@@ -116,19 +181,27 @@ class DataGeneration(QWidget):
         self.current_parameter_str = "\n".join(["{}: {}".format(key, self.current_parameters_dict_list[0][key]) for key in self.parameters.keys()])
         self.pld.info.setPlainText('State: ' + self.state + '\n\n' + 'Current parameters:\n' + self.current_parameter_str + '\n\n' + 'Current indices\n' + self.current_idx_str)
 
-    def init_run(self, init_from_file=None, iff=None):
+    def init_run(self, **kwargs):
         self.state = 'run'
         self.reinit()
-        self.init_data(init_from_file=init_from_file, iff=iff)
+        self.init_data(**kwargs)
         self.set_iterator_list_done()
         self.set_iterator_list()
 
+    def show_gui(self):
+        self.pld.show()
+
+    def close_gui(self):
+        self.pld.close()
+
     def iterator(self):
         while len(self.iterator_list) > 0:
+
             if hasattr(self, 'pv_l'):
                 self.iterator_list_done.extend(self.pv_l)
             if hasattr(self, 'pidx_l'):
                 self.iterator_idx_list_done.extend(self.pidx_l)
+            self.process_remeasure_items()
             self._progress = len(self.iterator_list_done) / np.prod([len(i) for i in self.parameters.values()])
             self.pv_l = [self.iterator_list.pop(0) for _ in range(min(self.number_of_simultaneous_measurements, len(self.iterator_list)))]
             self.pidx_l = [self.iterator_idx_list.pop(0) for _ in range(min(self.number_of_simultaneous_measurements, len(self.iterator_idx_list)))]
@@ -142,34 +215,41 @@ class DataGeneration(QWidget):
             yield l
         self._progress = len(self.iterator_list_done) / np.prod([len(i) for i in self.parameters.values()])
 
-
     def reinit(self):
         self.start_time = datetime.datetime.now()
 
     @property
     def save_dir(self):
-        sts = self.start_time.strftime('%Y%m%d-h%Hm%Ms%S')
-        save_dir = "{}/{}_{}".format(self.file_path, sts, self.file_name)
         try:
-            os.makedirs(save_dir)
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                raise
+            sts = self.start_time.strftime('%Y%m%d-h%Hm%Ms%S')
+            save_dir = "{}/{}_{}".format(self.file_path, sts, self.file_name)
+            try:
+                os.makedirs(save_dir)
+            except OSError as e:
+                if e.errno != errno.EEXIST:
+                    raise
+            except Exception:
+                print(save_dir)
+                exc_type, exc_value, exc_tb = sys.exc_info()
+                traceback.print_exception(exc_type, exc_value, exc_tb)
+            return save_dir
         except Exception:
-            print(save_dir)
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
-        return save_dir
 
     @property
     def save_dir_tmp(self):
-        save_dir_tmp = "{}/tmp".format(self.save_dir)
         try:
-            os.makedirs(save_dir_tmp)
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                raise
-        return save_dir_tmp
+            save_dir_tmp = "{}/tmp".format(self.save_dir)
+            try:
+                os.makedirs(save_dir_tmp)
+            except OSError as e:
+                if e.errno != errno.EEXIST:
+                    raise
+            return save_dir_tmp
+        except Exception:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
 
     def save_qutip_enhanced(self, destination_dir):
         src = r'D:\Python\qutip_enhanced\qutip_enhanced'
@@ -186,7 +266,7 @@ class DataGeneration(QWidget):
     def save(self):
         fpp = "{}/".format(self.save_dir)
         try:
-            self.pld.fig.savefig("{}plot.png".format(fpp))
+            self.pld.save_plot("{}plot.png".format(fpp))
         except:
             pass
         if self.file_notes != '':
@@ -199,165 +279,34 @@ class DataGeneration(QWidget):
         self.data.save("{}/data.hdf".format(self.save_dir))
         print("saved nuclear to '{}'".format(fpp))
 
-# import time
-# from pi3diamond import pi3d
-# import misc
-# from numbers import Number
-# import zipfile
-#
-# class NuclearOPs(DataGeneration):
-#
-#     # Tracking stuff:
-#     refocus_interval = misc.ret_property_typecheck('refocus_interval', int)
-#     odmr_interval = misc.ret_property_typecheck('odmr_interval', Number)
-#     additional_recalibration_interval = misc.ret_property_typecheck('additional_recalibration_interval', int)
-#     initial_confocal_odmr_refocus = misc.ret_property_typecheck('initial_confocal_odmr_refocus', bool)
-#
-#     @property
-#     def analyze_type(self):
-#         return self.ana_trace.analyze_type
-#
-#     @analyze_type.setter
-#     def analyze_type(self, val):
-#         self.ana_trace.analyze_type = val
-#
-#     @property
-#     def observation_names(self):
-#         return ['result_{}'.format(i) for i in range(self.number_of_results)] + ['trace', 'events', 'thresholds', 'start_time', 'end_time', 'local_oscillator_freq']
-#
-#     @property
-#     def dtypes(self):
-#         if not hasattr(self, '_dtypes'):
-#             self._dtypes = dict(trace='object', events='int', start_time='str', end_time='str', local_oscillator_freq='float', thresholds='object')
-#         return self._dtypes
-#
-#     @dtypes.setter
-#     def dtypes(self, val):
-#         if isinstance(val, dict):
-#             for k, v in val.items():
-#                 if not (k in self.parameters.keys() or isinstance(v, str)):
-#                     raise Exception("Error: {}".format(val))
-#             self._dtypes = val
-#
-#     @property
-#     def data_observation_names(self):
-#         return ['result_{}'.format(i) for i in range(self.number_of_results)] + ['trace', 'events', 'thresholds', 'start_time', 'end_time', 'local_oscillator_freq']
-#
-#     @property
-#     def number_of_results(self):
-#         if self.analyze_type == 'tomography':
-#             return 2**len([[i[0]] for i in self.ana_trace.analyze_sequence if i[0] == 'result'])
-#         if self.analyze_type == 'multifreq':
-#             return self.ana_trace.analyze_sequence[-1][-1]
-#         if getattr(self, 'ana_trace', None) is not None:
-#             return len([[i[0]] for i in self.ana_trace.analyze_sequence if i[0] == 'result'])
-#         else:
-#             return 1
-#
-#     def run(self, abort, init_from_file=None, iff=None):
-#         self.init_run(init_from_file=init_from_file, iff=iff)
-#         try:
-#             pi3d.microwave.On()
-#             for l in self.iterator():
-#                 if abort.is_set(): break
-#                 self.do_refocusodmr(abort, l)
-#                 if abort.is_set(): break
-#                 self.setup_rf(l)
-#                 if abort.is_set(): break
-#                 self.data.set_observations([OrderedDict(local_oscillator_freq=pi3d.tt.current_local_oscillator_freq)]*len(self.pv_l))
-#                 self.data.set_observations([OrderedDict(start_time=datetime.datetime.now().strftime('%Y%m%d-h%Hm%Ms%S'))]*len(self.pv_l))
-#                 trace = self.get_trace(abort)
-#                 if abort.is_set(): break
-#                 self.data.set_observations([OrderedDict(end_time=datetime.datetime.now().strftime('%Y%m%d-h%Hm%Ms%S'))]*len(self.pv_l))
-#                 self.data.set_observations([OrderedDict(trace=trace)]*len(self.pv_l))
-#                 if abort.is_set(): break
-#                 self.analyze(trace=trace)
-#                 if abort.is_set(): break
-#                 self.save()
-#                 if abort.is_set(): break
-#                 self.iterator_list_done.extend(self.pv_l)
-#                 self.iterator_idx_list_done.extend(self.pidx_l)
-#                 self.set_iterator_list()
-#         except Exception:
-#             abort.set()
-#             exc_type, exc_value, exc_tb = sys.exc_info()
-#             traceback.print_exception(exc_type, exc_value, exc_tb)
-#         finally:
-#             pi3d.multi_channel_awg_sequence.stop_awgs()
-#             self.state = 'idle'
-#             self.update_current_str()
-#
-#     def reinit(self):
-#         super(NuclearOPs, self).reinit()
-#         self.odmr_count = 0
-#         self.additional_recalibration_interval_count = 0
-#         self.initial_confocal_odmr_refocus = False
-#         self.last_odmr = {True: -np.inf, False: time.time()}[self.initial_confocal_odmr_refocus]
-#         self.last_rabi_refocus = time.time()
-#
-#     def do_refocusodmr(self, abort, ls):
-#         delta_t = time.time() - self.last_odmr
-#         if self.odmr_interval != 0 and (delta_t >= self.odmr_interval):
-#             if self.refocus_interval != 0 and self.odmr_count % self.refocus_interval == 0:
-#                 pi3d.confocal.run_refocus()
-#             pi3d.odmr.external_stop_request = abort
-#             pi3d.odmr.do_frequency_refocus()
-#             self.odmr_count += 1
-#             self.last_odmr = time.time()
-#         if self.additional_recalibration_interval != 0 and self.additional_recalibration_interval_count % self.additional_recalibration_interval == 0:
-#             self.additional_recalibration_fun(ls)
-#         self.additional_recalibration_interval_count += 1
-#         pi3d.odmr.set_odmr_f(pi3d.tt.current_local_oscillator_freq)
-#         pi3d.save_values_to_file([pi3d.odmr.odmr_contrast], 'odmr_contrast')
-#
-#     def get_trace(self, abort):
-#         self.mcas.initialize_sequence(abort=abort)
-#         pi3d.gated_counter.count(abort, ch_dict=self.mcas.ch_dict)
-#         return np.array(pi3d.gated_counter.trace.copy(), dtype=np.int)
-#
-#     def setup_rf(self, ls):
-#         self.mcas = self.ret_mcas(ls)
-#         pi3d.mcas_dict[self.mcas.seq_name] = self.mcas
-#         self.mcas.write_seq()
-#
-#     def analyze(self, trace):
-#         if self.analyze_type is not None:
-#             pi3d.trace = trace
-#             self.ana_trace.raw_trace = trace
-#             analysis = self.ana_trace.analyze(analyze_type=self.analyze_type, number_of_simultaneous_measurements=self.number_of_simultaneous_measurements)
-#             thresholds = self.ana_trace.thresholds
-#             self.data.set_observations([OrderedDict(('result_{}'.format(i), result) for i, result in enumerate(results)) for results in analysis['results']])
-#             self.data.set_observations([OrderedDict(events=events) for events in analysis['events']])
-#             self.data.set_observations([OrderedDict(thresholds=thresholds)]*self.number_of_simultaneous_measurements)
-#             self.pld.data = self.data
-#             for results, events in zip(analysis['results'], analysis['events']):
-#                 print("result: {results}, events: {events}, thresholds: {thresholds}".format(thresholds=thresholds, results=results, events=events))
-#
-#     def save(self):
-#         super(NuclearOPs, self).save()
-#         self.save_pi3diamond(destination_dir=self.save_dir)
-#
-#     def save_pi3diamond(self, destination_dir):
-#         f = '{}/pi3diamond.zip'.format(destination_dir)
-#         if not os.path.isfile(f):
-#             zf = zipfile.ZipFile(f, 'a')
-#             for fp in os.listdir(os.getcwd()):
-#                 if fp.endswith('.py'):
-#                     zf.write(fp)
-#             zf.close()
-#
-#     def reset_settings(self):
-#         """
-#         Here only settings are changed that are not automatically changed during run()
-#         :return:
-#         """
-#         self.additional_recalibration_interval = 0
-#         self.ret_mcas = None
-#         self.mcas = None
-#         self.refocus_interval = 2
-#         self.odmr_interval = 15
-#         self.file_path = 'D:/data/NuclearOPs/'
-#         self.file_name = ''
-#         self.file_notes = ''
-#         self.meas_code = ''
-#         self.thread = None
+    def remeasure(self, l):
+        if type(l) is not list:
+            raise Exception('Error: l must be a list of items in iterator_list_done')
+        for idx, item in enumerate(l):
+            if type(item) in [list, tuple]:
+                l[idx] = collections.OrderedDict([(key, val) for key, val in zip([i for i in self.data.parameter_names if not '_idx' in i], item)])
+        remeasure_indices = self.data.dict_access(l).index
+        if len(remeasure_indices) != len(l):
+            raise Exception('Error: Not every item in l could be found in the dataframe!\n{}, {}, {}'.format(len(l), len(self.remeasure_indices), l))
+        if self.number_of_simultaneous_measurements != 1:
+            if len(l)%self.number_of_simultaneous_measurements != 0:
+                raise Exception('Error: length of indices to be remeasured must be an integer multiple of number_of_simultaneous_measurements!\n{} {} {}'.format(l, remeasure_indices, self.number_of_simultaneous_measurements))
+            if remeasure_indices[0]%self.number_of_simultaneous_measurements != 0:
+                raise Exception('Error: {} {}'.format(remeasure_indices, self.number_of_simultaneous_measurements))
+            if not all(y==x+1 for x, y in zip(remeasure_indices, remeasure_indices[1:])):
+                raise Exception("Error: Only connected packets of indices are allowed, i.e. monotonously increasing with stepsize 1".format(remeasure_indices))
+        self.remeasure_indices = remeasure_indices
+        self.remeasure_items = l
+
+    def process_remeasure_items(self):
+        if self.remeasure_items is not None:
+            if self.remeasure_indices is None:
+                print('Something went horribly wrong! {}'.format(self.remeasure_items))
+                return
+            self.iterator_list.extend([i for idx, i in enumerate(self.iterator_list) if idx in self.remeasure_indices ])
+            self.iterator_idx_list.extend([i for idx, i in enumerate(self.iterator_list) if idx in self.remeasure_indices])
+            self.iterator_list_done = [self.iterator_list_done[i] for i in xrange(len(self.iterator_list_done )) if i not in self.remeasure_indices ]
+            self.iterator_idx_list_ = [self.iterator_idx_list_done[i] for i in xrange(len(self.iterator_idx_list_done )) if i not in self.remeasure_indices ]
+            self.data.dict_delete(self.remeasure_items)
+            self.remeasure_items = None
+            self.remeasure_indices = None
