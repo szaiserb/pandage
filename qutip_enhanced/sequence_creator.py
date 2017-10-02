@@ -1,18 +1,21 @@
 # coding=utf-8
 from __future__ import print_function, absolute_import, division
+
 __metaclass__ = type
 
 import numpy as np
 import itertools
 from .qutip_enhanced import coordinates
+import numbers
+import sys
 import more_itertools
 import lmfit.lineshapes
 import collections
 import traceback
 from .qutip_enhanced import coordinates
 
-class pd(dict):
 
+class pd(dict):
     def __init__(self):
         super(pd, self).__init__(self)
         self.ddp = dict()
@@ -71,6 +74,7 @@ class pd(dict):
         bp += np.deg2rad(offset_phase)
         return bp
 
+
 __PHASES_DD__ = pd()
 
 
@@ -78,6 +82,7 @@ class list_repeat(list):
     """
     Allows one wavefile to be used for driving at multiple frequencies without copying it.
     """
+
     def __getitem__(self, i):
         try:
             return super(list_repeat, self).__getitem__(i)
@@ -86,6 +91,7 @@ class list_repeat(list):
                 exc_type, exc_value, exc_tb = sys.exc_info()
                 traceback.print_exception(exc_type, exc_value, exc_tb)
         return super(list_repeat, self).__getitem__(0)
+
 
 # def xy2aphi(xy):
 #     norm = np.array([np.linalg.norm(xy, axis=1)]).transpose()
@@ -96,8 +102,8 @@ def xy2aphi(xy, out=None):
     import time
     t0 = time.time()
     out = np.empty(xy.shape) if out is None else out
-    print(time.time()-t0)
-    out[:,0] = xy[:, 0] ** 2
+    print(time.time() - t0)
+    out[:, 0] = xy[:, 0] ** 2
     print(time.time() - t0)
     out[:, 0] += xy[:, 1] ** 2
     print(time.time() - t0)
@@ -109,7 +115,8 @@ def xy2aphi(xy, out=None):
 
 
 def round2float(arr, val):
-    return np.around(arr/val) * val
+    return np.around(arr / val) * val
+
 
 class DDParameters:
     def __init__(self, name, rabi_period, time_digitization=None, **kwargs):
@@ -182,7 +189,9 @@ class DDParameters:
 
     @property
     def eff_pulse_dur_waiting_time(self):
-        return np.concatenate([[3 / 8. * self.rabi_period], 0.5 * self.rabi_period * np.ones(self.number_of_pi_pulses), [3 / 8. * self.rabi_period]])  # effective duration of pi pulse for each waiting time. The effective phase evolution time during the pi/2 pulse is taken as half of the pulse duration
+        return np.concatenate([[3 / 8. * self.rabi_period], 0.5 * self.rabi_period * np.ones(self.number_of_pi_pulses),
+                               [
+                                   3 / 8. * self.rabi_period]])  # effective duration of pi pulse for each waiting time. The effective phase evolution time during the pi/2 pulse is taken as half of the pulse duration
 
     @property
     def minimum_total_tau(self):
@@ -192,12 +201,12 @@ class DDParameters:
     def effective_durations_dd(self):
         if self.minimum_total_tau > self.total_tau:
             raise Exception('Waiting times smaller than zero are not allowed. '
-                            'Total tau must be at least {} (current: {})'.format(self.minimum_total_tau, self.total_tau))
+                            'Total tau must be at least {} (current: {})'.format(self.minimum_total_tau,
+                                                                                 self.total_tau))
         return self.tau_list - self.eff_pulse_dur_waiting_time
 
+
 class Arbitrary:
-
-
     @property
     def controls(self):
         if hasattr(self, '_controls'):
@@ -264,17 +273,22 @@ class Arbitrary:
         return out
 
     def split(self, locations, n):
-        self._times_full =  np.array(list(itertools.chain(*[[t/n] * n if idx in locations else [t] for idx, t in enumerate(self.times_full)])))
-        self._fields_full = np.repeat(self.fields_full, [n if i in locations else 1 for i in range(self.n_bins)], axis=0)
-        self._sequence = list(itertools.chain(*[[item] * n if idx in locations else [item] for idx, item in enumerate(self.sequence)]))
+        self._times_full = np.array(
+            list(itertools.chain(*[[t / n] * n if idx in locations else [t] for idx, t in enumerate(self.times_full)])))
+        self._fields_full = np.repeat(self.fields_full, [n if i in locations else 1 for i in range(self.n_bins)],
+                                      axis=0)
+        self._sequence = list(
+            itertools.chain(*[[item] * n if idx in locations else [item] for idx, item in enumerate(self.sequence)]))
 
     def split_all_max(self, time_digitization):
-        print('This might be slow, rounding and probably also numpy.allclose are veeery slow. making sure in advance that everything is correct and not having to round might be better')
+        print(
+            'This might be slow, rounding and probably also numpy.allclose are veeery slow. making sure in advance that everything is correct and not having to round might be better')
         old_times_full = self.times_full
         old_sequence = self.sequence
         old_fields_full = self.fields_full
         if not np.allclose(old_times_full, round2float(old_times_full, time_digitization), time_digitization * 1e-4):
-            raise Exception('length mus {} is not valid for the current sample_frequency {}'.format(old_times_full, 12e3))
+            raise Exception(
+                'length mus {} is not valid for the current sample_frequency {}'.format(old_times_full, 12e3))
         n_split = (old_times_full / time_digitization).astype(int)
         n_rows = int(sum(old_times_full) / time_digitization)
         if not float(n_rows).is_integer():
@@ -301,7 +315,7 @@ class Arbitrary:
         NOTE: Not all controls have to be given, if e.g. only 'mw' should be renamed to 'MW' then val = {'mw': 'MW'} is allowed
         """
         out = {}
-        for k, v  in val.items():
+        for k, v in val.items():
             if k not in self.controls:
                 raise Exception("Error: {}, {}, {}, {}".format(val, out, k, v))
             out[k] = v
@@ -315,7 +329,7 @@ class Arbitrary:
             for i, row in enumerate(m):
                 if np.any(row):
                     seq[i].append(self.export_names_dict[name])
-        return [i for i in seq if len(i)> 0]
+        return [i for i in seq if len(i) > 0]
 
     @property
     def sequence_steps(self):
@@ -345,12 +359,16 @@ class Arbitrary:
         """
         I HAVE NO IDEA HOW THIS BEHAVES WHEN MORE THAN ONE CONTROL IS TURNED ON AT ONCE
         """
-        _WAVE_FILE_DICT_ = dict([(self.export_names_dict[key], self.times_fields_aphi(name=key, sample_frequency=sample_frequency)) for key in self.export_names_dict])
+        _WAVE_FILE_DICT_ = dict(
+            [(self.export_names_dict[key], self.times_fields_aphi(name=key, sample_frequency=sample_frequency)) for key
+             in self.export_names_dict])
 
         sequence_steps = []
         for i in self.sequence_steps:
             sequence_steps.append([[i[0]], [int(i[1])]])
-            sequence_steps[-1][1] = dict([(key, val) for key, val in zip(['length_mus', 'omega', 'phases'], _WAVE_FILE_DICT_[sequence_steps[-1][0][0]][sequence_steps[-1][1][0] - 1])])
+            sequence_steps[-1][1] = dict([(key, val) for key, val in zip(['length_mus', 'omega', 'phases'],
+                                                                         _WAVE_FILE_DICT_[sequence_steps[-1][0][0]][
+                                                                             sequence_steps[-1][1][0] - 1])])
             sequence_steps[-1][1]['omega'] = [sequence_steps[-1][1]['omega']]
             if sequence_steps[-1][0][0] != 'WAIT':
                 sequence_steps[-1][1]['phases'] = np.degrees([sequence_steps[-1][1]['phases']])
@@ -364,13 +382,17 @@ class Arbitrary:
         return np.column_stack([t, self.fields_aphi(name)])
 
     def save_times_fields_aphi(self, name, path=None, sample_frequency=12e3):
-        np.savetxt(path, np.around(self.times_fields_aphi(name=name, sample_frequency=sample_frequency), 9), fmt=str('%+1.9e'))
+        np.savetxt(path, np.around(self.times_fields_aphi(name=name, sample_frequency=sample_frequency), 9),
+                   fmt=str('%+1.9e'))
 
     def save_dynamo_fields(self, directory):
         self.save_times_fields("{}\\fields.dat".format(directory))
         for k, v in self.export_names_dict.items():
             self.save_times_fields_aphi(name=k, path="{}\\{}.dat".format(directory, v))
             print("Fields {} saved.".format(v))
+
+    # def delete_bins(self, l):
+
 
     # def dataframe(self):
     #     out = Data()
@@ -384,16 +406,17 @@ class Arbitrary:
         for s, t in zip(self.sequence, self.times()):
             print(s, t)
 
+
 class Wait(Arbitrary):
-    def __init__(self, t_wait, time_digitization=1/12e3, n_bins_wait=1, control='wait'):
+    def __init__(self, t_wait, time_digitization=1 / 12e3, n_bins_wait=1, control='wait'):
         self.column_dict = {control: [0]}
         self.n_bins_wait = n_bins_wait
-        self.time_digitization=time_digitization
+        self.time_digitization = time_digitization
         self.set_t_wait(t_wait)
 
     def set_t_wait(self, val):
-
-        self.t_wait = np.around(wait / (self.n_bins_wait * self.time_digitization)) * self.n_bins_wait * self.time_digitization
+        self.t_wait = np.around(
+            val / (self.n_bins_wait * self.time_digitization)) * self.n_bins_wait * self.time_digitization
 
     @property
     def sequence(self):
@@ -406,6 +429,7 @@ class Wait(Arbitrary):
     @property
     def times_full(self):
         return getattr(self, '_times_full', np.array([self.t_wait / float(self.n_bins_wait)] * self.n_bins_wait))
+
 
 class Rabi(Arbitrary):
     def __init__(self, t_rabi, omega, phase=0.0, control_field='mw', n_bins_rabi=1, time_digitization=None):
@@ -440,30 +464,30 @@ class Rabi(Arbitrary):
     def times_full(self):
         return getattr(self, '_times_full', np.array([self.t_rabi / self.n_bins_rabi] * self.n_bins_rabi))
 
-# class ShapedPi(Arbitrary):
-#     def __init__(self, t_rabi, omega, phase=0.0, control_field='mw', bin_duration=1/12e3):
-#         self.n_bins_rabi = n_bins_rabi
-#         self.t_rabi = t_rabi
-#         self.phase = phase
-#         self.omega = omega
-#         self.control_field = control_field
-#         self.column_dict = collections.OrderedDict([(self.control_field, [0, 1])])
-#
-#     @property
-#     def sequence(self):
-#         return getattr(self, '_sequence', [[self.control_field]] * self.n_bins_rabi)
-#
-#     def omega_list(self):
-#         return np.ones([self.n_bins_rabi]) * self.omega
-#
-#     @property
-#     def fields_full(self):
-#         ol = self.omega_list()
-#         return getattr(self, '_fields_full', np.array([ol * np.cos(self.phase), ol * np.sin(self.phase)]).T)
-#
-#     @property
-#     def times_full(self):
-#         return getattr(self, '_times_full', np.array([self.t_rabi / self.n_bins_rabi] * self.n_bins_rabi))
+    # class ShapedPi(Arbitrary):
+    #     def __init__(self, t_rabi, omega, phase=0.0, control_field='mw', bin_duration=1/12e3):
+    #         self.n_bins_rabi = n_bins_rabi
+    #         self.t_rabi = t_rabi
+    #         self.phase = phase
+    #         self.omega = omega
+    #         self.control_field = control_field
+    #         self.column_dict = collections.OrderedDict([(self.control_field, [0, 1])])
+    #
+    #     @property
+    #     def sequence(self):
+    #         return getattr(self, '_sequence', [[self.control_field]] * self.n_bins_rabi)
+    #
+    #     def omega_list(self):
+    #         return np.ones([self.n_bins_rabi]) * self.omega
+    #
+    #     @property
+    #     def fields_full(self):
+    #         ol = self.omega_list()
+    #         return getattr(self, '_fields_full', np.array([ol * np.cos(self.phase), ol * np.sin(self.phase)]).T)
+    #
+    #     @property
+    #     def times_full(self):
+    #         return getattr(self, '_times_full', np.array([self.t_rabi / self.n_bins_rabi] * self.n_bins_rabi))
     # x = (0:n - 1)*N / n;
     # x = mod(x, 1);
     # x = 1 - tau / tpi * abs(x - 0.5);
@@ -493,6 +517,7 @@ class RabiGaussian(Rabi):
 
     def omega_list(self):
         return lmfit.lineshapes.gaussian(self.times_center(self.control_field), **self.gaussian_parameters)
+
 
 class DDAlpha(Arbitrary):
     def __init__(self, pi_phases=None, spt=None,
@@ -596,6 +621,7 @@ class DDAlpha(Arbitrary):
         out[self.locations('wait')[-1]] /= 2
         return getattr(self, '_times_full', out)
 
+
 class DD(Arbitrary):
     def __init__(self, dd_type=None, rabi_period=None, time_digitization=None, **kwargs):
         self.dd_type = dd_type
@@ -670,7 +696,7 @@ class DD(Arbitrary):
             else:
                 tau = kwargs['total_tau'] / self.n_tau
         if self.time_digitization is not None:
-            tau = 2*np.around((tau/2.) / self.time_digitization) * self.time_digitization
+            tau = 2 * np.around((tau / 2.) / self.time_digitization) * self.time_digitization
         self.total_tau = self.n_tau * tau
 
     def tau_list(self):
@@ -679,7 +705,7 @@ class DD(Arbitrary):
             return self.uhrig_taus
         else:
             tau = self.total_tau / self.n_tau
-            return np.array([tau/2.] + [tau for _ in range(self.number_of_pi_pulses - 1)] + [tau/2.])
+            return np.array([tau / 2.] + [tau for _ in range(self.number_of_pi_pulses - 1)] + [tau / 2.])
 
     @property
     def number_of_pi_pulses(self):
@@ -687,7 +713,8 @@ class DD(Arbitrary):
 
     @property
     def number_of_pulses(self):
-        raise Exception('THIS IS BULLSHIT, THIS SEQUENCE EXCLUDES THE Pi/2 pulses, i.e. number of pulses = number of pi pulses')
+        raise Exception(
+            'THIS IS BULLSHIT, THIS SEQUENCE EXCLUDES THE Pi/2 pulses, i.e. number of pulses = number of pi pulses')
         return self.number_of_pi_pulses + 2
 
     @property
@@ -711,7 +738,9 @@ class DD(Arbitrary):
 
     @property
     def eff_pulse_dur_waiting_time(self):
-        return np.concatenate([[3 / 8. * self.rabi_period], 0.5 * self.rabi_period * np.ones(self.number_of_pi_pulses), [3 / 8. * self.rabi_period]])  # effective duration of pi pulse for each waiting time. The effective phase evolution time during the pi/2 pulse is taken as half of the pulse duration
+        return np.concatenate([[3 / 8. * self.rabi_period], 0.5 * self.rabi_period * np.ones(self.number_of_pi_pulses),
+                               [
+                                   3 / 8. * self.rabi_period]])  # effective duration of pi pulse for each waiting time. The effective phase evolution time during the pi/2 pulse is taken as half of the pulse duration
 
     @property
     def minimum_total_tau(self):
@@ -721,8 +750,10 @@ class DD(Arbitrary):
     def effective_durations_dd(self):
         if self.minimum_total_tau > self.total_tau:
             raise Exception('Waiting times smaller than zero are not allowed. '
-                            'Total tau must be at least {} (current: {})'.format(self.minimum_total_tau, self.total_tau))
+                            'Total tau must be at least {} (current: {})'.format(self.minimum_total_tau,
+                                                                                 self.total_tau))
         return self.tau_list - self.eff_pulse_dur_waiting_time
+
 
 class Z(Arbitrary):
     def __init__(self, fields_l, times_l):
@@ -731,8 +762,8 @@ class Z(Arbitrary):
         self.times_full = np.array(times_l)
         self.sequence = [[i] for i in self.controls]
 
-class PList(collections.MutableSequence):
 
+class PList(collections.MutableSequence):
     def __init__(self, list_owner):
         self.oktypes = (Arbitrary)
         self.list_owner = list_owner
@@ -764,7 +795,7 @@ class PList(collections.MutableSequence):
     def __setitem__(self, i, v):
         raise NotImplementedError
 
-    def insert(self, i, v):  #  needed for append
+    def insert(self, i, v):  # needed for append
         if i != len(self.list):
             raise Exception('Only appending and popping items allowed')
         self.list.insert(i, v)
@@ -775,6 +806,7 @@ class PList(collections.MutableSequence):
 
     def __repr__(self):
         return str(self.list)
+
 
 class Concatenated(Arbitrary):
     def __init__(self, p_list, controls):
@@ -803,9 +835,10 @@ class Concatenated(Arbitrary):
         """
         nbcs = np.cumsum([0] + [p.n_bins for p in self.p_list])
         cd = self.column_dict
-        for idx in range(len(nbcs)-1):
-            self.p_list[idx]._fields_full = fields_full[nbcs[idx]:nbcs[idx+1], list(itertools.chain(*[cd[c] for c in self.p_list[idx].controls]))]
-            self.p_list[idx]._times_full = times_full[nbcs[idx]:nbcs[idx+1]]
+        for idx in range(len(nbcs) - 1):
+            self.p_list[idx]._fields_full = fields_full[nbcs[idx]:nbcs[idx + 1],
+                                            list(itertools.chain(*[cd[c] for c in self.p_list[idx].controls]))]
+            self.p_list[idx]._times_full = times_full[nbcs[idx]:nbcs[idx + 1]]
 
     def set_sequence(self):
         self._sequence = list(itertools.chain(*[i.sequence for i in self.p_list]))
@@ -825,7 +858,8 @@ class Concatenated(Arbitrary):
             for p in self.p_list:
                 if c in p.column_dict:
                     if c in n_cc and n_cc[c] != len(p.column_dict[c]):
-                        raise Exception('Error: Control {} has different column length on different items of p_list'.format(c))
+                        raise Exception(
+                            'Error: Control {} has different column length on different items of p_list'.format(c))
                     else:
                         n_cc[c] = len(p.column_dict[c])
         out = collections.OrderedDict()
@@ -860,11 +894,13 @@ class Concatenated(Arbitrary):
         for i in range(len(self.p_list)):
             for c in self.controls:
                 if c in self.p_list[i].column_dict:
-                    out[nbcs[i]:nbcs[i+1], self.column_dict[c]] = self.p_list[i].fields_full[:, self.p_list[i].column_dict[c]]
-            # out[nbcs[i]:nbcs[i+1], :] = self.extend_fields_full(i)
-            # [self.extend_fields_full(i) for i in range(len(self.p_list))]
+                    out[nbcs[i]:nbcs[i + 1], self.column_dict[c]] = self.p_list[i].fields_full[:,
+                                                                    self.p_list[i].column_dict[c]]
+                    # out[nbcs[i]:nbcs[i+1], :] = self.extend_fields_full(i)
+                    # [self.extend_fields_full(i) for i in range(len(self.p_list))]
         # )
         self._fields_full = out
+
     @property
     def fields_full(self):
         return self._fields_full
@@ -876,172 +912,6 @@ class Concatenated(Arbitrary):
     def times_full(self):
         return self._times_full
 
-# class DD2(Concatenated):
-#     """
-#     NOTES:
-#         1. tau is time between centers of (pi -) pulses
-#         2. preceeding and following tau/2 not included for better rounding. To
-#            To include them and have desired time_digitization=t0, here set time_digitization to 2*t0 and append and prepend Wait(tau/2, time_digitization=t0)
-#         3. fid and hahn echo are not included, for reason see 2.)
-#     """
-#     def __init__(self, dd_type, pulse_list, tau_arr, time_digitization=None):
-#         self.set_dd_type(dd_type)
-#         self.time_digitization = time_digitization
-#         self.pulse_list
-#         self.set_tau(tau)
-#         super(DDConcatenated, self).__init__(self.generate_p_list(), ['mw'])
-#
-#     @property
-#     def dd_type(self):
-#         return self._dd_type
-#
-#     @property
-#     def phases(self):
-#         return self._phases
-#
-#     def set_dd_type(self, val):
-#         if 'uhrig' in val or 'fid' in val or 'hahn' in val:
-#             raise NotImplementedError
-#         self._dd_type = val
-#         self._phases = __PHASES_DD__[self.dd_type]
-#
-#     @property
-#     def p_list_pulses(self):
-#         return self._p_list_pulses
-#
-#     def set_p_list_pulses(self, val):
-#         if len(val) != len(__PHASES_DD__[self.dd_type]):
-#             raise Exception('Error: {}, {}, {}'.format(len(val), val, self.dd_type))
-#         if len(set(val)) != len(val):
-#             raise Exception("Error: {}".format(val))
-#         for idx, pulse in enumerate(val):
-#             if self.time_digitization is not None and pulse.time_digitization != self.time_digitization:
-#                 raise Exception("Error: {}, {}".format(pulse.time_digitization, self.time_digitization))
-#             pulse.phase += self.phases[idx]
-#         self._p_list_pulses = val
-#
-#     @property
-#     def tau(self):
-#         return self._tau
-#
-#     def set_tau(self, val):
-#         if self.time_digitization is not None:
-#             val = np.around(val / self.time_digitization) * self.time_digitization
-#         self._tau = val
-#
-#     @property
-#     def n_tau(self):
-#         return self.number_of_pi_pulses - 1
-#
-#     @property
-#     def number_of_pi_pulses(self):
-#         return len(self.phases)
-#
-#     @property
-#     def pulse_durations(self):
-#         return np.array([self.p_list_pulses[i].T for i in range(len(self.phases))])
-#
-#     @property
-#     def pulse_durations_per_tau(self):
-#         return (self.pulse_durations[:-1] + self.pulse_durations[1:])/2.
-#
-#     @property
-#     def effective_tau_list(self):
-#         return -(self.pulse_durations_per_tau-self.tau)
-#
-#     @property
-#     def p_list_tau(self):
-#         return [Rabi(t_rabi=t_wait,
-#                      time_digitization=self.time_digitization,
-#                      omega=0.0,
-#                      control_field='mw') for t_wait in self.effective_tau_list]
-#
-#     def generate_p_list(self):
-#         return list(more_itertools.interleave_longest(self.p_list_pulses, self.p_list_tau))
-
-# class DDConcatenated(Concatenated):
-#     """
-#     THIS IS VERSATILE BUT SLOW
-#     NOTES:
-#         1. tau is time between centers of (pi -) pulses
-#         2. preceeding and following tau/2 not included for better rounding. To
-#            To include them and have desired time_digitization=t0, here set time_digitization to 2*t0 and append and prepend Wait(tau/2, time_digitization=t0)
-#         3. fid and hahn echo are not included, for reason see 2.)
-#     """
-#     def __init__(self, dd_type, p_list_pulses, tau, time_digitization=None):
-#         self.set_dd_type(dd_type)
-#         self.time_digitization = time_digitization
-#         self.set_p_list_pulses(p_list_pulses)
-#         self.set_tau(tau)
-#         super(DDConcatenated, self).__init__(self.generate_p_list(), ['mw'])
-#
-#     @property
-#     def dd_type(self):
-#         return self._dd_type
-#
-#     @property
-#     def phases(self):
-#         return self._phases
-#
-#     def set_dd_type(self, val):
-#         if 'uhrig' in val or 'fid' in val or 'hahn' in val:
-#             raise NotImplementedError
-#         self._dd_type = val
-#         self._phases = __PHASES_DD__[self.dd_type]
-#
-#     @property
-#     def p_list_pulses(self):
-#         return self._p_list_pulses
-#
-#     def set_p_list_pulses(self, val):
-#         if len(val) != len(__PHASES_DD__[self.dd_type]):
-#             raise Exception('Error: {}, {}, {}'.format(len(val), val, self.dd_type))
-#         if len(set(val)) != len(val):
-#             raise Exception("Error: {}".format(val))
-#         for idx, pulse in enumerate(val):
-#             if self.time_digitization is not None and pulse.time_digitization != self.time_digitization:
-#                 raise Exception("Error: {}, {}".format(pulse.time_digitization, self.time_digitization))
-#             pulse.phase += self.phases[idx]
-#         self._p_list_pulses = val
-#
-#     @property
-#     def tau(self):
-#         return self._tau
-#
-#     def set_tau(self, val):
-#         if self.time_digitization is not None:
-#             val = np.around(val / self.time_digitization) * self.time_digitization
-#         self._tau = val
-#
-#     @property
-#     def n_tau(self):
-#         return self.number_of_pi_pulses - 1
-#
-#     @property
-#     def number_of_pi_pulses(self):
-#         return len(self.phases)
-#
-#     @property
-#     def pulse_durations(self):
-#         return np.array([self.p_list_pulses[i].T for i in range(len(self.phases))])
-#
-#     @property
-#     def pulse_durations_per_tau(self):
-#         pulse_durations = self.pulse_durations
-#         return (pulse_durations[:-1] + pulse_durations[1:])/2.
-#
-#     @property
-#     def effective_tau_list(self):
-#         return -(self.pulse_durations_per_tau-self.tau)
-#
-#     @property
-#     def p_list_tau(self):
-#         return [Wait(t_wait=t_wait,
-#                      time_digitization=self.time_digitization,
-#                      control='wait') for t_wait in self.effective_tau_list]
-#
-#     def generate_p_list(self):
-#         return list(more_itertools.interleave_longest(self.p_list_pulses, self.p_list_tau))
 
 class DDConcatenated(Concatenated):
     """
@@ -1052,6 +922,7 @@ class DDConcatenated(Concatenated):
            To include them and have desired time_digitization=t0, here set time_digitization to 2*t0 and append and prepend Wait(tau/2, time_digitization=t0)
         3. fid and hahn echo are not included, for reason see 2.)
     """
+
     def __init__(self, dd_type, p_list_pulses, tau_list, time_digitization=None):
         self.set_dd_type(dd_type)
         self.time_digitization = time_digitization
@@ -1100,7 +971,7 @@ class DDConcatenated(Concatenated):
         elif len(val) != self.n_tau:
             raise Exception('Error: {}, {}'.format(val, self.n_tau))
         if self.time_digitization is not None:
-            val = np.around(val / self.time_digitization,  out=val)
+            val = np.around(val / self.time_digitization, out=val)
             val *= self.time_digitization
         self._tau_list = val
 
@@ -1119,13 +990,11 @@ class DDConcatenated(Concatenated):
     @property
     def pulse_durations_per_tau(self):
         pulse_durations = self.pulse_durations
-        return (pulse_durations[:-1] + pulse_durations[1:])/2.
+        return (pulse_durations[:-1] + pulse_durations[1:]) / 2.
 
     @property
     def effective_tau_list(self):
         return self.tau_list - self.pulse_durations_per_tau
-
-
 
     @property
     def p_list_tau(self):
@@ -1144,7 +1013,7 @@ class DDDegen(Arbitrary):
         self.rabi_period = rabi_period
         self.tau = tau
         self.sample_frequency = sample_frequency
-        self._sequence = ['mw']*self.total_length_smpl
+        self._sequence = ['mw'] * self.total_length_smpl
         self.set_fields_full()
         self.set_times_full()
 
@@ -1158,46 +1027,45 @@ class DDDegen(Arbitrary):
 
     @property
     def t_pi(self):
-        return .5*self.rabi_period
+        return .5 * self.rabi_period
 
     @property
     def length_smpl_per_pi(self):
-        return int(np.around(self.sample_frequency*self.tau))
+        return int(np.around(self.sample_frequency * self.tau))
 
     @property
     def total_length_smpl(self):
-        out = self.length_smpl_per_pi*self.n_pi
+        out = self.length_smpl_per_pi * self.n_pi
         return int(out)
 
     def set_times_full(self):
-        self._times_full = np.ones(self.total_length_smpl)/self.sample_frequency
+        self._times_full = np.ones(self.total_length_smpl) / self.sample_frequency
 
     def set_fields_full(self):
-        #amplitudes
+        # amplitudes
         x = np.arange(self.total_length_smpl, dtype=float)
         x *= self.n_pi
         x /= self.total_length_smpl
         np.mod(x, 1, out=x)
-        x = x-.5
+        x = x - .5
         x = np.abs(x)
-        x=x/self.t_pi
-        x = x*self.tau
-        x = -1*x
-        x = x+1
+        x = x / self.t_pi
+        x = x * self.tau
+        x = -1 * x
+        x = x + 1
         np.maximum(x, 0, out=x)
-        x *= np.pi/2.
+        x *= np.pi / 2.
         np.sin(x, out=x)
         np.power(x, 2, out=x)
 
-        #phases
+        # phases
         p = __PHASES_DD__[self.dd_type].reshape(-1, 1)
         p = np.repeat(p, 2, axis=1)
-        np.cos(p[:,0], out=p[:, 0])
+        np.cos(p[:, 0], out=p[:, 0])
         np.sin(p[:, 1], out=p[:, 1])
         p = np.repeat(p, self.length_smpl_per_pi, axis=0)
 
-        self._fields_full = 1/self.rabi_period*(p.T*x).T
-
+        self._fields_full = 1 / self.rabi_period * (p.T * x).T
 
     @property
     def times_full(self):
@@ -1207,61 +1075,37 @@ class DDDegen(Arbitrary):
     def fields_full(self):
         return self._fields_full
 
-# if __name__ == '__main__':
-#
-#     from qutip_enhanced import *
-#     # reload(sc)
-#     import time
-#     dd_type = '1000_kdd4'
-#     # t0 = time.time()
-#     # self = sc.DDConcatenated(dd_type=dd_type,
-#     #                          p_list_pulses=[sc.Rabi(t_rabi=0.025,
-#     #                                                 omega=1 / 0.05,
-#     #                                                 time_digitization=1/12e3,
-#     #                                                 control_field='mw')
-#     #                                         for _ in range(len(sc.__PHASES_DD__[dd_type]))],
-#     #                          tau=0.1,
-#     #                          time_digitization=1/12e3,
-#     #                          )
-#     # time_digitization = 1/12e3
-#     # # self.split_all_max(time_digitization)
-#     #
-#     # print(time.time()-t0)
-#     # def run():
-#     #     self = sc.DDConcatenated(dd_type=dd_type,
-#     #                              p_list_pulses=[sc.Rabi(t_rabi=0.025,
-#     #                                                     omega=1 / 0.05,
-#     #                                                     time_digitization=1 / 12e3,
-#     #                                                     control_field='mw')
-#     #                                             for _ in range(len(sc.__PHASES_DD__[dd_type]))],
-#     #                              tau_list=[0.1],
-#     #                              time_digitization=1 / 12e3,
-#     #                              )
-#     #     time_digitization = 1 / 12e3
-#     #     self.split_all_max(time_digitization)
-#     #
-#     # import cProfile
-#     # cProfile.run('run()')
-#     #
-#     # dd_type = '1_kdd4'
-#     # self = sc.DDConcatenated(dd_type=dd_type,
-#     #                          p_list_pulses=[sc.Rabi(t_rabi=0.025,
-#     #                                                 omega=1 / 0.05,
-#     #                                                 time_digitization=1 / 12e3,
-#     #                                                 control_field='mw')
-#     #                                         for _ in range(len(sc.__PHASES_DD__[dd_type]))],
-#     #                          tau_list=[0.1],
-#     #                          time_digitization=1 / 12e3,
-#     #                          )
-#
-# # from qutip_enhanced import *
-# # reload(sc)
-# # d = sc.DDDegen(dd_type='20_hahn', rabi_period=0.05, tau = 0.1, sample_frequency=12e3)
-# # import matplotlib.pyplot as plt
-# # c = d.set_fields_full()
-# # # plt.plot(d.set_fields_full())
-#
-# # import time
-# # t0 = time.time()
-# # y = d.amplitudes()
-# # print(time.time()-t0)
+
+def unitary_propagator(length_mus, h_mhz, fields, L_Bc):
+    return (-1j * 2 * np.pi * length_mus * (h_mhz + sum(omega*Bc for omega, Bc in zip(fields, L_Bc)))).expm()
+
+
+def unitary_propagator_list(h_mhz, times_full, fields_full, L_Bc):
+    u_list = []
+    for t, c_l in zip(times_full, fields_full):
+        u_list.append(
+            unitary_propagator(
+                length_mus=t,
+                h_mhz=h_mhz,
+                fields=c_l,
+                L_Bc=L_Bc
+            )
+        )
+    return u_list
+
+
+def unitary_propagator_list_mult(h_mhz, times_full, fields_full, L_Bc):
+    def u(i):
+        unitary_propagator(
+            length_mus=times_full[i],
+            h_mhz=h_mhz,
+            fields=fields_full[i],
+            L_Bc=L_Bc
+        )
+
+    u_list_mult = [u(len(times_full)-1)]
+    for i in range(len(times_full)[-2::-1]):
+        u_list_mult.append(
+            u(i)
+        )
+    return u_list_mult

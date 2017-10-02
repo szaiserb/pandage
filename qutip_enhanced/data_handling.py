@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import itertools
 from numbers import Number
+import traceback
 import collections
 import subprocess
 from PyQt5.QtWidgets import  QListWidgetItem, QTableWidgetItem,  QMainWindow
@@ -419,18 +420,20 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
     @x_axis_parameter.setter
     def x_axis_parameter(self, val):
         if getattr(self, 'x_axis_parameter', None) != val:
+            self._x_axis_parameter = val
             if val in self.x_axis_parameter_list:
-                self._x_axis_parameter = val
                 self.update_x_axis_parameter_value_comboBox_signal.emit(val)
-            else:
-                raise Exception('Error: {}, {}'.format(val, self.x_axis_parameter_list))
 
     def update_x_axis_parameter_value_comboBox(self, val):
         self.x_axis_parameter_comboBox.setCurrentText(val)
 
     @property
     def x_axis_parameter_list(self):
-        return self._x_axis_parameter_list
+        try:
+            return self._x_axis_parameter_list
+        except Exception:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
 
     @x_axis_parameter_list.setter
     def x_axis_parameter_list(self, val):
@@ -449,13 +452,14 @@ class PlotData(QMainWindow, plot_data_gui.Ui_window):
         self.x_axis_parameter_comboBox.clear() # if there is something to clear, currentIndexChanged is triggered, value is "". This causes an error.
         self.x_axis_parameter_comboBox.addItems(self.x_axis_parameter_list) #currentIndexChanged is triggered, value is first item (e.g. sweeps)
         self.x_axis_parameter_comboBox.blockSignals(False)
-        if 'x' in self.x_axis_parameter_list:
-            self.x_axis_parameter = 'x'
-        else:
-            try:
-                self.x_axis_parameter = self.parameter_with_largest_dim
-            except:
-                self.x_axis_parameter = self.x_axis_parameter_list[-1]
+        if not hasattr(self, '_x_axis_paramter') or getattr(self, '_x_axis_parameter') not in self._x_axis_parameter_list:
+            if 'x' in self.x_axis_parameter_list:
+                self.x_axis_parameter = 'x'
+            else:
+                try:
+                    self.x_axis_parameter = self.parameter_with_largest_dim
+                except:
+                    self.x_axis_parameter = self.x_axis_parameter_list[-1]
 
     def update_x_axis_parameteter_from_comboBox(self, integervalue):
         self.x_axis_parameter = str(self.x_axis_parameter_comboBox.currentText())

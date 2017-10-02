@@ -179,7 +179,8 @@ class DataGeneration(QObject):
     def update_current_str(self):
         self.current_idx_str = "\n".join(["{}: {} ({})".format(key, int(self.current_indices_dict_list[0]["{}_idx".format(key)]), len(val)) for key, val in self.parameters.items()])
         self.current_parameter_str = "\n".join(["{}: {}".format(key, self.current_parameters_dict_list[0][key]) for key in self.parameters.keys()])
-        self.pld.info.setPlainText('State: ' + self.state + '\n\n' + 'Current parameters:\n' + self.current_parameter_str + '\n\n' + 'Current indices\n' + self.current_idx_str)
+        if hasattr(self, '_pld'):
+            self.pld.info.setPlainText('State: ' + self.state + '\n\n' + 'Current parameters:\n' + self.current_parameter_str + '\n\n' + 'Current indices\n' + self.current_idx_str)
 
     def init_run(self, **kwargs):
         self.state = 'run'
