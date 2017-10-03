@@ -23,11 +23,12 @@ from PyQt5.QtWidgets import QWidget
 from PyQt5.QtCore import pyqtSignal, QObject
 import datetime
 
-class DataGeneration(QObject):
+# class DataGeneration(QObject):
+class DataGeneration:
 
-    def __init__(self, parent=None):
-        super(DataGeneration, self).__init__(parent)
-        self.update_current_str_signal.connect(self.update_current_str)
+    def __init__(self):
+        super(DataGeneration, self).__init__()
+        # self.update_current_str_signal.connect(self.update_current_str)
         self.date_of_creation = datetime.datetime.now()
         self.remeasure_items = None
         self.remeasure_indices = None
@@ -42,18 +43,13 @@ class DataGeneration(QObject):
     meas_code = data_handling.ret_property_typecheck('meas_code', str)
     state = data_handling.ret_property_list_element('state', ['idle', 'run'])
 
-    update_current_str_signal = pyqtSignal()
-    show_gui_signal = pyqtSignal()
-    close_gui_signal = pyqtSignal()
+    # update_current_str_signal = pyqtSignal()
+    # show_gui_signal = pyqtSignal()
+    # close_gui_signal = pyqtSignal()
 
     @property
     def parameters(self):
-        try:
-            return self._parameters
-        except Exception:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
-
+        return self._parameters
 
     @parameters.setter
     def parameters(self, val):
@@ -64,22 +60,16 @@ class DataGeneration(QObject):
 
     @property
     def observation_names(self):
-        try:
-            raise NotImplementedError
-        except Exception:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        raise NotImplementedError
+
 
     @property
     def number_of_simultaneous_measurements(self):
-        try:
-            if hasattr(self, '_number_of_simultaneous_measurements'):
-                return self._number_of_simultaneous_measurements
-            else:
-                return 1
-        except Exception:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        if hasattr(self, '_number_of_simultaneous_measurements'):
+            return self._number_of_simultaneous_measurements
+        else:
+            return 1
+
 
     @number_of_simultaneous_measurements.setter
     def number_of_simultaneous_measurements(self, val):
@@ -96,14 +86,10 @@ class DataGeneration(QObject):
 
     @property
     def data(self):
-        try:
-            if hasattr(self, '_pld'):
-                return self.pld.data
-            else:
-                return self._data
-        except Exception:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        if hasattr(self, '_pld'):
+            return self.pld.data
+        else:
+            return self._data
 
     @data.setter
     def data(self, val):
@@ -114,11 +100,8 @@ class DataGeneration(QObject):
 
     @property
     def pld(self):
-        try:
-            return self._pld
-        except Exception:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        return self._pld
+
 
     @pld.setter
     def pld(self, val):
@@ -128,8 +111,8 @@ class DataGeneration(QObject):
         if hasattr(self, '_data'):
             self.pld.data = self._data
             del self._data
-        self.show_gui_signal.connect(self.show_gui)
-        self.close_gui_signal.connect(self.close_gui)
+        # self.show_gui_signal.connect(self.show_gui)
+        # self.close_gui_signal.connect(self.close_gui)
 
 
     def set_iterator_list(self):
@@ -144,21 +127,18 @@ class DataGeneration(QObject):
 
     @property
     def progress(self):
-        try:
-            return getattr(self, '_progress', 0)
-        except Exception:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        return getattr(self, '_progress', 0)
 
     def init_data(self, init_from_file=None, iff=None, move_folder=True):
         init_from_file = iff if iff is not None else init_from_file
         self.init_from_file = init_from_file
-        self.data = data_handling.Data(
+        data = data_handling.Data(
             parameter_names=self.parameters.keys() + [self.parameters.keys()[i]+'_idx' for i in range(len(self.parameters.keys()))],
             observation_names=self.observation_names,
             dtypes=self.dtypes
         )
-        self.data.init(init_from_file=init_from_file)
+        data.init(init_from_file=init_from_file)
+        self.data = data
         if init_from_file is not None and move_folder:
             # TODO: might be useful to use shutil.copy2 followed by shutil.rmtree to copy metadata (e.g. creation date)
             folder = os.path.split(init_from_file)[0]
@@ -174,13 +154,14 @@ class DataGeneration(QObject):
 
     def init_gui(self, title):
         self.pld = data_handling.PlotData(title)
-        self.pld.show()
+        self.pld.emit_show_signal()
 
     def update_current_str(self):
         self.current_idx_str = "\n".join(["{}: {} ({})".format(key, int(self.current_indices_dict_list[0]["{}_idx".format(key)]), len(val)) for key, val in self.parameters.items()])
         self.current_parameter_str = "\n".join(["{}: {}".format(key, self.current_parameters_dict_list[0][key]) for key in self.parameters.keys()])
         if hasattr(self, '_pld'):
-            self.pld.info.setPlainText('State: ' + self.state + '\n\n' + 'Current parameters:\n' + self.current_parameter_str + '\n\n' + 'Current indices\n' + self.current_idx_str)
+            self.pld.emit_update_info_signal('State: ' + self.state + '\n\n' + 'Current parameters:\n' + self.current_parameter_str + '\n\n' + 'Current indices\n' + self.current_idx_str)
+            # self.pld.info.setPlainText()
 
     def init_run(self, **kwargs):
         self.state = 'run'
@@ -189,15 +170,14 @@ class DataGeneration(QObject):
         self.set_iterator_list_done()
         self.set_iterator_list()
 
-    def show_gui(self):
-        self.pld.show()
-
-    def close_gui(self):
-        self.pld.close()
+    # def show_gui(self):
+    #     self.pld.show()
+    #
+    # def close_gui(self):
+    #     self.pld.close()
 
     def iterator(self):
         while len(self.iterator_list) > 0:
-
             if hasattr(self, 'pv_l'):
                 self.iterator_list_done.extend(self.pv_l)
             if hasattr(self, 'pidx_l'):
@@ -212,7 +192,7 @@ class DataGeneration(QObject):
             self.data.append(l)
             import time
             time.sleep(1)
-            self.update_current_str_signal.emit()
+            self.update_current_str()
             yield l
         self._progress = len(self.iterator_list_done) / np.prod([len(i) for i in self.parameters.values()])
 
@@ -221,36 +201,30 @@ class DataGeneration(QObject):
 
     @property
     def save_dir(self):
+        sts = self.start_time.strftime('%Y%m%d-h%Hm%Ms%S')
+        save_dir = "{}/{}_{}".format(self.file_path, sts, self.file_name)
         try:
-            sts = self.start_time.strftime('%Y%m%d-h%Hm%Ms%S')
-            save_dir = "{}/{}_{}".format(self.file_path, sts, self.file_name)
-            try:
-                os.makedirs(save_dir)
-            except OSError as e:
-                if e.errno != errno.EEXIST:
-                    raise
-            except Exception:
-                print(save_dir)
-                exc_type, exc_value, exc_tb = sys.exc_info()
-                traceback.print_exception(exc_type, exc_value, exc_tb)
-            return save_dir
+            os.makedirs(save_dir)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
         except Exception:
+            print(save_dir)
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
+        return save_dir
+
 
     @property
     def save_dir_tmp(self):
+        save_dir_tmp = "{}/tmp".format(self.save_dir)
         try:
-            save_dir_tmp = "{}/tmp".format(self.save_dir)
-            try:
-                os.makedirs(save_dir_tmp)
-            except OSError as e:
-                if e.errno != errno.EEXIST:
-                    raise
-            return save_dir_tmp
-        except Exception:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+            os.makedirs(save_dir_tmp)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+        return save_dir_tmp
+
 
     def save_qutip_enhanced(self, destination_dir):
         src = r'D:\Python\qutip_enhanced\qutip_enhanced'
