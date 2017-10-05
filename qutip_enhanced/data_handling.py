@@ -470,9 +470,9 @@ class PlotDataNoQt:
         self._data = val
         self.update_x_axis_parameter_list()
         self.update_parameter_table_data()
-        self.update_parameter_table_selected_data()
+        self.update_parameter_table_selected_indices()
         self.update_observation_list_data()
-        self.update_observation_list_selected_data()
+        self.update_observation_list_selected_indices()
         self.update_selected_plot_items()
         self.update_plot()
         self.update_fit_select_table_data()
@@ -489,7 +489,7 @@ class PlotDataNoQt:
             '_parameter_table_data',
             '_parameter_table_selected_data',
             '_observation_list_data',
-            '_observation_list_selected_data',
+            '_observation_list_selected_indices',
             '_selected_plot_items',
             '_fit_select_table_data',
             '_fit_select_table_selected_rows'
@@ -552,35 +552,54 @@ class PlotDataNoQt:
     def update_observation_list_data(self):
         if not hasattr(self, '_observation_list_data'):
             self._observation_list_data = self.observation_names_reduced()
-            # if hasattr(self, '_gui'):
-            #     self.gui.update_observation_data(self.observation_list_data)
+            if hasattr(self, '_gui'):
+                self.gui.update_observation_list_data(self.observation_list_data)
         elif self.observation_list_data != self.observation_names_reduced():
             raise Exception('Error: Data of observation list must not be changed after data was given to PlotData.', self.observation_list_data, self.observation_names_reduced())
 
     @property
-    def observation_list_selected_data(self):
-        return self._observation_list_selected_data
+    def observation_list_selected_indices(self):
+        return self._observation_list_selected_indices
 
-    def update_observation_list_selected_data(self, val=None):
-        self._observation_list_selected_data = self.observation_list_data[0:1] if val is None else val
+    def update_observation_list_selected_indices(self, val=None):
+        self._observation_list_selected_indices = [0] if val is None else val
+        if hasattr(self, '_gui'):
+            self.gui.update_observation_list_selected_indices(self.observation_list_selected_indices)
+
+    @property
+    def observation_list_selected_data(self):
+        return [self.observation_list_data[i] for i in self.observation_list_selected_indices]
 
     def observation_names_reduced(self):
         return [i for i in self.data.observation_names if not i in ['trace', 'start_time', 'end_time', 'thresholds']]
 
     @property
-    def parameter_table_selected_data(self):
-        return self._parameter_table_selected_data
+    def parameter_table_selected_indices(self):
+        return self._parameter_table_selected_indices
 
-    def update_parameter_table_selected_data(self, val=None):
+    def update_parameter_table_selected_indices(self, val=None):
         if val is None:
             # if len(self.data.df) > 1000:
             #     self._parameter_table_selected_data = collections.OrderedDict([(key, []) for key, val in self.parameter_table_data.items()])
             #     return
-            self._parameter_table_selected_data = collections.OrderedDict([(key, []) if key in ['sweeps', self.x_axis_parameter] else (key, val) for key, val in self.parameter_table_data.items()])
+            self._parameter_table_selected_indices = collections.OrderedDict([(key, []) if key in ['sweeps', self.x_axis_parameter] else (key, '__all__') for key, val in self.parameter_table_data.items()])
         elif not isinstance(val, collections.OrderedDict):
             raise Exception(type(val), val)
         else:
-            self._parameter_table_selected_data = val
+            self._parameter_table_selected_indices = val
+        if hasattr(self, '_gui'):
+            self.gui.update_parameter_table_selected_indices(self.parameter_table_selected_indices)
+
+    @property
+    def parameter_table_selected_data(self):
+        out = collections.OrderedDict()
+        for cn, val in self.parameter_table_selected_indices.items():
+            data_full = getattr(self.data.df, cn).unique()
+            if val == '__all__':
+                out[cn] = data_full
+            else:
+                out[cn] = [i for i in data_full if i in val]
+        return out
 
     @property
     def selected_plot_items(self):
@@ -656,22 +675,6 @@ class PlotDataNoQt:
                 plot_data.append(dict(condition_dict_reduced=condition_dict_reduced, observation_name=observation_name, x=getattr(dfxy, self.x_axis_parameter), y=getattr(dfxy, observation_name)))
         return plot_data
 
-    def update_plot(self):
-        pass
-        # if hasattr(self, 'gui'):
-        #     fig = self.gui.fig
-        #     try:
-        #         fig.clear()
-        #     except:
-        #         pass
-        #     ax = fig.add_subplot(111)
-        #     for idx, pdi in enumerate(self.line_plot_data()):
-        #         ax.plot(pdi['x'], pdi['y'], '-',
-        #                      )
-        #     fig.tight_layout()
-            # self.canvas.draw()
-            # return ax
-
     def update_plot_fit(self):
         pass
         # if hasattr(self, 'gui'):
@@ -715,6 +718,9 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
     update_x_axis_parameter_comboBox_signal = pyqtSignal()
     clear_signal = pyqtSignal()
     update_parameter_table_data_signal = pyqtSignal(collections.OrderedDict)
+    update_parameter_table_selected_indices_signal = pyqtSignal(collections.OrderedDict)
+    update_observation_list_data_signal = pyqtSignal(list)
+    update_observation_list_selected_indices_signal = pyqtSignal(list)
 
     def clear(self):
         self.clear_signal.emit()
@@ -736,7 +742,7 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
         self.x_axis_parameter_comboBox.blockSignals(False)
         self.update_parameter_table_item_flags()
 
-    def update_x_axis_parameteter_from_comboBox(self, integervalue):
+    def update_x_axis_parameteter_from_comboBox(self):
         self.plot_data_no_qt.x_axis_parameter = str(self.x_axis_parameter_comboBox.currentText())
 
     def update_parameter_table_data(self, new_data):
@@ -763,13 +769,101 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
                     self.parameter_table.set_column_flags(cn, Qt.ItemIsSelectable | Qt.ItemIsEnabled)
         self.parameter_table.blockSignals(False)
 
+    def update_observation_list_data(self, observation_list_data):
+        print(observation_list_data)
+        self.update_observation_list_data_signal.emit(observation_list_data)
+
+    def update_observation_list_data_signal_emitted(self, observation_list_data):
+        if self.observation_widget.count() == 0:
+            for obs in observation_list_data:
+                self.observation_widget.addItem(QListWidgetItem(obs))
+        elif len(self.observation_list_data) != self.observation_widget.count():
+            raise Exception('Error: ', self.observation_widget.count(), observation_list_data)
+
+    def update_parameter_table_selected_indices(self, selected_indices):
+        self.update_parameter_table_selected_indices_signal.emit(selected_indices)
+
+    def update_parameter_table_selected_indices_signal_emitted(self, update_parameter_table_selected_indices):
+        self.parameter_table.blockSignals(True)
+        for cn, val in update_parameter_table_selected_indices.items():
+            cidx = self.parameter_table.column_index(cn)
+            val = range(self.parameter_table.n_rows(cn)) if val == '__all__' else val
+            for ridx in val:
+                self.parameter_table.item(ridx, cidx).setSelected(True)
+        self.parameter_table.blockSignals(False)
+
+    def update_parameter_table_selected_indices_from_gui(self):
+        out = collections.OrderedDict()
+        column_names = self.parameter_table.column_names
+        for item in self.parameter_table.selectedItems():
+            cn = column_names[item.column()]
+            if not cn in out:
+                out[cn] = []
+            out[cn].append(item.row())
+        self.plot_data_no_qt.update_parameter_table_selected_indices(out)
+
+    def update_observation_list_selected_indices(self, selected_indices):
+        self.update_observation_list_selected_indices_signal.emit(selected_indices)
+
+    def update_observation_list_selected_indices_signal_emitted(self, update_observation_list_selected_indices):
+        self.observation_widget.blockSignals(True)
+        for i in update_observation_list_selected_indices:
+            self.observation_widget.item(i).setSelected(True)
+        self.observation_widget.blockSignals(False)
+
+    def update_observation_list_selected_indicess_from_gui(self):
+        print('changed')
+        self.plot_data_no_qt.update_obervation_list_selected_indices([i.row() for i in self.observation_widget.selectedIndexes()])
+
+        def update_plot(self):
+            if hasattr(self, 'gui'):
+                fig = self.gui.fig
+                try:
+                    fig.clear()
+                except:
+                    pass
+                self.gui.ax = fig.add_subplot(111)
+                for idx, pdi in enumerate(self.line_plot_data()):
+                    self.gui.ax.plot(pdi['x'], pdi['y'], '-',
+                                     )
+                fig.tight_layout()
+                self.gui.canvas.draw()
+                return self.gui.ax
+
+    # def select_observation_table_item(self, i):
+    #     self.observation_widget.item(i).setSelected(True)
+    #
+    # def select_all_plots_if_none(self):
+    #     if len(self.parameter_table.selectedItems()) == 0:
+    #         column_names = self.parameter_names_reduced()[1:]
+    #         column_names.remove(self.x_axis_parameter)
+    #         for cn in column_names:
+    #             self.select_parameter_table_column_signal.emit(cn)
+    #     if len(self.observation_widget.selectedItems()) == 0:
+    #         self.select_observation_table_item_signal.emit(0)
+
+
+
+        # self.parameter_table.blockSignals(True)
+        # if self.parameter_table.columnCount() == 0:
+        #     header = new_data.keys()
+        #     self.parameter_table.setColumnCount(len(header))
+        #     self.parameter_table.setHorizontalHeaderLabels(header)
+        # for column_name, val in new_data.items():
+        #     self.parameter_table.append_to_column_parameters(column_name, val)
+        #     self.update_parameter_table_item_flags()
+        # self.parameter_table.blockSignals(False)
+
     def init_gui(self):
 
         for name in [
             'clear',
             'update_x_axis_parameter_comboBox',
             'update_parameter_table_data',
-                     ]:
+            'update_observation_list_data',
+            'update_parameter_table_selected_indices',
+            'update_observation_list_selected_indices'
+        ]:
             getattr(getattr(self, "{}_signal".format(name)), 'connect')(getattr(self, "{}_signal_emitted".format(name)))
 
         # self.show_signal.connect(self.show)
@@ -805,7 +899,7 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
         self.parameter_tab.setCurrentIndex(0)
 
         # self.parameter_table.hdf_file_dropped.connect(self.set_data_from_path)
-
+        self.parameter_table.itemSelectionChanged.connect(self.update_parameter_table_selected_indices_from_gui)
         # self.open_code_button.clicked.connect(self.open_measurement_code)
         # self.open_explorer_button.clicked.connect(self.open_explorer)
         # self.parameter_table.itemSelectionChanged.connect(self.update_selected_plot_items)

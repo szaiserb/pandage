@@ -21,13 +21,15 @@ class QTableWidgetEnhanced(QTableWidget):
         self.clear_table_contents_signal.connect(self.clear_table_contents_for_signal)
 
     def column_data(self, column_name):
-
         out = []
         for row in range(self.rowCount()):
             o = self.item(row, self.column_index(column_name))
             if o.text() != '':
                 out.append(o.data(0x0100))
         return out
+
+    def n_rows(self, column_name):
+        return len([row for row in range(self.rowCount()) if self.item(row, self.column_index(column_name)).text() != ''])
 
     @property
     def column_names(self):
@@ -70,7 +72,9 @@ class QTableWidgetEnhanced(QTableWidget):
 
     def set_column_flags(self, column_name, flag):
         for row in range(self.rowCount()):
-            self.item(row, self.column_index(column_name)).setFlags(flag)
+            item = self.item(row, self.column_index(column_name))
+            if item.data(0x0100) is not None:
+                item.setFlags(flag)
 
     def selected_table_items(self, column_name):
         out = []
