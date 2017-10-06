@@ -14,11 +14,8 @@ from PyQt5.QtCore import pyqtSignal
 
 class QTableWidgetEnhanced(QTableWidget):
 
-    clear_table_contents_signal = pyqtSignal()
-
     def __init__(self, parent=None):
         super(QTableWidgetEnhanced, self).__init__(parent)
-        self.clear_table_contents_signal.connect(self.clear_table_contents_for_signal)
 
     def column_data(self, column_name):
         out = []
@@ -37,6 +34,9 @@ class QTableWidgetEnhanced(QTableWidget):
 
     def column_index(self, column_name):
         return self.column_names.index(column_name)
+
+    def column_name(self, column_index):
+        return self.column_names[column_index]
 
     def add_rows(self, n_new):
         if n_new > 0:
@@ -83,18 +83,17 @@ class QTableWidgetEnhanced(QTableWidget):
                 out.append(item.data(0x0100))
         return out
 
-    def selected_items_unique_column_indices(self):
+    def selected_items_unique_row_indices(self):
         return list(set([i.row() for i in self.selectedItems()]))
 
     def clear_table_contents(self):
-        self.clear_table_contents_signal.emit()
-
-    def clear_table_contents_for_signal(self):
         for idx in itertools.product(range(self.rowCount()), range(self.columnCount())):
-            self.clearSelection()
             self.item(idx[0], idx[1]).setText('')
             self.item(idx[0], idx[1]).setData(0x0100, None)
             self.item(idx[0], idx[1]).setFlags(Qt.NoItemFlags)
+        self.clear()
+        self.setRowCount(0)
+        self.setColumnCount(0)
 
 class QTableWidgetEnhancedDrop(QTableWidgetEnhanced):
 

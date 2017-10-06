@@ -69,6 +69,7 @@ class Ui_window(object):
         self.fit_select_table = QTableWidgetEnhanced(self.fit_tab)
         self.fit_select_table.setGeometry(QtCore.QRect(0, 0, 421, 261))
         self.fit_select_table.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
+        self.fit_select_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.fit_select_table.setObjectName("fit_select_table")
         self.fit_select_table.setColumnCount(0)
         self.fit_select_table.setRowCount(0)
