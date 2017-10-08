@@ -13,7 +13,7 @@ import collections
 import subprocess
 from PyQt5.QtWidgets import  QListWidgetItem, QTableWidgetItem,  QMainWindow
 
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QObject
 from PyQt5.uic import compileUi
 
 from .qtgui import plot_data_gui
@@ -389,61 +389,11 @@ def recompile_plotdata_ui_file():
     reload(plot_data_gui)
 
 
-def cpd():
-    out = PlotDataNoQt()
-    out.x_axis_parameter = 'LO_frequency'
-    for fn in os.listdir(os.getcwd()):
-        if fn.endswith('.hdf'):
-            out.set_data_from_path(fn)
-    # out.show()
-    return out
+class PlotData:
 
-def subfolders_with_hdf(folder):
-    l = []
-    for root, dirs, files in os.walk(folder):
-        for file in files:
-            if file.endswith(".hdf"):
-                l.append(root)
-    return l
-
-def number_of_points_of_hdf_files_in_subfolders(folder):
-    l = subfolders_with_hdf(folder)
-    out_openable = []
-    out_failed = []
-    for subdir in l:
-        for root, dirs, files in os.walk(subdir):
-            for file in files:
-                if file.endswith(".hdf"):
-                    try:
-                        d = Data(iff=os.path.join(root, file))
-                        out_openable.append({'root': root, 'file': file, 'points': len(d.df)})
-                    except:
-                        out_failed.append({'root': root, 'file': file})
-    return out_openable, out_failed
-
-def hdf_files_in_subfolders_with_less_than_n_points(folder, n):
-    out_openable, out_failed = number_of_points_of_hdf_files_in_subfolders(folder)
-    out_smaller = [i for i in out_openable if i['points'] < n]
-    out_larger_equal = [i for i in out_openable if i['points'] >= n]
-    return out_smaller, out_larger_equal, out_failed
-
-def move_folder(folder_list_dict=None, destination_folder=None):
-    import shutil
-    failed=0
-    for i in folder_list_dict:
-        try:
-            src = i['root']
-            dst = os.path.join(destination_folder, os.path.basename(i['root']))
-            shutil.move(src, dst)
-        except:
-            failed +=1
-            print("Folder {} could not be moved. Lets hope it has tbc in its name".format(i['root']))
-    print("Successfully moved: {}. Failed: {}".format(len(folder_list_dict)- failed, failed))
-
-class PlotDataNoQt:
-
-    def __init__(self):
-        self._gui = PlotDataQt(plot_data_no_qt = self)
+    def __init__(self, title=None, parent=None):
+        super(PlotData, self).__init__()
+        self._gui = PlotDataQt(plot_data_no_qt=self, title=title, parent=parent)
 
     fit_function = 'cosine'
     show_legend = False
@@ -463,8 +413,7 @@ class PlotDataNoQt:
     @data.setter
     def data(self, val):
         self.delete_attributes()
-        if hasattr(self, '_gui'):
-            self.gui.clear()
+        self.gui.clear()
         self._data = val
         self.update_x_axis_parameter_list()
         self.update_parameter_table_data()
@@ -478,6 +427,7 @@ class PlotDataNoQt:
         self.update_plot_fit()
 
     def new_data_arrived(self):
+        self.update_x_axis_parameter_list()
         self.update_parameter_table_data()
         self.update_observation_list_data()
         self.update_plot()
@@ -486,7 +436,6 @@ class PlotDataNoQt:
         for attr_name in [
             'data_path',
             '_data',
-            '_x_axis_parameter',
             '_x_axis_parameter_list',
             '_parameter_table_data',
             '_parameter_table_selected_data',
@@ -509,30 +458,24 @@ class PlotDataNoQt:
     def x_axis_parameter(self, val):
         if getattr(self, '_x_axis_parameter', None) != val:
             self._x_axis_parameter = val
-            if hasattr(self, '_gui'):
-                self.gui.update_x_axis_parameter_comboBox()
+            self.gui.update_x_axis_parameter_comboBox()
 
     @property
     def x_axis_parameter_list(self):
         return self._x_axis_parameter_list
 
-    def update_x_axis_parameter_list(self, data=None):
-        data = self.data if data is None else data
-        if len(data.df) > 0:
-            self._x_axis_parameter_list = [cn for cn in self.parameter_names_reduced(data=data) if cn in data.df._get_numeric_data().columns]
-            if not hasattr(self, '_x_axis_parameter') or self.x_axis_parameter not in self.x_axis_parameter_list:
-                self._x_axis_parameter = self.numeric_x_axis_parameter_with_largest_dim(data=data)
-            if hasattr(self, '_gui'):
-                self.gui.update_x_axis_parameter_comboBox()
+    def update_x_axis_parameter_list(self):
+        self._x_axis_parameter_list = [cn for cn in self.parameter_names_reduced() if cn in self.data.df._get_numeric_data().columns]
+        if not hasattr(self, '_x_axis_parameter') or (self.x_axis_parameter not in self.x_axis_parameter_list and len(self.x_axis_parameter_list)>0):
+            self._x_axis_parameter = self.x_axis_parameter_with_largest_dim()
+        self.gui.update_x_axis_parameter_comboBox()
 
     def parameter_names_reduced(self, data=None):
         data = self.data if data is None else data
         return [i for i in data.parameter_names if not '_idx' in i]
 
-    def numeric_x_axis_parameter_with_largest_dim(self, data=None, x_axis_parameter_list=None):
-        data = self.data if data is None else data
-        x_axis_parameter_list = self.x_axis_parameter_list if x_axis_parameter_list is None else x_axis_parameter_list
-        return data.parameter_names[np.argmax([len(getattr(data.df, p).unique()) for p in x_axis_parameter_list])]
+    def x_axis_parameter_with_largest_dim(self):
+        return self.data.parameter_names[np.argmax([len(getattr(self.data.df, p).unique()) for p in self.x_axis_parameter_list])]
 
     @property
     def parameter_table_data(self):
@@ -546,8 +489,7 @@ class PlotDataNoQt:
             ptd[cn] = getattr(self.data.df, cn).unique()
             ptd_new[cn] = [i for i in ptd[cn] if i not in self.parameter_table_data[cn]]
         self._parameter_table_data = ptd
-        if hasattr(self, 'gui'):
-            self.gui.update_parameter_table_data(ptd_new)
+        self.gui.update_parameter_table_data(ptd_new)
 
     @property
     def observation_list_data(self):
@@ -556,8 +498,7 @@ class PlotDataNoQt:
     def update_observation_list_data(self):
         if not hasattr(self, '_observation_list_data'):
             self._observation_list_data = self.observation_names_reduced()
-            if hasattr(self, '_gui'):
-                self.gui.update_observation_list_data(self.observation_list_data)
+            self.gui.update_observation_list_data(self.observation_list_data)
         elif self.observation_list_data != self.observation_names_reduced():
             raise Exception('Error: Data of observation list must not be changed after data was given to PlotData.', self.observation_list_data, self.observation_names_reduced())
 
@@ -567,8 +508,7 @@ class PlotDataNoQt:
 
     def update_observation_list_selected_indices(self, val=None):
         self._observation_list_selected_indices = [0] if val is None else val
-        if hasattr(self, '_gui'):
-            self.gui.update_observation_list_selected_indices(self.observation_list_selected_indices)
+        self.gui.update_observation_list_selected_indices(self.observation_list_selected_indices)
 
     @property
     def observation_list_selected_data(self):
@@ -594,8 +534,7 @@ class PlotDataNoQt:
             for cn, val in parameter_table_selected.items():
                 out[cn] = val
             self._parameter_table_selected_indices = out
-        if hasattr(self, '_gui'):
-            self.gui.update_parameter_table_selected_indices(self.parameter_table_selected_indices)
+        self.gui.update_parameter_table_selected_indices(self.parameter_table_selected_indices)
 
     @property
     def parameter_table_selected_data(self):
@@ -638,15 +577,13 @@ class PlotDataNoQt:
             if len(cpd[column_name]) == 0:
                 del cpd[column_name]
         self._fit_select_table_data = cpd
-        if hasattr(self, 'gui'):
-            self.gui.update_fit_select_table_data(self.fit_select_table_data)
+        self.gui.update_fit_select_table_data(self.fit_select_table_data)
 
     @property
     def fit_select_table_selected_rows(self):
         return self._fit_select_table_selected_rows
 
     def update_fit_select_table_selected_rows(self, fit_select_table_selected_rows=None):
-        print('a', fit_select_table_selected_rows)
         self._fit_select_table_selected_rows = [] if fit_select_table_selected_rows is None else fit_select_table_selected_rows #self.fit_select_table.selected_items_unique_column_indices()
         self.gui.update_fit_select_table_selected_rows(self.fit_select_table_selected_rows)
 
@@ -661,12 +598,15 @@ class PlotDataNoQt:
         elif self.fit_function == 'exp':
             pass
         self._fit_results = []
-        for i in [spi[idx] for idx in self.fit_select_table_selected_rows]:
+        for idx in self.fit_select_table_selected_rows:
+            print("idx", idx)
+            i = spi[idx]
             try:
                 params = mod.guess(data=i['y'], x=i['x'])
+
                 self._fit_results.append([i, mod.fit(i['y'], params, x=i['x'])])
             except:
-                self._fit_results.append([i, None])
+                # self._fit_results.append([i, None])
                 print('fitting failed: {}'.format(i))
         self.update_fit_result_table_data()
 
@@ -684,8 +624,7 @@ class PlotDataNoQt:
                 for key, val in fri[0]['condition_dict_reduced'].items() + [('observation_name', fri[0]['observation_name'])] + [(key, val.value) for key, val in fri[1].params.items()]:
                     out[key].append(val)
         self._fit_result_table_data = out
-        if hasattr(self, 'gui'):
-            self.gui.update_fit_result_table_data(self.fit_result_table_data)
+        self.gui.update_fit_result_table_data(self.fit_result_table_data)
 
     def ret_line_plot_data_single(self, condition_dict, observation_name):
         out = self.data.df[functools.reduce(np.logical_and, [self.data.df[key] == val for key, val in condition_dict.items() if val not in ['__all__', '__average__']])]
@@ -696,42 +635,41 @@ class PlotDataNoQt:
     @property
     def line_plot_data(self):
         plot_data = []
-        for p in self.selected_plot_items:
-            condition_dict = collections.OrderedDict([(ni, pi) for ni, pi in zip(self.parameter_names_reduced(), p)])
-            for observation_name in self.observation_list_selected_data:
-                dfxy = self.ret_line_plot_data_single(condition_dict, observation_name)
-                condition_dict_reduced = collections.OrderedDict([(key, val) for key, val in condition_dict.items() if val not in ['__average__', '__all__']])
-                plot_data.append(dict(condition_dict_reduced=condition_dict_reduced, observation_name=observation_name, x=getattr(dfxy, self.x_axis_parameter), y=getattr(dfxy, observation_name)))
+        if len(self.data.df) > 0:
+            for p in self.selected_plot_items:
+                condition_dict = collections.OrderedDict([(ni, pi) for ni, pi in zip(self.parameter_names_reduced(), p)])
+                for observation_name in self.observation_list_selected_data:
+                    dfxy = self.ret_line_plot_data_single(condition_dict, observation_name)
+                    condition_dict_reduced = collections.OrderedDict([(key, val) for key, val in condition_dict.items() if val not in ['__average__', '__all__']])
+                    plot_data.append(dict(condition_dict_reduced=condition_dict_reduced, observation_name=observation_name, x=getattr(dfxy, self.x_axis_parameter), y=getattr(dfxy, observation_name)))
         return plot_data
 
     def update_plot(self):
         self.update_selected_plot_items()
         self.update_fit_select_table_data()
-        if hasattr(self, '_gui'):
-            try:
-                self.gui.fig.clear()
-            except:
-                pass
-            self.gui.ax = self.gui.fig.add_subplot(111)
-            for idx, pdi in enumerate(self.line_plot_data):
-                self.gui.ax.plot(pdi['x'], pdi['y'], '-')
-            self.gui.fig.tight_layout()
-            self.gui.canvas.draw()
+        try:
+            self.gui.fig.clear()
+        except:
+            pass
+        self.gui.ax = self.gui.fig.add_subplot(111)
+        for idx, pdi in enumerate(self.line_plot_data):
+            self.gui.ax.plot(pdi['x'], pdi['y'], '-')
+        self.gui.fig.tight_layout()
+        self.gui.canvas.draw()
 
     def update_plot_fit(self):
         self.update_fit_results()
-        if hasattr(self, 'gui'):
-            self.gui.fig_fit.clear()
-            self.gui.ax_fit = self.gui.fig_fit.add_subplot(111)
-            for idx, fi in enumerate(self.fit_results):
-                color = self.gui.ax_fit._get_lines.get_next_color()
-                r = fi[1]
-                x = r.userkws['x']
-                y = r.eval(params=r.params, x=x)
-                self.gui.ax_fit.plot(x,y, '-', color=color)
-                self.gui.ax_fit.plot(x, r.data, 'o', color=color, markersize=3.5)
-                self.gui.fig_fit.tight_layout()
-                self.gui.canvas_fit.draw()
+        self.gui.fig_fit.clear()
+        self.gui.ax_fit = self.gui.fig_fit.add_subplot(111)
+        for idx, fi in enumerate(self.fit_results):
+            color = self.gui.ax_fit._get_lines.get_next_color()
+            r = fi[1]
+            x = r.userkws['x']
+            y = r.eval(params=r.params, x=x)
+            self.gui.ax_fit.plot(x,y, '-', color=color)
+            self.gui.ax_fit.plot(x, r.data, 'o', color=color, markersize=3.5)
+            self.gui.fig_fit.tight_layout()
+            self.gui.canvas_fit.draw()
 
     def save_plot(self, filepath):
         plt.ioff()
@@ -745,16 +683,23 @@ class PlotDataNoQt:
         fig.savefig(filepath)
         plt.ion()
 
+    @property
+    def info_text(self):
+        return self._info_text
+
+    def update_info_text(self, info_text):
+        self._info_text = info_text
+        self.gui.update_info_text(info_text)
+
 class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
 
     def __init__(self, title=None, parent=None, plot_data_no_qt=None):
-        super(PlotDataQt, self).__init__(parent)
+        super(PlotDataQt, self).__init__(parent=parent)
         self.plot_data_no_qt = plot_data_no_qt
         self.setupUi(self)
         self.init_gui()
         title = '' if title is None else title
         self.setWindowTitle(title)
-        self.show()
 
     update_x_axis_parameter_comboBox_signal = pyqtSignal()
     clear_signal = pyqtSignal()
@@ -767,6 +712,7 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
     update_fit_select_table_data_signal = pyqtSignal(collections.OrderedDict)
     update_fit_select_table_selected_rows_signal = pyqtSignal(list)
     update_fit_result_table_data_signal = pyqtSignal(collections.OrderedDict)
+    update_info_text_signal = pyqtSignal(str)
 
     def clear(self):
         self.clear_signal.emit()
@@ -782,10 +728,16 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
             getattr(self, item[0]).blockSignals(True)
             getattr(getattr(self, item[0]), item[1])()
             getattr(self, item[0]).blockSignals(False)
-        self.fig.clf()
-        self.canvas.draw()
-        self.fig_fit.clf()
-        self.canvas_fit.draw()
+        try:
+            self.fig.clf()
+            self.canvas.draw()
+        except:
+            pass
+        try:
+            self.fig_fit.clf()
+            self.canvas_fit.draw()
+        except:
+            pass
 
     def update_x_axis_parameter_comboBox(self):
         self.update_x_axis_parameter_comboBox_signal.emit()
@@ -827,7 +779,6 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
         self.parameter_table.blockSignals(False)
 
     def update_observation_list_data(self, observation_list_data):
-        print(observation_list_data)
         self.update_observation_list_data_signal.emit(observation_list_data)
 
     def update_observation_list_data_signal_emitted(self, observation_list_data):
@@ -912,6 +863,12 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
             self.fit_result_table.append_to_column_parameters(column_name, val)
         self.fit_result_table.blockSignals(False)
 
+    def update_info_text(self, info_text):
+        self.update_info_text_signal.emit(info_text)
+
+    def update_info_text_signal_emitted(self, info_text):
+        self.info.setPlainText(info_text)
+
     def init_gui(self):
         for name in [
             'clear',
@@ -922,7 +879,8 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
             'update_observation_list_selected_indices',
             'update_fit_select_table_data',
             'update_fit_select_table_selected_rows',
-            'update_fit_result_table_data'
+            'update_fit_result_table_data',
+            'update_info_text'
         ]:
             getattr(getattr(self, "{}_signal".format(name)), 'connect')(getattr(self, "{}_signal_emitted".format(name)))
 
@@ -954,9 +912,7 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
 
         self.update_plot_button.clicked.connect(self.plot_data_no_qt.update_plot)
         self.update_fit_result_button.clicked.connect(self.plot_data_no_qt.update_plot_fit)
-        # self.update_fit_select_table_and_plot_signal.connect(self.update_fit_select_table_and_plot)
         self.update_plot_button.setAcceptDrops(True)
-        # self.update_fit_result_button.clicked.connect(self.update_fit_result_table)
         # self.parameter_tab.setCurrentIndex(0)
 
         self.parameter_table.hdf_file_dropped.connect(self.plot_data_no_qt.set_data_from_path)
@@ -967,17 +923,85 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
 
         self.x_axis_parameter_comboBox.currentIndexChanged.connect(self.update_x_axis_parameteter_from_comboBox)
 
+    def show_gui(self):
+        self.show_signal.emit()
+
+    def close_gui(self):
+        self.close_signal.emit()
+
     def open_measurement_code(self):
-        if hasattr(self.data, 'hdf_filepath'):
-            subprocess.Popen(r"start {}/meas_code.py".format(os.path.dirname(self.data.hdf_filepath)), shell=True)
+        if hasattr(self.plot_data_no_qt.data, 'hdf_filepath'):
+            subprocess.Popen(r"start {}/meas_code.py".format(os.path.dirname(self.plot_data_no_qt.data.hdf_filepath)), shell=True)
         else:
             print('No filepath.')
 
     def open_explorer(self):
-        if hasattr(self.data, 'hdf_filepath'):
-            subprocess.Popen("explorer {}".format(os.path.abspath(os.path.dirname(self.data.hdf_filepath))), shell=True)
+        if hasattr(self.plot_data_no_qt.data, 'hdf_filepath'):
+            subprocess.Popen("explorer {}".format(os.path.abspath(os.path.dirname(self.plot_data_no_qt.data.hdf_filepath))), shell=True)
         else:
             print('No filepath.')
+
+
+
+def cpd():
+    import threading
+    from PyQt5 import QtGui
+    # app = QtGui.QApplication(sys.argv)
+    out = PlotData()
+    def run():
+
+        for fn in os.listdir(os.getcwd()):
+            if fn.endswith('.hdf'):
+                out.set_data_from_path(fn)
+        out.gui.show_gui()
+
+    # out.x_axis_parameter = 'LO_frequency'
+    t = threading.Thread(target=run)
+    t.start()
+    # return out
+
+def subfolders_with_hdf(folder):
+    l = []
+    for root, dirs, files in os.walk(folder):
+        for file in files:
+            if file.endswith(".hdf"):
+                l.append(root)
+    return l
+
+def number_of_points_of_hdf_files_in_subfolders(folder):
+    l = subfolders_with_hdf(folder)
+    out_openable = []
+    out_failed = []
+    for subdir in l:
+        for root, dirs, files in os.walk(subdir):
+            for file in files:
+                if file.endswith(".hdf"):
+                    try:
+                        d = Data(iff=os.path.join(root, file))
+                        out_openable.append({'root': root, 'file': file, 'points': len(d.df)})
+                    except:
+                        out_failed.append({'root': root, 'file': file})
+    return out_openable, out_failed
+
+def hdf_files_in_subfolders_with_less_than_n_points(folder, n):
+    out_openable, out_failed = number_of_points_of_hdf_files_in_subfolders(folder)
+    out_smaller = [i for i in out_openable if i['points'] < n]
+    out_larger_equal = [i for i in out_openable if i['points'] >= n]
+    return out_smaller, out_larger_equal, out_failed
+
+def move_folder(folder_list_dict=None, destination_folder=None):
+    import shutil
+    failed=0
+    for i in folder_list_dict:
+        try:
+            src = i['root']
+            dst = os.path.join(destination_folder, os.path.basename(i['root']))
+            shutil.move(src, dst)
+        except:
+            failed +=1
+            print("Folder {} could not be moved. Lets hope it has tbc in its name".format(i['root']))
+    print("Successfully moved: {}. Failed: {}".format(len(folder_list_dict)- failed, failed))
+
 
 if __name__ == '__main__':
     from qutip_enhanced import *

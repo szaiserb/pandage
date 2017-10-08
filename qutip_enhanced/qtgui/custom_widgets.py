@@ -65,7 +65,7 @@ class QTableWidgetEnhanced(QTableWidget):
         delta_n_row = len(parameters) - self.rowCount()
         if delta_n_row > 0:
             self.add_rows(delta_n_row)
-        for row_idx, new_param in zip(len(parameters) - len(new_params) + np.arange(0, len(parameters)), new_params):
+        for row_idx, new_param in zip(len(cd) + np.arange(0, len(parameters)), new_params):
             self.item(row_idx, self.column_index(column_name)).setText(str(new_param))
             self.item(row_idx, self.column_index(column_name)).setData(0x0100, new_param)
             self.item(row_idx, self.column_index(column_name)).setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
