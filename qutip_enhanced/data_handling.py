@@ -553,7 +553,7 @@ class PlotData:
 
     def update_selected_plot_items(self):
         out = self.parameter_table_selected_data
-        if all([len(i) == 0 for i in out]):
+        if all([len(i) == 0 for i in out.values()]):
             self._selected_plot_items = []
             return
         for key, val in out.items():
@@ -592,7 +592,7 @@ class PlotData:
         return self._fit_results
 
     def update_fit_results(self):
-        spi = self.line_plot_data
+        spi = self.line_plot_data()
         if self.fit_function == 'cosine':
             mod = lmfit_models.CosineModel()
         elif self.fit_function == 'exp':
@@ -631,8 +631,6 @@ class PlotData:
         # TODO: wont work for dates as can not be averaged
         return out.groupby([key for key, val in condition_dict.items() if val != '__average__']).agg({observation_name: np.mean}).reset_index()
 
-
-    @property
     def line_plot_data(self):
         plot_data = []
         if len(self.data.df) > 0:
@@ -652,7 +650,7 @@ class PlotData:
         except:
             pass
         self.gui.ax = self.gui.fig.add_subplot(111)
-        for idx, pdi in enumerate(self.line_plot_data):
+        for idx, pdi in enumerate(self.line_plot_data()):
             self.gui.ax.plot(pdi['x'], pdi['y'], '-')
         self.gui.fig.tight_layout()
         self.gui.canvas.draw()

@@ -64,11 +64,18 @@ class QTableWidgetEnhanced(QTableWidget):
         new_params = [i for i in parameters if i not in cd]
         delta_n_row = len(parameters) - self.rowCount()
         if delta_n_row > 0:
+            rc_old = self.rowCount()
             self.add_rows(delta_n_row)
-        for row_idx, new_param in zip(len(cd) + np.arange(0, len(parameters)), new_params):
-            self.item(row_idx, self.column_index(column_name)).setText(str(new_param))
-            self.item(row_idx, self.column_index(column_name)).setData(0x0100, new_param)
-            self.item(row_idx, self.column_index(column_name)).setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+            print("RowCount", rc_old, self.rowCount(), delta_n_row, len(parameters), column_name)
+        for ridx, new_param in zip(len(cd) + np.arange(0, len(parameters)), new_params):
+            cidx = self.column_index(column_name)
+            if self.item(ridx, cidx) == None:
+                print("SOMETHING IS WEIRD:\n")
+                print(ridx, cidx, new_param, "delta_n_row: ", delta_n_row, cd)
+            else:
+                self.item(ridx, cidx).setText(str(new_param))
+                self.item(ridx, cidx).setData(0x0100, new_param)
+                self.item(ridx, cidx).setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
 
     def set_column_flags(self, column_name, flag):
         for row in range(self.rowCount()):
