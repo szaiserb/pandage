@@ -6,8 +6,6 @@ import numpy as np
 from qutip import basis, tensor, ket2dm, sigmax, sigmay, sigmaz, expect
 import itertools
 
-
-
 import matplotlib.pyplot as plt
 
 def purity(dm):
@@ -16,9 +14,8 @@ def purity(dm):
     comb = list(itertools.chain.from_iterable(itertools.combinations(s, r) for r in range(len(s) + 1)))[1:]
     return dict((i, ((dm.ptrace(i)) ** 2).tr()) for i in comb)
 
-def test_states(gate, pure=False, **kwargs):
-    dims = gate.dims[0]
-    out = {}
+def test_states(gate=None, pure=False, dims=None, **kwargs):
+    dims = gate.dims[0] if dims is None else dims
     test_states_single = dict(
         x=basis(2, 0) + basis(2, 1),
         xm=basis(2, 0) - basis(2, 1),
@@ -28,12 +25,27 @@ def test_states(gate, pure=False, **kwargs):
         zm=basis(2, 1),
     )
 
+    def names_multi_str_to_list(names_multi):
+        out = list()
+        while len(names_multi) > 0:
+            if names_multi[-1] == 'm':
+                out.append(names_multi[-2:])
+                names_multi = names_multi[:-2]
+            else:
+                out.append(names_multi[-1])
+                names_multi = names_multi[:-1]
+        return tuple(out[::-1])
+
     if 'names_multi_list' in kwargs:
         names_multi_list = kwargs.get('names_multi_list')
+
     else:
         names_single = kwargs.get('names_single', ['x', 'xm', 'y', 'ym', 'z', 'zm'])
         names_multi_list = itertools.product(*[names_single] * len(dims))
-    for names_multi in names_multi_list:
+    out = {}
+    for idx, names_multi in enumerate(names_multi_list):
+        if type(names_multi) in [str]:
+            names_multi = names_multi_str_to_list(names_multi)
         name_multi = "".join(names_multi)
         out[name_multi] = tensor(*[test_states_single[name] for name in names_multi]).unit()
         if not pure:

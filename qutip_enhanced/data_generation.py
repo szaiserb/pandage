@@ -179,7 +179,6 @@ class DataGeneration:
             traceback.print_exception(exc_type, exc_value, exc_tb)
         return save_dir
 
-
     @property
     def save_dir_tmp(self):
         save_dir_tmp = "{}/tmp".format(self.save_dir)
@@ -190,6 +189,17 @@ class DataGeneration:
                 raise
         return save_dir_tmp
 
+    def make_save_location_params(self, script_path, **kwargs):
+        self.file_name = str(os.path.splitext(os.path.basename(script_path))[0])
+        folder = kwargs['folder'] if 'folder' in kwargs else os.path.dirname(os.path.dirname(script_path))
+        if 'sub_folder_kw' in kwargs:
+            fnl = script_path.split('\\')
+            fnl = fnl[fnl.index(kwargs['sub_folder_kw']) + 1:]
+            fnl[-1] = fnl[-1].split('.')[0]
+            subfolder = "/".join(fnl)
+            self.file_path = str(os.path.join(folder, subfolder))
+        else:
+            self.file_path = str(folder)
 
     def save_qutip_enhanced(self, destination_dir):
         src = r'D:\Python\qutip_enhanced\qutip_enhanced'
@@ -209,7 +219,7 @@ class DataGeneration:
             self.pld.save_plot("{}plot.png".format(fpp))
         except:
             pass
-        if self.file_notes != '':
+        if hasattr(self, 'file_notes'):
             with open("{}notes.dat".format(fpp), "w") as text_file:
                 text_file.write(self.file_notes)
         if self.meas_code != '':

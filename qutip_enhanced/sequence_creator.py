@@ -13,6 +13,7 @@ import lmfit.lineshapes
 import collections
 import traceback
 from .qutip_enhanced import coordinates
+from qutip import Qobj
 
 
 class pd(dict):
@@ -408,19 +409,21 @@ class Arbitrary:
 
 
 class Wait(Arbitrary):
-    def __init__(self, t_wait, time_digitization=1 / 12e3, n_bins_wait=1, control='wait'):
+    def __init__(self, t, time_digitization=1 / 12e3, n_bins=1, control='wait'):
         self.column_dict = {control: [0]}
-        self.n_bins_wait = n_bins_wait
+        self.control = control
+        self._sequence = getattr(self, '_sequence', [[self.control]] * n_bins)
         self.time_digitization = time_digitization
-        self.set_t_wait(t_wait)
+        self.set_t(t)
 
-    def set_t_wait(self, val):
-        self.t_wait = np.around(
-            val / (self.n_bins_wait * self.time_digitization)) * self.n_bins_wait * self.time_digitization
+
+    def set_t(self, val):
+        self.t = np.around(
+            val / (self.n_bins * self.time_digitization)) * self.n_bins * self.time_digitization
 
     @property
     def sequence(self):
-        return getattr(self, '_sequence', [['wait']] * self.n_bins_wait)
+        return self._sequence
 
     @property
     def fields_full(self):
@@ -428,7 +431,7 @@ class Wait(Arbitrary):
 
     @property
     def times_full(self):
-        return getattr(self, '_times_full', np.array([self.t_wait / float(self.n_bins_wait)] * self.n_bins_wait))
+        return getattr(self, '_times_full', np.array([self.t / float(self.n_bins)] * self.n_bins))
 
 
 class Rabi(Arbitrary):
@@ -1077,11 +1080,11 @@ class DDDegen(Arbitrary):
 
 
 def unitary_propagator(length_mus, h_mhz, fields, L_Bc):
-    return (-1j * 2 * np.pi * length_mus * (h_mhz + sum(omega*Bc for omega, Bc in zip(fields, L_Bc)))).expm()
-
+    return (-1j*length_mus*(2*np.pi*h_mhz + sum(omega*Bc for omega, Bc in zip(fields, L_Bc)))).expm()
 
 def unitary_propagator_list(h_mhz, times_full, fields_full, L_Bc):
     u_list = []
+    L_Bc = [Qobj(i, dims=h_mhz.dims) for i in L_Bc]
     for t, c_l in zip(times_full, fields_full):
         u_list.append(
             unitary_propagator(
@@ -1093,19 +1096,19 @@ def unitary_propagator_list(h_mhz, times_full, fields_full, L_Bc):
         )
     return u_list
 
-
 def unitary_propagator_list_mult(h_mhz, times_full, fields_full, L_Bc):
+    L_Bc = [Qobj(i, dims=h_mhz.dims) for i in L_Bc]
     def u(i):
-        unitary_propagator(
+        return unitary_propagator(
             length_mus=times_full[i],
             h_mhz=h_mhz,
             fields=fields_full[i],
-            L_Bc=L_Bc
+            L_Bc=L_Bc,
         )
 
     u_list_mult = [u(len(times_full)-1)]
-    for i in range(len(times_full)[-2::-1]):
+    for i in range(len(times_full))[-2::-1]:
         u_list_mult.append(
-            u(i)
+            u_list_mult[-1]*u(i)
         )
     return u_list_mult

@@ -819,8 +819,8 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
             self.observation_widget.item(i).setSelected(True)
         self.observation_widget.blockSignals(False)
 
-    def update_observation_list_selected_indicess_from_gui(self):
-        self.plot_data_no_qt.update_obervation_list_selected_indices([i.row() for i in self.observation_widget.selectedIndexes()])
+    def update_observation_list_selected_indices_from_gui(self):
+        self.plot_data_no_qt.update_observation_list_selected_indices([i.row() for i in self.observation_widget.selectedIndexes()])
 
     def update_fit_select_table_data(self, fit_select_table_data):
         self.update_fit_select_table_data_signal.emit(fit_select_table_data)
@@ -916,6 +916,7 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
         self.parameter_table.hdf_file_dropped.connect(self.plot_data_no_qt.set_data_from_path)
         self.parameter_table.itemSelectionChanged.connect(self.update_parameter_table_selected_indices_from_gui)
         self.fit_select_table.itemSelectionChanged.connect(self.update_fit_select_table_selected_rows_from_gui)
+        self.observation_widget.itemSelectionChanged.connect(self.update_observation_list_selected_indices_from_gui)
         self.open_code_button.clicked.connect(self.open_measurement_code)
         self.open_explorer_button.clicked.connect(self.open_explorer)
 
