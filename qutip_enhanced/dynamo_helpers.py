@@ -137,9 +137,9 @@ def ensemble(base, weight_base=None):
 
 class DynPython(sequence_creator.Arbitrary):
 
-    def __init__(self, dynamo_path, initial, final, dims=None, use_engine=None, print_flag=True):
+    def __init__(self, dynamo_path, initial, final, dims=None, print_flag=True, **kwargs):
         self.dims = dims
-        self.eng = self.get_eng(use_engine=use_engine)
+        self.eng = self.get_eng(**kwargs)
         self.dynamo_path = dynamo_path
         self.out = StringIO()
         self.err = StringIO()
@@ -148,7 +148,7 @@ class DynPython(sequence_creator.Arbitrary):
         self.final = final
         self.print_flag = print_flag
 
-    def get_eng(self, use_engine=None):
+    def get_eng(self, use_engine=None, desktop=False):
         if type(use_engine) == matlab.engine.matlabengine.MatlabEngine:
             print('using existing engine {}'.format(use_engine.eval('matlab.engine.engineName')))
             return use_engine
@@ -164,7 +164,10 @@ class DynPython(sequence_creator.Arbitrary):
             if not n in mdp:
                 break
         name = "dpe{}".format(n) if use_engine is None else use_engine
-        eng = matlab.engine.start_matlab()
+        if desktop:
+            eng = matlab.engine.start_matlab("-desktop")
+        else:
+            eng = matlab.engine.start_matlab()
         eng.eval("matlab.engine.shareEngine('{}')".format(name), nargout=0)
         print('started matlab engine {}'.format(name))
         return eng
@@ -198,6 +201,10 @@ class DynPython(sequence_creator.Arbitrary):
         self.eng.workspace[str("dyn")] = self._dyn
         self.print_out()
 
+    @property
+    def n_ensemble(self):
+        return int(self.eng.eval("dyn.system.n_ensemble"))
+
     def set_labels(self, title, c_labels):
         self.eng.eval(str("dyn.system.set_labels('{}', {}, {{{}}})").format(title, self.dims, ", ".join("'{}'".format(i) for i in c_labels)), stdout=self.out, stderr=self.err, nargout=0)
 
@@ -212,6 +219,16 @@ class DynPython(sequence_creator.Arbitrary):
         fields = matlab.double(np.array(fields, dtype=np.complex64).tolist(), is_complex=True)
         self.eng.set_controls(self.dyn, fields, stdout=self.out, stderr=self.err, nargout=0)
         self.print_out()
+
+    def set_projector(self, bin, P=None, n_ens=None, clear_workspace=True):
+        self.eng.workspace["Projector_from_python"] = matlab.double(np.array(P, dtype=np.complex64).tolist(), is_complex=True)
+        # n_ens_list = range(1, self.n_ensemble+1) if n_ens is None else [n_ens+1]
+        n_ens_list = range(1, self.n_ensemble+1) if n_ens is None else [n_ens+1]
+        for n_ens in n_ens_list:
+            self.eng.eval("dyn.cache.set_P({}, {}, Projector_from_python)".format(bin+1, n_ens), nargout=0)
+        # if clear_workspace:
+        #     self.eng.eval("clear({Projector_from_python})", nargout=0)
+
 
     def open_ui(self):
         self.eng.ui_open(self.dyn, nargout=0)
