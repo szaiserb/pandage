@@ -475,7 +475,7 @@ class PlotData:
         return [i for i in data.parameter_names if not '_idx' in i]
 
     def x_axis_parameter_with_largest_dim(self):
-        return self.data.parameter_names[np.argmax([len(getattr(self.data.df, p).unique()) for p in self.x_axis_parameter_list])]
+        return self.x_axis_parameter_list[np.argmax([len(getattr(self.data.df, p).unique()) for p in self.x_axis_parameter_list])]
 
     @property
     def parameter_table_data(self):
@@ -940,12 +940,20 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
         else:
             print('No filepath.')
 
-
-
 def cpd():
     import threading
     from PyQt5 import QtGui
     # app = QtGui.QApplication(sys.argv)
+    out = PlotData()
+    for fn in os.listdir(os.getcwd()):
+        if fn.endswith('.hdf'):
+            out.set_data_from_path(fn)
+        out.gui.show_gui()
+    return out
+
+
+def cpd_thread():
+    import threading
     out = PlotData()
     def run():
 
@@ -954,10 +962,9 @@ def cpd():
                 out.set_data_from_path(fn)
         out.gui.show_gui()
 
-    # out.x_axis_parameter = 'LO_frequency'
     t = threading.Thread(target=run)
     t.start()
-    # return out
+
 
 def subfolders_with_hdf(folder):
     l = []
