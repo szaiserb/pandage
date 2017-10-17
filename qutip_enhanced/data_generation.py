@@ -19,8 +19,6 @@ import qutip_enhanced.analyze as qta; reload(qta)
 import os
 import itertools
 import collections
-from PyQt5.QtWidgets import QWidget
-from PyQt5.QtCore import pyqtSignal, QObject
 import datetime
 
 
@@ -110,7 +108,7 @@ class DataGeneration:
     def init_data(self, init_from_file=None, iff=None, move_folder=True):
         init_from_file = iff if iff is not None else init_from_file
         self.init_from_file = init_from_file
-        self.pld.data = data_handling.Data(
+        self.pld._data = data_handling.Data(
             parameter_names=self.parameters.keys() + [self.parameters.keys()[i]+'_idx' for i in range(len(self.parameters.keys()))],
             observation_names=self.observation_names,
             dtypes=self.dtypes,
@@ -155,8 +153,6 @@ class DataGeneration:
             self.current_indices_dict_list = [collections.OrderedDict([("{}_idx".format(key), pidx[i]) for i, key in enumerate(self.parameters.keys())]) for pidx in self.pidx_l]
             l = [collections.OrderedDict(i.items() + j.items()) for i, j in zip(self.current_parameters_dict_list, self.current_indices_dict_list)]
             self.data.append(l)
-            import time
-            time.sleep(1)
             self.update_current_str()
             yield l
         self._progress = len(self.iterator_list_done) / np.prod([len(i) for i in self.parameters.values()])
@@ -190,6 +186,7 @@ class DataGeneration:
         return save_dir_tmp
 
     def make_save_location_params(self, script_path, **kwargs):
+        script_path = os.path.abspath(script_path)
         self.file_name = str(os.path.splitext(os.path.basename(script_path))[0])
         folder = kwargs['folder'] if 'folder' in kwargs else os.path.dirname(os.path.dirname(script_path))
         if 'sub_folder_kw' in kwargs:

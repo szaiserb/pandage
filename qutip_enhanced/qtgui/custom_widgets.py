@@ -63,10 +63,14 @@ class QTableWidgetEnhanced(QTableWidget):
         cd = self.column_data(column_name)
         new_params = [i for i in parameters if i not in cd]
         delta_n_row = len(parameters) - self.rowCount()
+        # print('dncn_row_cd', column_name, delta_n_row, cd, parameters)
+        # print('rc_np', self.rowCount(), new_params)
         if delta_n_row > 0:
             rc_old = self.rowCount()
             self.add_rows(delta_n_row)
-            print("RowCount", rc_old, self.rowCount(), delta_n_row, len(parameters), column_name)
+            # print("RowCount", rc_old, self.rowCount(), delta_n_row, len(parameters), column_name)
+        # else:
+            # print("LOWER", self.rowCount(), delta_n_row, len(parameters), column_name, parameters)
         for ridx, new_param in zip(len(cd) + np.arange(0, len(parameters)), new_params):
             cidx = self.column_index(column_name)
             if self.item(ridx, cidx) == None:

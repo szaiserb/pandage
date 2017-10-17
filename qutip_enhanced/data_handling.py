@@ -391,9 +391,15 @@ def recompile_plotdata_ui_file():
 
 class PlotData:
 
-    def __init__(self, title=None, parent=None):
+    def __init__(self, title=None, parent=None, gui=True, **kwargs):
         super(PlotData, self).__init__()
-        self._gui = PlotDataQt(plot_data_no_qt=self, title=title, parent=parent)
+        if gui:
+            self._gui = PlotDataQt(plot_data_no_qt=self, title=title, parent=parent)
+            self.gui.show()
+        if 'path' in kwargs:
+            self.set_data_from_path(path=kwargs['path'])
+        elif 'data' in kwargs:
+            self.data = kwargs['data']
 
     fit_function = 'cosine'
     show_legend = False
@@ -413,24 +419,26 @@ class PlotData:
     @data.setter
     def data(self, val):
         self.delete_attributes()
-        self.gui.clear()
+        if hasattr(self, '_gui'):
+            self.gui.clear()
         self._data = val
+        self.new_data_arrived()
+
+    def new_data_arrived(self):
+
         self.update_x_axis_parameter_list()
         self.update_parameter_table_data()
         self.update_parameter_table_selected_indices()
         self.update_observation_list_data()
         self.update_observation_list_selected_indices()
-        self.update_plot()
-        self.update_fit_select_table_data()
-        self.update_fit_select_table_selected_rows()
-        self.update_fit_results()
-        self.update_plot_fit()
-
-    def new_data_arrived(self):
-        self.update_x_axis_parameter_list()
-        self.update_parameter_table_data()
-        self.update_observation_list_data()
-        self.update_plot()
+        if len(self.data.df) < 5000:
+            self.update_plot()
+    #
+    # def new_data_arrived(self):
+    #     self.update_x_axis_parameter_list()
+    #     self.update_parameter_table_data()
+    #     self.update_observation_list_data()
+    #     self.update_plot()
 
     def delete_attributes(self):
         for attr_name in [
@@ -458,7 +466,8 @@ class PlotData:
     def x_axis_parameter(self, val):
         if getattr(self, '_x_axis_parameter', None) != val:
             self._x_axis_parameter = val
-            self.gui.update_x_axis_parameter_comboBox()
+            if hasattr(self, '_gui'):
+                self.gui.update_x_axis_parameter_comboBox()
 
     @property
     def x_axis_parameter_list(self):
@@ -468,7 +477,8 @@ class PlotData:
         self._x_axis_parameter_list = [cn for cn in self.parameter_names_reduced() if cn in self.data.df._get_numeric_data().columns]
         if not hasattr(self, '_x_axis_parameter') or (self.x_axis_parameter not in self.x_axis_parameter_list and len(self.x_axis_parameter_list)>0):
             self._x_axis_parameter = self.x_axis_parameter_with_largest_dim()
-        self.gui.update_x_axis_parameter_comboBox()
+        if hasattr(self, '_gui'):
+            self.gui.update_x_axis_parameter_comboBox()
 
     def parameter_names_reduced(self, data=None):
         data = self.data if data is None else data
@@ -484,12 +494,13 @@ class PlotData:
 
     def update_parameter_table_data(self):
         ptd = collections.OrderedDict()
-        ptd_new = collections.OrderedDict()
+        # ptd_new = collections.OrderedDict()
         for cn in self.parameter_names_reduced():
             ptd[cn] = getattr(self.data.df, cn).unique()
-            ptd_new[cn] = [i for i in ptd[cn] if i not in self.parameter_table_data[cn]]
+            # ptd_new[cn] = [i for i in ptd[cn] if i not in self.parameter_table_data[cn]]
         self._parameter_table_data = ptd
-        self.gui.update_parameter_table_data(ptd_new)
+        if hasattr(self, '_gui'):
+            self.gui.update_parameter_table_data(parameter_table_data=self.parameter_table_data)
 
     @property
     def observation_list_data(self):
@@ -498,7 +509,8 @@ class PlotData:
     def update_observation_list_data(self):
         if not hasattr(self, '_observation_list_data'):
             self._observation_list_data = self.observation_names_reduced()
-            self.gui.update_observation_list_data(self.observation_list_data)
+            if hasattr(self, '_gui'):
+                self.gui.update_observation_list_data(self.observation_list_data)
         elif self.observation_list_data != self.observation_names_reduced():
             raise Exception('Error: Data of observation list must not be changed after data was given to PlotData.', self.observation_list_data, self.observation_names_reduced())
 
@@ -508,7 +520,8 @@ class PlotData:
 
     def update_observation_list_selected_indices(self, val=None):
         self._observation_list_selected_indices = [0] if val is None else val
-        self.gui.update_observation_list_selected_indices(self.observation_list_selected_indices)
+        if hasattr(self, '_gui'):
+            self.gui.update_observation_list_selected_indices(self.observation_list_selected_indices)
 
     @property
     def observation_list_selected_data(self):
@@ -521,20 +534,21 @@ class PlotData:
     def parameter_table_selected_indices(self):
         return self._parameter_table_selected_indices
 
-    def update_parameter_table_selected_indices(self, parameter_table_selected=None):
-        if parameter_table_selected is None:
+    def update_parameter_table_selected_indices(self, parameter_table_selected_indices=None):
+        if parameter_table_selected_indices is None:
             # if len(self.data.df) > 1000:
             #     self._parameter_table_selected_data = collections.OrderedDict([(key, []) for key, val in self.parameter_table_data.items()])
             #     return
             self._parameter_table_selected_indices = collections.OrderedDict([(key, []) if key in ['sweeps', self.x_axis_parameter] else (key, '__all__') for key, val in self.parameter_table_data.items()])
-        elif not isinstance(parameter_table_selected, collections.OrderedDict):
-            raise Exception(type(parameter_table_selected), parameter_table_selected)
+        elif not isinstance(parameter_table_selected_indices, collections.OrderedDict):
+            raise Exception(type(parameter_table_selected_indices), parameter_table_selected_indices)
         else:
             out = collections.OrderedDict([(key, []) if key in ['sweeps', self.x_axis_parameter] else (key, []) for key, val in self.parameter_table_data.items()])
-            for cn, val in parameter_table_selected.items():
+            for cn, val in parameter_table_selected_indices.items():
                 out[cn] = val
             self._parameter_table_selected_indices = out
-        self.gui.update_parameter_table_selected_indices(self.parameter_table_selected_indices)
+        if hasattr(self, '_gui'):
+            self.gui.update_parameter_table_selected_indices(self.parameter_table_selected_indices)
 
     @property
     def parameter_table_selected_data(self):
@@ -546,6 +560,18 @@ class PlotData:
             else:
                 out[cn] = [data_full[i] for i in val]
         return out
+
+    def update_parameter_table_selected_data(self, parameter_table_selected_data):
+        out = collections.OrderedDict()
+        for cn, val in parameter_table_selected_data.items():
+            if val in ['__all__', '__average__']:
+                out[cn] = val
+            else:
+                indices = []
+                for i in val:
+                    indices.append(np.where(self.parameter_table_data[cn] == i)[0][0])
+                out[cn] = indices
+        self.update_parameter_table_selected_indices(out)
 
     @property
     def selected_plot_items(self):
@@ -577,15 +603,17 @@ class PlotData:
             if len(cpd[column_name]) == 0:
                 del cpd[column_name]
         self._fit_select_table_data = cpd
-        self.gui.update_fit_select_table_data(self.fit_select_table_data)
+        if hasattr(self, '_gui'):
+            self.gui.update_fit_select_table_data(self.fit_select_table_data)
 
     @property
     def fit_select_table_selected_rows(self):
         return self._fit_select_table_selected_rows
 
     def update_fit_select_table_selected_rows(self, fit_select_table_selected_rows=None):
-        self._fit_select_table_selected_rows = [] if fit_select_table_selected_rows is None else fit_select_table_selected_rows #self.fit_select_table.selected_items_unique_column_indices()
-        self.gui.update_fit_select_table_selected_rows(self.fit_select_table_selected_rows)
+        self._fit_select_table_selected_rows = [] if fit_select_table_selected_rows is None else fit_select_table_selected_rows  # self.fit_select_table.selected_items_unique_column_indices()
+        if hasattr(self, '_gui'):
+            self.gui.update_fit_select_table_selected_rows(self.fit_select_table_selected_rows)
 
     @property
     def fit_results(self):
@@ -599,7 +627,6 @@ class PlotData:
             pass
         self._fit_results = []
         for idx in self.fit_select_table_selected_rows:
-            print("idx", idx)
             i = spi[idx]
             try:
                 params = mod.guess(data=i['y'], x=i['x'])
@@ -624,7 +651,8 @@ class PlotData:
                 for key, val in fri[0]['condition_dict_reduced'].items() + [('observation_name', fri[0]['observation_name'])] + [(key, val.value) for key, val in fri[1].params.items()]:
                     out[key].append(val)
         self._fit_result_table_data = out
-        self.gui.update_fit_result_table_data(self.fit_result_table_data)
+        if hasattr(self, '_gui'):
+            self.gui.update_fit_result_table_data(self.fit_result_table_data)
 
     def ret_line_plot_data_single(self, condition_dict, observation_name):
         out = self.data.df[functools.reduce(np.logical_and, [self.data.df[key] == val for key, val in condition_dict.items() if val not in ['__all__', '__average__']])]
@@ -639,35 +667,44 @@ class PlotData:
                 for observation_name in self.observation_list_selected_data:
                     dfxy = self.ret_line_plot_data_single(condition_dict, observation_name)
                     condition_dict_reduced = collections.OrderedDict([(key, val) for key, val in condition_dict.items() if val not in ['__average__', '__all__']])
-                    plot_data.append(dict(condition_dict_reduced=condition_dict_reduced, observation_name=observation_name, x=getattr(dfxy, self.x_axis_parameter), y=getattr(dfxy, observation_name)))
+                    plot_data.append(
+                        dict(
+                            condition_dict_reduced=condition_dict_reduced,
+                            observation_name=observation_name,
+                            x=getattr(dfxy, self.x_axis_parameter),
+                            y=getattr(dfxy, observation_name)
+                        )
+                    )
         return plot_data
 
     def update_plot(self):
         self.update_selected_plot_items()
         self.update_fit_select_table_data()
-        try:
-            self.gui.fig.clear()
-        except:
-            pass
-        self.gui.ax = self.gui.fig.add_subplot(111)
-        for idx, pdi in enumerate(self.line_plot_data()):
-            self.gui.ax.plot(pdi['x'], pdi['y'], '-')
-        self.gui.fig.tight_layout()
-        self.gui.canvas.draw()
+        if hasattr(self, '_gui'):
+            try:
+                self.gui.fig.clear()
+            except:
+                pass
+            self.gui.ax = self.gui.fig.add_subplot(111)
+            for idx, pdi in enumerate(self.line_plot_data()):
+                self.gui.ax.plot(pdi['x'], pdi['y'], '-')
+            self.gui.fig.tight_layout()
+            self.gui.canvas.draw()
 
     def update_plot_fit(self):
         self.update_fit_results()
-        self.gui.fig_fit.clear()
-        self.gui.ax_fit = self.gui.fig_fit.add_subplot(111)
-        for idx, fi in enumerate(self.fit_results):
-            color = self.gui.ax_fit._get_lines.get_next_color()
-            r = fi[1]
-            x = r.userkws['x']
-            y = r.eval(params=r.params, x=x)
-            self.gui.ax_fit.plot(x,y, '-', color=color)
-            self.gui.ax_fit.plot(x, r.data, 'o', color=color, markersize=3.5)
-            self.gui.fig_fit.tight_layout()
-            self.gui.canvas_fit.draw()
+        if hasattr(self, '_gui'):
+            self.gui.fig_fit.clear()
+            self.gui.ax_fit = self.gui.fig_fit.add_subplot(111)
+            for idx, fi in enumerate(self.fit_results):
+                color = self.gui.ax_fit._get_lines.get_next_color()
+                r = fi[1]
+                x = r.userkws['x']
+                y = r.eval(params=r.params, x=x)
+                self.gui.ax_fit.plot(x,y, '-', color=color)
+                self.gui.ax_fit.plot(x, r.data, 'o', color=color, markersize=3.5)
+                self.gui.fig_fit.tight_layout()
+                self.gui.canvas_fit.draw()
 
     def save_plot(self, filepath):
         plt.ioff()
@@ -687,7 +724,8 @@ class PlotData:
 
     def update_info_text(self, info_text):
         self._info_text = info_text
-        self.gui.update_info_text(info_text)
+        if hasattr(self, '_gui'):
+            self.gui.update_info_text(info_text)
 
 class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
 
@@ -752,16 +790,16 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
     def update_x_axis_parameteter_from_comboBox(self):
         self.plot_data_no_qt.x_axis_parameter = str(self.x_axis_parameter_comboBox.currentText())
 
-    def update_parameter_table_data(self, new_data):
-        self.update_parameter_table_data_signal.emit(new_data)
+    def update_parameter_table_data(self, parameter_table_data):
+        self.update_parameter_table_data_signal.emit(parameter_table_data)
 
-    def update_parameter_table_data_signal_emitted(self, new_data):
+    def update_parameter_table_data_signal_emitted(self, parameter_table_data):
         self.parameter_table.blockSignals(True)
         if self.parameter_table.columnCount() == 0:
-            header = new_data.keys()
+            header = parameter_table_data.keys()
             self.parameter_table.setColumnCount(len(header))
             self.parameter_table.setHorizontalHeaderLabels(header)
-        for column_name, val in new_data.items():
+        for column_name, val in parameter_table_data.items():
             self.parameter_table.append_to_column_parameters(column_name, val)
             self.update_parameter_table_item_flags()
         self.parameter_table.blockSignals(False)
@@ -941,14 +979,10 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
             print('No filepath.')
 
 def cpd():
-    import threading
-    from PyQt5 import QtGui
-    # app = QtGui.QApplication(sys.argv)
-    out = PlotData()
     for fn in os.listdir(os.getcwd()):
         if fn.endswith('.hdf'):
-            out.set_data_from_path(fn)
-        out.gui.show_gui()
+            out = PlotData(path=fn)
+            out.gui.show_gui()
     return out
 
 
@@ -1012,4 +1046,3 @@ def move_folder(folder_list_dict=None, destination_folder=None):
 if __name__ == '__main__':
     from qutip_enhanced import *
     self = dh.cpd()
-
