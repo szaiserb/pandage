@@ -425,7 +425,6 @@ class PlotData:
         self.new_data_arrived()
 
     def new_data_arrived(self):
-
         self.update_x_axis_parameter_list()
         self.update_parameter_table_data()
         self.update_parameter_table_selected_indices()
@@ -433,12 +432,6 @@ class PlotData:
         self.update_observation_list_selected_indices()
         if len(self.data.df) < 5000:
             self.update_plot()
-    #
-    # def new_data_arrived(self):
-    #     self.update_x_axis_parameter_list()
-    #     self.update_parameter_table_data()
-    #     self.update_observation_list_data()
-    #     self.update_plot()
 
     def delete_attributes(self):
         for attr_name in [
@@ -494,10 +487,8 @@ class PlotData:
 
     def update_parameter_table_data(self):
         ptd = collections.OrderedDict()
-        # ptd_new = collections.OrderedDict()
         for cn in self.parameter_names_reduced():
             ptd[cn] = getattr(self.data.df, cn).unique()
-            # ptd_new[cn] = [i for i in ptd[cn] if i not in self.parameter_table_data[cn]]
         self._parameter_table_data = ptd
         if hasattr(self, '_gui'):
             self.gui.update_parameter_table_data(parameter_table_data=self.parameter_table_data)
@@ -796,22 +787,23 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
     def update_parameter_table_data_signal_emitted(self, parameter_table_data):
         self.parameter_table.blockSignals(True)
         if self.parameter_table.columnCount() == 0:
-            header = parameter_table_data.keys()
-            self.parameter_table.setColumnCount(len(header))
-            self.parameter_table.setHorizontalHeaderLabels(header)
+            self.parameter_table.set_column_names(parameter_table_data.keys())
         for column_name, val in parameter_table_data.items():
-            self.parameter_table.append_to_column_parameters(column_name, val)
-            self.update_parameter_table_item_flags()
+            self.parameter_table.set_column(column_name, val)
+        self.update_parameter_table_item_flags()
         self.parameter_table.blockSignals(False)
 
     def update_parameter_table_item_flags(self):
         self.parameter_table.blockSignals(True)
         if hasattr(self.plot_data_no_qt, '_x_axis_parameter'):
-            for cn in self.parameter_table.column_names:
+            for cidx in range(self.parameter_table.columnCount()):
+                cn = self.parameter_table.column_name(cidx)
                 if cn == self.plot_data_no_qt.x_axis_parameter:
-                    self.parameter_table.set_column_flags(cn, Qt.NoItemFlags)
+                    flag = Qt.NoItemFlags
                 else:
-                    self.parameter_table.set_column_flags(cn, Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+                    flag = Qt.ItemIsSelectable | Qt.ItemIsEnabled
+                for ridx in self.parameter_table.column_data_indices(cn):
+                    self.parameter_table.set_cell(ridx, cidx, flag=flag)
         self.parameter_table.blockSignals(False)
 
     def update_observation_list_data(self, observation_list_data):
@@ -831,7 +823,7 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
         self.parameter_table.blockSignals(True)
         for cn, val in parameter_table_selected_indices.items():
             cidx = self.parameter_table.column_index(cn)
-            for ridx in range(self.parameter_table.n_rows(cn)):
+            for ridx in self.parameter_table.column_data_indices(cn):
                 if val == '__all__' or ridx in val:
                     self.parameter_table.item(ridx, cidx).setSelected(True)
                 else:
@@ -866,11 +858,9 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
     def update_fit_select_table_data_signal_emitted(self, fit_select_table_data):
         self.fit_select_table.blockSignals(True)
         self.fit_select_table.clear_table_contents()
-        header = fit_select_table_data.keys()
-        self.fit_select_table.setColumnCount(len(header))
-        self.fit_select_table.setHorizontalHeaderLabels(header)
+        self.fit_select_table.set_column_names(fit_select_table_data.keys())
         for column_name, val in fit_select_table_data.items():
-            self.fit_select_table.append_to_column_parameters(column_name, val)
+            self.fit_select_table.set_column(column_name, val, [Qt.ItemIsSelectable | Qt.ItemIsEnabled for _ in range(len(val))])
         self.fit_select_table.blockSignals(False)
 
     def update_fit_select_table_selected_rows_from_gui(self):
@@ -892,11 +882,9 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
     def update_fit_result_table_data_signal_emitted(self, fit_result_table_data):
         self.fit_result_table.blockSignals(True)
         self.fit_result_table.clear_table_contents()
-        header = fit_result_table_data.keys()
-        self.fit_result_table.setColumnCount(len(header))
-        self.fit_result_table.setHorizontalHeaderLabels(header)
+        self.fit_result_table.set_column_names(fit_result_table_data.keys())
         for column_name, val in fit_result_table_data.items():
-            self.fit_result_table.append_to_column_parameters(column_name, val)
+            self.fit_result_table.set_column(column_name, val)
         self.fit_result_table.blockSignals(False)
 
     def update_info_text(self, info_text):

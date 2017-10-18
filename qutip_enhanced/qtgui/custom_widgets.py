@@ -6,8 +6,7 @@ __metaclass__ = type
 import numpy as np
 import itertools
 
-
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, QMenu, QAction
 from PyQt5.QtGui import QCursor
 from PyQt5.QtCore import pyqtSignal
@@ -17,20 +16,73 @@ class QTableWidgetEnhanced(QTableWidget):
     def __init__(self, parent=None):
         super(QTableWidgetEnhanced, self).__init__(parent)
 
-    def column_data(self, column_name):
-        out = []
-        for row in range(self.rowCount()):
-            o = self.item(row, self.column_index(column_name))
-            if o.text() != '':
-                out.append(o.data(0x0100))
-        return out
+    def column_data_indices(self, column_name):
+        """
+        :return: all rows whose text is not an empty string, as this is considered a cell not containing data
+        """
+        cidx = self.column_index(column_name)
+        return [ridx for ridx in range(self.rowCount()) if self.item(ridx, cidx).text() != '']
 
-    def n_rows(self, column_name):
-        return len([row for row in range(self.rowCount()) if self.item(row, self.column_index(column_name)).text() != ''])
+    def column_data(self, column_name):
+        """
+        :return: data of all rows, whose text is not an empty string, as this is considered a cell not containing data
+        """
+        cidx = self.column_index(column_name)
+        return [self.item(ridx, cidx).data(0x0100) for ridx in self.column_data_indices(column_name)]
+
+    def row_data_indices(self, ridx):
+        return [cidx for cidx in range(self.columnCount()) if self.item(ridx, cidx).text() != '']
+
+    def row_data(self, ridx):
+        return [self.item(ridx, cidx).data(0x0100) for cidx in self.row_data_indices(ridx)]
+
+    def set_cell(self, ridx, cidx, val=None, flag=None):
+        item = self.item(ridx, cidx)
+        if item is None:
+            item = QTableWidgetItem()
+            self.setItem(ridx, cidx, item)
+            if flag is None:
+                item.setFlags(Qt.NoItemFlags)
+        if val is not None:
+            item.setText(str(val))
+            item.setData(0x0100, val)
+        if flag is not None:
+            item.setFlags(flag)
+
+
+    def parse_data_flags(self, data=None, flags=None):
+        if data is not None and flags is not None and len(data) != len(flags):
+            raise Exception('Error: {}, {}'.format(data, flags))
+        data = itertools.repeat(None) if data is None else data
+        flags = itertools.repeat(None) if flags is None else flags
+        return data, flags
+
+    def set_column(self, column_name, data=None, flags=None):
+        nd = len(data) if hasattr(data, '__len__') else 0
+        nf = len(flags) if hasattr(flags, '__len__') else 0
+        self.set_n_rows(max(nd, nf, self.rowCount()))
+        data, flags = self.parse_data_flags(data=data, flags=flags)
+        cidx = self.column_index(column_name=column_name)
+        for ridx, val, flag in zip(range(self.rowCount()), data, flags):
+            self.set_cell(ridx, cidx, val, flag)
+
+    def set_row(self, ridx, data=None, flags=None):
+        nd = len(data) if hasattr(data, '__len__') else 0
+        nf = len(flags) if hasattr(flags, '__len__') else 0
+        if max(nd, nf) > self.columnCount():
+            raise Exception("Error: Can not set row {}.\nEither data or flags has more items than the table has columns.\n{}, {}".format(ridx, data, flags))
+        data, flags = self.parse_data_flags(data=data, flags=flags)
+        for cidx, val, flag in zip(range(self.columnCount()), data, flags):
+            self.set_cell(ridx, cidx, val, flag)
 
     @property
     def column_names(self):
         return [self.horizontalHeaderItem(i).text() for i in range(self.columnCount())]
+
+    def set_column_names(self, header):
+        self.clear_table_contents()
+        self.setColumnCount(len(header))
+        self.setHorizontalHeaderLabels(header)
 
     def column_index(self, column_name):
         return self.column_names.index(column_name)
@@ -38,70 +90,45 @@ class QTableWidgetEnhanced(QTableWidget):
     def column_name(self, column_index):
         return self.column_names[column_index]
 
-    def add_rows(self, n_new):
+    def set_n_rows(self, n_rows):
+        n_new = n_rows - self.rowCount()
         if n_new > 0:
             n_old = self.rowCount()
             self.setRowCount(n_old+n_new)
-            for rc in itertools.product(range(n_old, n_old+n_new), range(self.columnCount())):
-                new_item = QTableWidgetItem('')
-                new_item.setData(0x0100, None)
-                new_item.setFlags(Qt.NoItemFlags)
-                self.setItem(rc[0], rc[1], new_item)
+            for ridx in range(n_old, n_old+n_new):
+                self.set_row(ridx)
 
-    def set_columns(self, desired_total_count, header):
-        if desired_total_count != len(header):
-            raise Exception("Error: {}{}".format(desired_total_count, header))
-        self.setColumnCount(desired_total_count)
-        self.setHorizontalHeaderLabels(header)
-        for rc in itertools.product(range(self.rowCount()), range(desired_total_count)):
-            new_item = QTableWidgetItem('')
-            new_item.setData(0x0100, None)
-            new_item.setFlags(Qt.NoItemFlags)
-            self.setItem(rc[0], rc[1], new_item)
-
-    def append_to_column_parameters(self, column_name, parameters):
-        cd = self.column_data(column_name)
-        new_params = [i for i in parameters if i not in cd]
-        delta_n_row = len(parameters) - self.rowCount()
-        # print('dncn_row_cd', column_name, delta_n_row, cd, parameters)
-        # print('rc_np', self.rowCount(), new_params)
-        if delta_n_row > 0:
-            rc_old = self.rowCount()
-            self.add_rows(delta_n_row)
-            # print("RowCount", rc_old, self.rowCount(), delta_n_row, len(parameters), column_name)
-        # else:
-            # print("LOWER", self.rowCount(), delta_n_row, len(parameters), column_name, parameters)
-        for ridx, new_param in zip(len(cd) + np.arange(0, len(parameters)), new_params):
-            cidx = self.column_index(column_name)
-            if self.item(ridx, cidx) == None:
-                print("SOMETHING IS WEIRD:\n")
-                print(ridx, cidx, new_param, "delta_n_row: ", delta_n_row, cd)
-            else:
-                self.item(ridx, cidx).setText(str(new_param))
-                self.item(ridx, cidx).setData(0x0100, new_param)
-                self.item(ridx, cidx).setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
-
-    def set_column_flags(self, column_name, flag):
-        for row in range(self.rowCount()):
-            item = self.item(row, self.column_index(column_name))
-            if item.data(0x0100) is not None:
-                item.setFlags(flag)
-
-    def selected_table_items(self, column_name):
+    def selected_column_items(self, column_name):
         out = []
         for item in self.selectedItems():
             if item.column() == self.column_index(column_name=column_name):
                 out.append(item.data(0x0100))
         return out
 
+    def selected_row_items(self, ridx):
+        out = []
+        for item in self.selectedItems():
+            if item.row() == ridx:
+                out.append(item.data(0x0100))
+        return out
+
     def selected_items_unique_row_indices(self):
         return list(set([i.row() for i in self.selectedItems()]))
 
+    def clear_column_data(self, column_name):
+        cidx = self.column_index(column_name=column_name)
+        for ridx in range(self.columnCount()):
+            self.set_cell(ridx, cidx, val="")
+
+    def clear_column_flags(self, column_name):
+        cidx = self.column_index(column_name=column_name)
+        for ridx in range(self.columnCount()):
+            self.set_cell(ridx, cidx, flag=Qt.NoItemFlags)
+
     def clear_table_contents(self):
-        for idx in itertools.product(range(self.rowCount()), range(self.columnCount())):
-            self.item(idx[0], idx[1]).setText('')
-            self.item(idx[0], idx[1]).setData(0x0100, None)
-            self.item(idx[0], idx[1]).setFlags(Qt.NoItemFlags)
+        for column_name in self.column_names:
+            self.clear_column_data(column_name)
+            self.clear_column_flags(column_name)
         self.clear()
         self.setRowCount(0)
         self.setColumnCount(0)

@@ -103,15 +103,10 @@ def xy2aphi(xy, out=None):
     import time
     t0 = time.time()
     out = np.empty(xy.shape) if out is None else out
-    print(time.time() - t0)
     out[:, 0] = xy[:, 0] ** 2
-    print(time.time() - t0)
     out[:, 0] += xy[:, 1] ** 2
-    print(time.time() - t0)
     np.sqrt(out[:, 0], out=out[:, 0])
-    print(time.time() - t0)
     out[:, 1] = np.arctan2(xy[:, 1], xy[:, 0])
-    print(time.time() - t0)
     return out
 
 
