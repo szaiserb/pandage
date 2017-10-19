@@ -224,6 +224,7 @@ class DataGeneration:
                 text_file.write(self.meas_code)
         self.data.save("{}/data.csv".format(self.save_dir))
         self.data.save("{}/data.hdf".format(self.save_dir))
+        self.pld.save_plot("{}/plot.png".format(self.save_dir))
         print("saved nuclear to '{}'".format(fpp))
 
     def remeasure(self, l):

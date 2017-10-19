@@ -393,8 +393,9 @@ class PlotData:
 
     def __init__(self, title=None, parent=None, gui=True, **kwargs):
         super(PlotData, self).__init__()
+        self.update_window_title(title)
         if gui:
-            self._gui = PlotDataQt(plot_data_no_qt=self, title=title, parent=parent)
+            self._gui = PlotDataQt(plot_data_no_qt=self, parent=parent)
             self.gui.show()
         if 'path' in kwargs:
             self.set_data_from_path(path=kwargs['path'])
@@ -407,6 +408,30 @@ class PlotData:
     def set_data_from_path(self, path):
         self.data = Data(iff=path)
         self.data_path = path
+
+    @property
+    def data_path(self):
+        return self._data_path
+
+    @data_path.setter
+    def data_path(self, val):
+        self._data_path = val
+        self.update_window_title()
+
+    @property
+    def window_title(self):
+        return self._window_title
+
+    def update_window_title(self, val=None):
+        if val is None:
+            if hasattr(self, 'data_path'):
+                # self._window_title = os.path.split(os.path.split(self.data_path)[0])[-1]
+                self._window_title = self.data_path
+            else:
+                self._window_title = ''
+        if hasattr(self, '_gui'):
+            self.gui.update_window_title(self.window_title)
+
 
     @property
     def gui(self):
@@ -435,7 +460,7 @@ class PlotData:
 
     def delete_attributes(self):
         for attr_name in [
-            'data_path',
+            '_data_path',
             '_data',
             '_x_axis_parameter_list',
             '_parameter_table_data',
@@ -449,7 +474,12 @@ class PlotData:
             '_fit_result_table_data'
         ]:
             if hasattr(self, attr_name):
-                delattr(self, attr_name)
+                try:
+                    delattr(self, attr_name)
+                except:
+                    print("Attribute ", attr_name, " could not be deleted.")
+                    exc_type, exc_value, exc_tb = sys.exc_info()
+                    traceback.print_exception(exc_type, exc_value, exc_tb)
 
     @property
     def x_axis_parameter(self):
@@ -621,10 +651,13 @@ class PlotData:
             i = spi[idx]
             try:
                 params = mod.guess(data=i['y'], x=i['x'])
-
+                fp = getattr(self, 'fix_params', {})
+                if all(key in params for key in fp.keys()):
+                    for key, val in fp.items():
+                        params[key].vary = False
+                        params[key].value = val
                 self._fit_results.append([i, mod.fit(i['y'], params, x=i['x'])])
             except:
-                # self._fit_results.append([i, None])
                 print('fitting failed: {}'.format(i))
         self.update_fit_result_table_data()
 
@@ -700,11 +733,12 @@ class PlotData:
     def save_plot(self, filepath):
         plt.ioff()
         fig, ax = plt.subplots(1,1)
-        cn = self.parameter_names_reduced()[1:]
+        cn = self.parameter_names_reduced()
         cn.remove(self.x_axis_parameter)
         for d, d_idx, idx, df_sub in self.data.iterator(cn):
-            dfagg = df_sub.groupby([self.x_axis_parameter]).agg({'result_0': np.mean}).reset_index()
-            ax.plot(dfagg.x, dfagg.result_0)
+            for observation in self.observation_list_selected_data:
+                dfagg = df_sub.groupby([self.x_axis_parameter]).agg({observation: np.mean}).reset_index()
+                ax.plot(getattr(dfagg, self.x_axis_parameter), getattr(dfagg, observation))
         fig.tight_layout()
         fig.savefig(filepath)
         plt.ion()
@@ -720,18 +754,17 @@ class PlotData:
 
 class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
 
-    def __init__(self, title=None, parent=None, plot_data_no_qt=None):
+    def __init__(self, parent=None, plot_data_no_qt=None):
         super(PlotDataQt, self).__init__(parent=parent)
         self.plot_data_no_qt = plot_data_no_qt
         self.setupUi(self)
         self.init_gui()
-        title = '' if title is None else title
-        self.setWindowTitle(title)
 
     update_x_axis_parameter_comboBox_signal = pyqtSignal()
     clear_signal = pyqtSignal()
     show_signal = pyqtSignal()
     close_signal = pyqtSignal()
+    update_window_title_signal = pyqtSignal(str)
     update_parameter_table_data_signal = pyqtSignal(collections.OrderedDict)
     update_parameter_table_selected_indices_signal = pyqtSignal(collections.OrderedDict)
     update_observation_list_data_signal = pyqtSignal(list)
@@ -765,6 +798,12 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
             self.canvas_fit.draw()
         except:
             pass
+
+    def update_window_title(self, val):
+        self.update_window_title_signal.emit(val)
+
+    def update_window_title_signal_emitted(self, val):
+        self.setWindowTitle(val)
 
     def update_x_axis_parameter_comboBox(self):
         self.update_x_axis_parameter_comboBox_signal.emit()
@@ -896,6 +935,7 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
     def init_gui(self):
         for name in [
             'clear',
+            'update_window_title',
             'update_x_axis_parameter_comboBox',
             'update_parameter_table_data',
             'update_observation_list_data',
