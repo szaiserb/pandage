@@ -388,12 +388,10 @@ def recompile_plotdata_ui_file():
         compileUi(uipath, f)
     reload(plot_data_gui)
 
-
 class PlotData:
 
     def __init__(self, title=None, parent=None, gui=True, **kwargs):
         super(PlotData, self).__init__()
-        self.update_window_title(title)
         if gui:
             self._gui = PlotDataQt(plot_data_no_qt=self, parent=parent)
             self.gui.show()
@@ -401,6 +399,7 @@ class PlotData:
             self.set_data_from_path(path=kwargs['path'])
         elif 'data' in kwargs:
             self.data = kwargs['data']
+        self.update_window_title(title)
 
     fit_function = 'cosine'
     show_legend = False
@@ -425,11 +424,12 @@ class PlotData:
     def update_window_title(self, val=None):
         if val is None:
             if hasattr(self, 'data_path'):
-                # self._window_title = os.path.split(os.path.split(self.data_path)[0])[-1]
                 self._window_title = self.data_path
             else:
-                self._window_title = ''
-        if hasattr(self, '_gui'):
+                self._window_title = None
+        else:
+            self._window_title = val
+        if val is not None and hasattr(self, '_gui'):
             self.gui.update_window_title(self.window_title)
 
 
@@ -931,6 +931,14 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
 
     def update_info_text_signal_emitted(self, info_text):
         self.info.setPlainText(info_text)
+
+    def redraw_plot(self):
+        self.fig.tight_layout()
+        self.canvas.draw()
+
+    def redraw_plot_fit(self):
+        self.fig_fit.tight_layout()
+        self.canvas_fit.draw()
 
     def init_gui(self):
         for name in [
