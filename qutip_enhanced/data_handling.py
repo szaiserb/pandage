@@ -637,23 +637,25 @@ class PlotData:
 
     def update_fit_results(self):
         spi = self.line_plot_data()
-        if self.fit_function == 'cosine':
+        if hasattr(self, 'custom_model'):
+            mod = self.custom_model
+        elif self.fit_function == 'cosine':
             mod = lmfit_models.CosineModel()
         elif self.fit_function == 'exp':
             pass
         self._fit_results = []
         for idx in self.fit_select_table_selected_rows:
             i = spi[idx]
-            try:
-                params = mod.guess(data=i['y'], x=i['x'])
-                fp = getattr(self, 'fix_params', {})
-                if all(key in params for key in fp.keys()):
-                    for key, val in fp.items():
-                        params[key].vary = False
-                        params[key].value = val
-                self._fit_results.append([i, mod.fit(i['y'], params, x=i['x'])])
-            except:
-                print('fitting failed: {}'.format(i))
+            # try:
+            params = mod.guess(data=np.array(i['y']), x=np.array(i['x']))
+            fp = getattr(self, 'fix_params', {})
+            if all(key in params for key in fp.keys()):
+                for key, val in fp.items():
+                    params[key].vary = False
+                    params[key].value = val
+            self._fit_results.append([i, mod.fit(np.array(i['y']), params, x=np.array(i['x']))])
+            # except:
+            #     print('fitting failed: {}'.format(i))
         self.update_fit_result_table_data()
 
     @property
@@ -697,18 +699,19 @@ class PlotData:
         return plot_data
 
     def update_plot(self):
-        self.update_selected_plot_items()
-        self.update_fit_select_table_data()
-        if hasattr(self, '_gui'):
-            try:
-                self.gui.fig.clear()
-            except:
-                pass
-            self.gui.ax = self.gui.fig.add_subplot(111)
-            for idx, pdi in enumerate(self.line_plot_data()):
-                self.gui.ax.plot(pdi['x'], pdi['y'], '-')
-            self.gui.fig.tight_layout()
-            self.gui.canvas.draw()
+        if hasattr(self, '_data'):
+            self.update_selected_plot_items()
+            self.update_fit_select_table_data()
+            if hasattr(self, '_gui'):
+                try:
+                    self.gui.fig.clear()
+                except:
+                    pass
+                self.gui.ax = self.gui.fig.add_subplot(111)
+                for idx, pdi in enumerate(self.line_plot_data()):
+                    self.gui.ax.plot(pdi['x'], pdi['y'], '-')
+                self.gui.fig.tight_layout()
+                self.gui.canvas.draw()
 
     def update_plot_fit(self):
         self.update_fit_results()

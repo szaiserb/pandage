@@ -6,6 +6,7 @@ import numpy as np
 import lmfit.models
 import lmfit.lineshapes
 import itertools
+import scipy
 
 def cosine_no_decay_no_offset(x, amplitude, T, x0):
     return amplitude * np.cos(2 * np.pi * (x - x0) / float(T))
@@ -28,31 +29,90 @@ def exp_decay(x, amplitude, t1, c):
 def t2_decay(x, amplitude, t2, c, p):
     return amplitude * np.exp(-(x / t2) ** p) + c
 
-def double_gaussian(x, amplitude_1, amplitude_2, center_1, center_2, sigma_1, sigma_2, c):
-    return amplitude_1 * np.exp(-0.5 * ((x - center_1) / sigma_1) ** 2) + amplitude_2 * np.exp(-0.5 * ((x - center_2) / sigma_2) ** 2) + c
+# def double_gaussian(x, amplitude_1, amplitude_2, center_1, center_2, sigma_1, sigma_2, c):
+#     return amplitude_1 * np.exp(-0.5 * ((x - center_1) / sigma_1) ** 2) + amplitude_2 * np.exp(-0.5 * ((x - center_2) / sigma_2) ** 2) + c
+# def guess_from_peak(y, x, negative, ampscale=1.0, sigscale=1.0):
+#     """Estimate amp, cen, sigma for a peak, create params."""
+#     if x is None:
+#         return 1.0, 0.0, 1.0
+#     maxy, miny = max(y), min(y)
+#     maxx, minx = max(x), min(x)
+#     imaxy = lmfit.models.index_of(y, maxy)
+#     cen = x[imaxy]
+#     amp = (maxy - miny)*3.0
+#     sig = (maxx-minx)/6.0
+#
+#     halfmax_vals = np.where(y > (maxy+miny)/2.0)[0]
+#     if negative:
+#         # imaxy = lmfit.models.index_of(y, miny)
+#         amp = -(maxy - miny)*3.0
+#         halfmax_vals = np.where(y < (maxy+miny)/2.0)[0]
+#     if len(halfmax_vals) > 2:
+#         sig = (x[halfmax_vals[-1]] - x[halfmax_vals[0]])/2.0
+#         cen = x[halfmax_vals].mean()
+#     amp = amp*sig*ampscale
+#     sig = sig*sigscale
+#     return amp, cen, sig
 
-def guess_from_peak(y, x, negative, ampscale=1.0, sigscale=1.0):
-    """Estimate amp, cen, sigma for a peak, create params."""
-    if x is None:
-        return 1.0, 0.0, 1.0
-    maxy, miny = max(y), min(y)
-    maxx, minx = max(x), min(x)
-    imaxy = lmfit.models.index_of(y, maxy)
-    cen = x[imaxy]
-    amp = (maxy - miny)*3.0
-    sig = (maxx-minx)/6.0
+class LorentzModel(lmfit.Model):
+    def __init__(self, *args, **kwargs):
 
-    halfmax_vals = np.where(y > (maxy+miny)/2.0)[0]
-    if negative:
-        # imaxy = lmfit.models.index_of(y, miny)
-        amp = -(maxy - miny)*3.0
-        halfmax_vals = np.where(y < (maxy+miny)/2.0)[0]
-    if len(halfmax_vals) > 2:
-        sig = (x[halfmax_vals[-1]] - x[halfmax_vals[0]])/2.0
-        cen = x[halfmax_vals].mean()
-    amp = amp*sig*ampscale
-    sig = sig*sigscale
-    return amp, cen, sig
+        def Lorentzian_neg(x, center, g, a, c):
+            """Lorentzian centered at x0, with amplitude a, offset y0 and HWHM g."""
+            return -abs(a) / np.pi * (  abs(g) / ( (x-center)**2 + g**2 )  ) + c
+
+        super(LorentzModel, self).__init__(Lorentzian_neg, *args, **kwargs)
+
+    def guess(self, data, x=None, **kwargs):
+        x = np.array(x)
+        data = np.array(data)
+        def LorentzianEstimator_neg(y=None, x=None):
+            c = scipy.mean(y)
+            yp = np.array(y - c)
+            c = scipy.mean(c + abs(yp))
+            yp = y - c
+            Y = np.sum(yp) * (x[-1] - x[0]) / len(x)
+            y0 = yp.min()
+            center = x[y.argmin()]
+            g = Y / (np.pi * y0)
+            a = y0 * np.pi * g
+            return center, g, a, c
+
+        center, g, a, c = LorentzianEstimator_neg(y=data, x=x)
+        return lmfit.models.update_param_vals(self.make_params(center=center, g=g, a=a, c=c), self.prefix, **kwargs)
+
+class TripLorentzModel(lmfit.Model):
+    def __init__(self, splitting, *args, **kwargs):
+
+        self.splitting = np.abs(splitting)
+        def trip_lorentz_n14(x, center, g, a1, a2, a3, c):
+            """Lorentzian centered at x0, with amplitude a, offset y0 and HWHM g."""
+            x2 = center - self.splitting
+            x3 = center + self.splitting
+            return -abs(a1) / np.pi * (g ** 2 / ((x - center) ** 2 + g ** 2)) - abs(a2) / np.pi * (g ** 2 / ((x - x2) ** 2 + g ** 2)) - abs(a3) / np.pi * (g ** 2 / ((x - x3) ** 2 + g ** 2)) + c
+        super(TripLorentzModel, self).__init__(trip_lorentz_n14, *args, **kwargs)
+
+    def guess(self, data, x=None, **kwargs):
+        def trip_lorentz_estimator(y=None, x=None):
+            dx = abs(x[1] - x[0])
+            split_index1 = int(np.floor(self.splitting / dx))
+            split_index2 = min(int(np.floor(self.splitting * 2. / dx)), len(y)-1)
+            trip_mean = []
+            for i in range(len(y) - split_index2):
+                trip_mean.append((y[i] + y[i + split_index1] + y[i + split_index2]) / 3.)
+            trip_mean = np.array(trip_mean)
+            c = trip_mean.max()
+            center = x[trip_mean.argmin()] + self.splitting
+            g = 0.5  # HWHM
+            a1 = a2 = a3 = (trip_mean.min() - c) * np.pi
+            return center, g, a1, a2, a3, c
+
+        center, g, a1, a2, a3, c = trip_lorentz_estimator(y=data, x=x)
+        return lmfit.models.update_param_vals(self.make_params(center=center, g=g, a1=a1, a2=a2, a3=a3, c=c), self.prefix, **kwargs)
+
+
+
+
 
 
 # class DoubleGaussianModel(lmfit.Model):
