@@ -159,6 +159,8 @@ class DataGeneration:
 
     def reinit(self):
         self.start_time = datetime.datetime.now()
+        if hasattr(self, '_file_path') and hasattr(self, '_file_name'):
+            self.pld.data_path = "{}/data.hdf".format(self.save_dir)
 
     @property
     def save_dir(self):
@@ -184,6 +186,22 @@ class DataGeneration:
             if e.errno != errno.EEXIST:
                 raise
         return save_dir_tmp
+
+    @property
+    def file_name(self):
+        return self._file_name
+
+    @file_name.setter
+    def file_name(self, val):
+        self._file_name = val
+
+    @property
+    def file_path(self):
+        return self._file_path
+
+    @file_path.setter
+    def file_path(self, val):
+        self._file_path = val
 
     def make_save_location_params(self, script_path, **kwargs):
         script_path = os.path.abspath(script_path)

@@ -20,7 +20,7 @@ from .qtgui import plot_data_gui
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
-# import matplotlib.image as img
+import matplotlib
 import matplotlib.pyplot as plt
 import functools
 if sys.version_info.major == 2:
@@ -399,7 +399,8 @@ class PlotData:
             self.set_data_from_path(path=kwargs['path'])
         elif 'data' in kwargs:
             self.data = kwargs['data']
-        self.update_window_title(title)
+        if title is not None:
+            self.update_window_title(title)
 
     fit_function = 'cosine'
     show_legend = False
@@ -407,6 +408,7 @@ class PlotData:
     def set_data_from_path(self, path):
         self.data = Data(iff=path)
         self.data_path = path
+        self.update_window_title(self.data_path)
 
     @property
     def data_path(self):
@@ -415,23 +417,16 @@ class PlotData:
     @data_path.setter
     def data_path(self, val):
         self._data_path = val
-        self.update_window_title()
+        matplotlib.rcParams["savefig.directory"] = os.path.dirname(self.data_path)
 
     @property
     def window_title(self):
         return self._window_title
 
-    def update_window_title(self, val=None):
-        if val is None:
-            if hasattr(self, 'data_path'):
-                self._window_title = self.data_path
-            else:
-                self._window_title = None
-        else:
-            self._window_title = val
-        if val is not None and hasattr(self, '_gui'):
+    def update_window_title(self, val):
+        self._window_title = str(val)
+        if hasattr(self, '_gui'):
             self.gui.update_window_title(self.window_title)
-
 
     @property
     def gui(self):
@@ -1017,7 +1012,7 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
 def cpd():
     for fn in os.listdir(os.getcwd()):
         if fn.endswith('.hdf'):
-            out = PlotData(path=fn)
+            out = PlotData(path=os.path.join(os.getcwd(), fn))
             out.gui.show_gui()
     return out
 
