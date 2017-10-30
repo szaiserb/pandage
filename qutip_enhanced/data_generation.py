@@ -228,22 +228,22 @@ class DataGeneration:
                             zf.write(os.path.join(root, file), os.path.join(root.replace(os.path.commonprefix([root, src]), ""), file))
             zf.close()
 
-    def save(self):
-        fpp = "{}/".format(self.save_dir)
+    def save(self, name='', notify=False):
         try:
             self.pld.save_plot("{}plot.png".format(fpp))
         except:
             pass
         if hasattr(self, 'file_notes'):
-            with open("{}notes.dat".format(fpp), "w") as text_file:
+            with open("{}/notes.dat".format(self.save_dir), "w") as text_file:
                 text_file.write(self.file_notes)
         if self.meas_code != '':
-            with open("{}meas_code.py".format(fpp), "w") as text_file:
+            with open("{}/meas_code.py".format(self.save_dir), "w") as text_file:
                 text_file.write(self.meas_code)
         self.data.save("{}/data.csv".format(self.save_dir))
         self.data.save("{}/data.hdf".format(self.save_dir))
         self.pld.save_plot("{}/plot.png".format(self.save_dir))
-        print("saved nuclear to '{}'".format(fpp))
+        if notify:
+            print("saved {} to '{}".format(name, self.save_dir))
 
     def remeasure(self, l):
         if type(l) is not list:
