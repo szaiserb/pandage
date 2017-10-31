@@ -93,16 +93,20 @@ class DataGeneration:
             raise Exception('Error: there seem to be more nan values than can be expected from unfinished measurements ({}, {}). Whats wrong?'.format(ldf, len(self.data.df)))
 
     def set_iterator_df_done(self):
-        self.iterator_df_done = self.data.df.iloc[:, :len(self.parameters.keys())]
-
-    def set_iterator_df(self):
-        self.iterator_df = pd.DataFrame.from_records(
-            itertools.product(*self.parameters.values()),
-            columns=self.parameters.keys()
-        )
+        if len(self.data.df) > 0:
+            self.iterator_df_done = self.data.df.iloc[:, :len(self.parameters.keys())]
+        else:
+            self.iterator_df_done = self.iterator_df.drop(self.iterator_df.index, inplace=False)
         self.iterator_df = self.iterator_df.append(self.iterator_df_done)
         self.iterator_df.drop_duplicates(keep=False, inplace=True)
 
+    def set_iterator_df(self):
+        self.iterator_df = pd.DataFrame(
+            list(itertools.product(*self.parameters.values())),
+            columns=self.parameters.keys()
+        )
+        for cn in self.iterator_df.columns:
+            setattr(self.iterator_df, cn, getattr(self.iterator_df, cn).astype(type(self.parameters[cn][0])))
 
     @property
     def progress(self):
@@ -143,9 +147,9 @@ class DataGeneration:
     def init_run(self, **kwargs):
         self.state = 'run'
         self.reinit()
+        self.set_iterator_df()
         self.init_data(**kwargs)
         self.set_iterator_df_done()
-        self.set_iterator_df()
 
     def iterator(self):
         while len(self.iterator_df) > 0:
@@ -155,8 +159,11 @@ class DataGeneration:
             self._progress = len(self.iterator_df_done) / np.prod([len(i) for i in self.parameters.values()])
             self.current_iterator_df = self.iterator_df.head(min(self.number_of_simultaneous_measurements, len(self.iterator_df)))
             self.iterator_df = self.iterator_df.iloc[min(self.number_of_simultaneous_measurements, len(self.iterator_df)):, :]
-            l = self.current_iterator_df.to_dict(orient='records')
-            self.data.append(l)
+            l = []
+            for row in self.current_iterator_df.itertuples():
+                l.append(collections.OrderedDict([(key, val) for key, val in zip(self.data.parameter_names, row[1:])]))
+            # l = self.current_iterator_df.to_dict(orient='records')
+            self.data.append(self.current_iterator_df)
             self.update_current_str()
             yield l
         self._progress = len(self.iterator_list_done) / np.prod([len(i) for i in self.parameters.values()])

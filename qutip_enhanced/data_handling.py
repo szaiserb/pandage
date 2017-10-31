@@ -325,23 +325,33 @@ class Data:
             ptrepack(os.path.split(filepath)[1], os.path.split(filepath)[0])
             self.hdf_filepath = filepath
 
-    def append(self, l):
-        if type(l) in [collections.OrderedDict, dict]:
-            l = [l]
-        for kwargs in l:
-            if len(kwargs) != len(self.parameter_names):
-                raise Exception('Missing parameter for dataframe.')
-            if not all([i in kwargs for i in self.parameter_names]):
-                raise Exception('Wrong parameter for dataframe.')
-        for idx, li in enumerate(l):
-            for k, v in self.dtypes.items():
-                if v != 'float':
-                    l[idx][k] = getattr(__builtin__, v)()
-        df_append = pd.DataFrame(columns=self.variables, data=l)
-        if len(self._df) == 0:
-            self._df = df_append
+    def append(self, df_or_l):
+        if type(df_or_l) == pd.DataFrame:
+            df = df_or_l
+            if not (df.columns == self.parameter_names).all():
+                raise Exception('Error: Dataframe columns dont match: '.format(df.columns, self.parameter_names))
+            df_append = df_or_l
+        else:
+            l = df_or_l
+            if type(l) in [collections.OrderedDict, dict]:
+                l = [l]
+            for kwargs in l:
+                if len(kwargs) != len(self.parameter_names):
+                    raise Exception('Missing parameter for dataframe.')
+                if not all([i in kwargs for i in self.parameter_names]):
+                    raise Exception('Wrong parameter for dataframe.')
+            df_append = pd.DataFrame(columns=self.parameter_names, data=l)
+        if len(self.df) == 0:
+            l_obs = []
+            for idx in range(len(df_append)):
+                l_obs.append(collections.OrderedDict())
+                for k, v in self.dtypes.items():
+                    l_obs[idx][k] = getattr(__builtin__, v)()
+            df_append_obs = pd.DataFrame(columns=self.observation_names, data=l_obs)
+            self._df = pd.concat([df_append, df_append_obs], axis=1)
         else:
             self._df = self._df.append(df_append, ignore_index=True)
+
 
     def parse_l(self, l):
         if type(l) in [collections.OrderedDict, dict]:
