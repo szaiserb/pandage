@@ -8,6 +8,7 @@ else:
     from importlib import reload
 
 import numpy as np
+import pandas as pd
 import errno
 import shutil
 import traceback
@@ -22,13 +23,13 @@ import collections
 import datetime
 
 
+
 class DataGeneration:
 
     def __init__(self):
         super(DataGeneration, self).__init__()
         self.date_of_creation = datetime.datetime.now()
-        self.remeasure_items = None
-        self.remeasure_indices = None
+        self.remeasure_df = None
 
     current_idx_str = data_handling.ret_property_typecheck('current_idx_str', str) #######
     current_parameter_str = data_handling.ret_property_typecheck('current_parameter_str', str) #######
@@ -69,12 +70,6 @@ class DataGeneration:
         else:
             raise Exception('Error: {}'.format(val))
 
-    def set_iterator_list_done(self):
-        itld = self.data.df[self.parameters.keys()].values
-        itidxld = self.data.df[[self.parameters.keys()[i]+'_idx' for i in range(len(self.parameters.keys()))]].values
-        self.iterator_list_done = [tuple(itld[i]) for i in range((len(itld)))]
-        self.iterator_idx_list_done = [tuple(itidxld[i]) for i in range((len(itidxld)))]
-
     @property
     def data(self):
         return self.pld.data
@@ -91,15 +86,23 @@ class DataGeneration:
     def pld(self, val):
         self._pld = val
 
-    def set_iterator_list(self):
-        self.iterator_list = list(itertools.product(*self.parameters.values()))
-        self.iterator_idx_list = list(itertools.product(*[range(len(i)) for i in self.parameters.values()]))
-        for v, idx in zip(self.iterator_list_done, self.iterator_idx_list_done):
-            try:
-                self.iterator_list.remove(v)
-                self.iterator_idx_list.remove(idx)
-            except:
-                pass
+    def dropnan_data(self):
+        ldf = len(self.data.df)
+        self.data.df.dropna(axis=0, how='any', inplace=True)
+        if ldf - len(self.data.df) > self.number_of_simultaneous_measurements:
+            raise Exception('Error: there seem to be more nan values than can be expected from unfinished measurements ({}, {}). Whats wrong?'.format(ldf, len(self.data.df)))
+
+    def set_iterator_df_done(self):
+        self.iterator_df_done = self.data.df.iloc[:, :len(self.parameters.keys())]
+
+    def set_iterator_df(self):
+        self.iterator_df = pd.DataFrame.from_records(
+            itertools.product(*self.parameters.values()),
+            columns=self.parameters.keys()
+        )
+        self.iterator_df = self.iterator_df.append(self.iterator_df_done)
+        self.iterator_df.drop_duplicates(keep=False, inplace=True)
+
 
     @property
     def progress(self):
@@ -109,11 +112,12 @@ class DataGeneration:
         init_from_file = iff if iff is not None else init_from_file
         self.init_from_file = init_from_file
         self.pld._data = data_handling.Data(
-            parameter_names=self.parameters.keys() + [self.parameters.keys()[i]+'_idx' for i in range(len(self.parameters.keys()))],
+            parameter_names=self.parameters.keys(),
             observation_names=self.observation_names,
             dtypes=self.dtypes,
             init_from_file=init_from_file
         )
+        self.dropnan_data()
         if init_from_file is not None and move_folder:
             # TODO: might be useful to use shutil.copy2 followed by shutil.rmtree to copy metadata (e.g. creation date)
             folder = os.path.split(init_from_file)[0]
@@ -128,30 +132,30 @@ class DataGeneration:
             shutil.move(current_folder, initial_folder)
 
     def update_current_str(self):
-        self.current_idx_str = "\n".join(["{}: {} ({})".format(key, int(self.current_indices_dict_list[0]["{}_idx".format(key)]), len(val)) for key, val in self.parameters.items()])
-        self.current_parameter_str = "\n".join(["{}: {}".format(key, self.current_parameters_dict_list[0][key]) for key in self.parameters.keys()])
-        self.pld.update_info_text('State: ' + self.state + '\n\n' + 'Current parameters:\n' + self.current_parameter_str + '\n\n' + 'Current indices\n' + self.current_idx_str)
+        cid = self.current_iterator_df.iloc[-1, :].to_dict()
+        cps = ""
+        cis = ""
+        for key, val in cid.items():
+            cps += "{}: {}\n".format(key, val)
+            cis += "{}: {} ({})\n".format(key, list(self.parameters[key]).index(val), len(self.parameters[key]))
+        self.pld.update_info_text('State: ' + self.state + '\n\n' + 'Current parameters:\n' + cps + '\n\n' + 'Current indices\n' + cis)
 
     def init_run(self, **kwargs):
         self.state = 'run'
         self.reinit()
         self.init_data(**kwargs)
-        self.set_iterator_list_done()
-        self.set_iterator_list()
+        self.set_iterator_df_done()
+        self.set_iterator_df()
 
     def iterator(self):
-        while len(self.iterator_list) > 0:
-            if hasattr(self, 'pv_l'):
-                self.iterator_list_done.extend(self.pv_l)
-            if hasattr(self, 'pidx_l'):
-                self.iterator_idx_list_done.extend(self.pidx_l)
+        while len(self.iterator_df) > 0:
+            if hasattr(self, 'current_iterator_df'):
+                self.iterator_df_done = self.iterator_df_done.append(self.current_iterator_df)
             self.process_remeasure_items()
-            self._progress = len(self.iterator_list_done) / np.prod([len(i) for i in self.parameters.values()])
-            self.pv_l = [self.iterator_list.pop(0) for _ in range(min(self.number_of_simultaneous_measurements, len(self.iterator_list)))]
-            self.pidx_l = [self.iterator_idx_list.pop(0) for _ in range(min(self.number_of_simultaneous_measurements, len(self.iterator_idx_list)))]
-            self.current_parameters_dict_list = [collections.OrderedDict([(key, pv[i]) for i, key in enumerate(self.parameters.keys())]) for pv in self.pv_l]
-            self.current_indices_dict_list = [collections.OrderedDict([("{}_idx".format(key), pidx[i]) for i, key in enumerate(self.parameters.keys())]) for pidx in self.pidx_l]
-            l = [collections.OrderedDict(i.items() + j.items()) for i, j in zip(self.current_parameters_dict_list, self.current_indices_dict_list)]
+            self._progress = len(self.iterator_df_done) / np.prod([len(i) for i in self.parameters.values()])
+            self.current_iterator_df = self.iterator_df.head(min(self.number_of_simultaneous_measurements, len(self.iterator_df)))
+            self.iterator_df = self.iterator_df.iloc[min(self.number_of_simultaneous_measurements, len(self.iterator_df)):, :]
+            l = self.current_iterator_df.to_dict(orient='records')
             self.data.append(l)
             self.update_current_str()
             yield l
@@ -245,34 +249,25 @@ class DataGeneration:
         if notify:
             print("saved {} to '{}".format(name, self.save_dir))
 
-    def remeasure(self, l):
-        if type(l) is not list:
-            raise Exception('Error: l must be a list of items in iterator_list_done')
-        for idx, item in enumerate(l):
-            if type(item) in [list, tuple]:
-                l[idx] = collections.OrderedDict([(key, val) for key, val in zip([i for i in self.data.parameter_names if not '_idx' in i], item)])
-        remeasure_indices = self.data.dict_access(l).index
-        if len(remeasure_indices) != len(l):
-            raise Exception('Error: Not every item in l could be found in the dataframe!\n{}, {}, {}'.format(len(l), len(self.remeasure_indices), l))
-        if self.number_of_simultaneous_measurements != 1:
-            if len(l)%self.number_of_simultaneous_measurements != 0:
-                raise Exception('Error: length of indices to be remeasured must be an integer multiple of number_of_simultaneous_measurements!\n{} {} {}'.format(l, remeasure_indices, self.number_of_simultaneous_measurements))
-            if remeasure_indices[0]%self.number_of_simultaneous_measurements != 0:
-                raise Exception('Error: {} {}'.format(remeasure_indices, self.number_of_simultaneous_measurements))
-            if not all(y==x+1 for x, y in zip(remeasure_indices, remeasure_indices[1:])):
-                raise Exception("Error: Only connected packets of indices are allowed, i.e. monotonously increasing with stepsize 1".format(remeasure_indices))
-        self.remeasure_indices = remeasure_indices
-        self.remeasure_items = l
+    def remeasure(self, df):
+        indices = self.data.df.iloc[:, :len(self.parameters.keys())].isin(df).all(axis=1).index #get indices in self.df.data to be replaced
+        if len(indices) != len(df):
+            raise Exception('Not all rows in df could be found in self.data: (missing: {})'.format(len(df) - len(indices)))
+        elif indices[0]% self.number_of_simultaneous_measurements != 0:
+            raise Exception('Error: The first index to be remeasured must be an integer multiple of number_of_simultaneous_measurements!\n{} {} {}'.format(df, indices, self.number_of_simultaneous_measurements))
+        elif len(indices) % self.number_of_simultaneous_measurements != 0:
+            raise Exception('Error: length of indices to be remeasured must be an integer multiple of number_of_simultaneous_measurements!\n{} {} {}'.format(df, indices, self.number_of_simultaneous_measurements))
+        elif not ((indices[1:] - indices[:-1]) == 1).all():
+            raise Exception("Error: Only connected packets of indices are allowed, i.e. monotonously increasing with stepsize 1".format(indices))
+        self.remeasure_df = df
 
     def process_remeasure_items(self):
-        if self.remeasure_items is not None:
+        if self.remeasure_df is not None:
             if self.remeasure_indices is None:
                 print('Something went horribly wrong! {}'.format(self.remeasure_items))
                 return
-            self.iterator_list.extend([i for idx, i in enumerate(self.iterator_list) if idx in self.remeasure_indices ])
-            self.iterator_idx_list.extend([i for idx, i in enumerate(self.iterator_list) if idx in self.remeasure_indices])
-            self.iterator_list_done = [self.iterator_list_done[i] for i in xrange(len(self.iterator_list_done )) if i not in self.remeasure_indices ]
-            self.iterator_idx_list_ = [self.iterator_idx_list_done[i] for i in xrange(len(self.iterator_idx_list_done )) if i not in self.remeasure_indices ]
-            self.data.dict_delete(self.remeasure_items)
-            self.remeasure_items = None
-            self.remeasure_indices = None
+            self.iterator_df.append(self.remeasure_df)
+            self.iterator_df_done.append(self.remeasure_df)
+            self.iterator_df_done.drop_duplicates(keep=False, inplace=True)
+            self.data.df.drop_duplicates(keep=False, inplace=True, subset=self.data.parameter_names)
+            self.remeasure_df = None
