@@ -23,7 +23,6 @@ import collections
 import datetime
 
 
-
 class DataGeneration:
 
     def __init__(self):
@@ -97,6 +96,8 @@ class DataGeneration:
             self.iterator_df_done = self.data.df.iloc[:, :len(self.parameters.keys())]
         else:
             self.iterator_df_done = self.iterator_df.drop(self.iterator_df.index, inplace=False)
+
+    def iterator_df_drop_done(self):
         self.iterator_df = self.iterator_df.append(self.iterator_df_done)
         self.iterator_df.drop_duplicates(keep=False, inplace=True)
 
@@ -150,23 +151,29 @@ class DataGeneration:
         self.set_iterator_df()
         self.init_data(**kwargs)
         self.set_iterator_df_done()
+        self.iterator_df_drop_done()
+
+    def iterator_df_pop(self, n):
+        out = self.iterator_df.head(n)
+        self.iterator_df = self.iterator_df.iloc[n:, :]
+        return out
+
+    def update_progress(self):
+        self._progress = len(self.iterator_df_done) / np.prod([len(i) for i in self.parameters.values()])
 
     def iterator(self):
         while len(self.iterator_df) > 0:
             if hasattr(self, 'current_iterator_df'):
                 self.iterator_df_done = self.iterator_df_done.append(self.current_iterator_df)
+            self.set_iterator_df()
+            self.iterator_df_drop_done()
             self.process_remeasure_items()
-            self._progress = len(self.iterator_df_done) / np.prod([len(i) for i in self.parameters.values()])
-            self.current_iterator_df = self.iterator_df.head(min(self.number_of_simultaneous_measurements, len(self.iterator_df)))
-            self.iterator_df = self.iterator_df.iloc[min(self.number_of_simultaneous_measurements, len(self.iterator_df)):, :]
-            l = []
-            for row in self.current_iterator_df.itertuples():
-                l.append(collections.OrderedDict([(key, val) for key, val in zip(self.data.parameter_names, row[1:])]))
-            # l = self.current_iterator_df.to_dict(orient='records')
+            self.update_progress()
+            self.current_iterator_df = self.iterator_df_pop(min(self.number_of_simultaneous_measurements, len(self.iterator_df)))
             self.data.append(self.current_iterator_df)
             self.update_current_str()
-            yield l
-        self._progress = len(self.iterator_list_done) / np.prod([len(i) for i in self.parameters.values()])
+            yield self.current_iterator_df
+        self.update_progress()
 
     def reinit(self):
         self.start_time = datetime.datetime.now()

@@ -714,6 +714,8 @@ class PlotData:
 
     def update_selected_plot_items(self):
         try:
+            if len(getattr(self.data.df, self.x_axis_parameter).unique()) == 1:
+                self.x_axis_parameter = self.x_axis_parameter_with_largest_dim()
             out = self.parameter_table_selected_data
             if all([len(i) == 0 for i in out.values()]):
                 self._selected_plot_items = []
@@ -906,6 +908,8 @@ class PlotData:
         try:
             plt.ioff()
             fig, ax = plt.subplots(1, 1)
+            if len(getattr(self.data.df, self.x_axis_parameter).unique()) == 1:
+                self.x_axis_parameter = self.x_axis_parameter_with_largest_dim()
             cn = self.parameter_names_reduced()
             cn.remove(self.x_axis_parameter)
             for d, d_idx, idx, df_sub in self.data.iterator(cn):
