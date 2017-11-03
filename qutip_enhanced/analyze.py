@@ -53,7 +53,7 @@ def test_states(dims=None, pure=False, **kwargs):
     out = {}
     for idx, names_multi in enumerate(names_multi_list):
         name_multi = "".join(names_multi)
-        out[name_multi] = tensor(*[__TEST_STATES_SINGLE__[dim][name] for name, dim in zip(names_multi, dims)]).unit()
+        out[name_multi] = tensor(*[__TEST_STATES_SINGLE_PURE__[dim][name] for name, dim in zip(names_multi, dims)]).unit()
         if not pure:
             out[name_multi] = ket2dm(out[name_multi]).unit()
     return out
