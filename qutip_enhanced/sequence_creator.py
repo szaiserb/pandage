@@ -1092,6 +1092,7 @@ def unitary_propagator_list(h_mhz, times_full, fields_full, L_Bc):
     return u_list
 
 def unitary_propagator_list_mult(h_mhz, times_full, fields_full, L_Bc):
+    print(L_Bc)
     L_Bc = [Qobj(i, dims=h_mhz.dims) for i in L_Bc]
     def u(i):
         return unitary_propagator(

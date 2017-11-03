@@ -46,10 +46,18 @@ class DataGeneration:
 
     @parameters.setter
     def parameters(self, val):
-        self._parameters = collections.OrderedDict((data_handling.check_type(k, 'key', str), data_handling.check_array_like(v, 'val')) for k, v in data_handling.check_type(val, 'parameters', collections.OrderedDict).items())
-        self.plot_type = 'scatter'
-        if len(self._parameters.items()[-1][1]) > 2:
-            self.plot_type = 'line'
+        if type(val) != collections.OrderedDict:
+            raise Exception('Error: {}, {}'.format(type(val), val))
+        for k, v in val.items():
+            _ = data_handling.check_type(k, 'key', str)
+            _ = data_handling.check_array_like(v, 'value_in_{}'.format(k))
+            items_occuring_more_than_once = [k for k, c in collections.Counter(v).iteritems() if c > 1]
+            if len(items_occuring_more_than_once) > 0:
+                raise Exception("Error: parameter {} has duplicate items {}".format(k, items_occuring_more_than_once))
+        self._parameters = val
+        # self._parameters = collections.OrderedDict((data_handling.check_type(k, 'key', str), data_handling.check_array_like(v, 'val')) for k, v in data_handling.check_type(val, 'parameters', collections.OrderedDict).items())
+        # if len(self._parameters.items()[-1][1]) > 2:
+        #     self.plot_type = 'line'
 
     @property
     def observation_names(self):
