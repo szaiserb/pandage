@@ -2,8 +2,7 @@
 from __future__ import print_function, absolute_import, division
 
 __metaclass__ = type
-import numpy as np
-from qutip import basis, tensor, ket2dm, sigmax, sigmay, sigmaz, expect
+from qutip import tensor, ket2dm, sigmax, sigmay, sigmaz, expect, jmat
 import itertools
 
 import matplotlib.pyplot as plt
@@ -28,22 +27,33 @@ __TEST_STATES_SINGLE_PURE__ = dict([(dim, test_states_single(dim=dim, pure=True)
 __TEST_STATES_SINGLE__ = dict([(dim, test_states_single(dim=dim, pure=False)) for dim in [2,3]])
 
 def test_states(dims=None, pure=False, **kwargs):
+    """
+
+    :param dims: e.g. [2,3]
+    :param pure: boolean
+    :param kwargs: either variable names_multi_list or names_multi_list_str must be given
+        names_multi_list: e.g. [['z0', 'z1], ['x0', 'y2']], this will produce two teststates, each with total dim 2x3 (as given in dim=[2,3])
+    :return:
+    """
     if 'names_multi_list' in kwargs:
         names_multi_list = kwargs.get('names_multi_list')
-        for i in names_multi_list:
-            if len(i) != 2*len(dims):
-                raise Exception("Error: {} {}".format(dims, names_multi_list))
+        if not all(len(i) == len(dims) for i in names_multi_list):#:for i in names_multi_list:
+            raise Exception('Error: {}, {}, {}'.format(len(dims), dims, names_multi_list))
     elif 'names_multi_list_str' in kwargs:
         nmls = kwargs.get('names_multi_list_str')
-        names_multi_list = [i+j for i, j in zip(nmls[::2], nmls[1::2])]
+        names_multi_list = []
+        for i in nmls:
+            if type(i) != str:
+                raise Exception('Error: each item of names_multi_list_str must be {} (is {})'. format(str, type(i)))
+            if len(i) != 2 * len(dims):
+                raise Exception("Error: {}, {}, {}, {}".format(dims, 2 * len(dims), i, len(i)))
+            names_multi_list.append([i+j for i, j in zip(i[::2], i[1::2])])
+    else:
+        raise Exception('Error: {}'.format(kwargs))
     out = {}
     for idx, names_multi in enumerate(names_multi_list):
-        for name, dim in zip(names_multi, dims):
-
-        if type(names_multi) in [str]:
-            names_multi = names_multi_str_to_list(names_multi)
         name_multi = "".join(names_multi)
-        out[name_multi] = tensor(*[test_states_single[name] for name in names_multi]).unit()
+        out[name_multi] = tensor(*[__TEST_STATES_SINGLE__[dim][name] for name, dim in zip(names_multi, dims)]).unit()
         if not pure:
             out[name_multi] = ket2dm(out[name_multi]).unit()
     return out
