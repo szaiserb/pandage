@@ -341,14 +341,14 @@ class Data:
                 if not all([i in kwargs for i in self.parameter_names]):
                     raise Exception('Wrong parameter for dataframe.')
             df_append = pd.DataFrame(columns=self.parameter_names, data=l)
+        l_obs = []
+        for idx in range(len(df_append)):
+            l_obs.append(collections.OrderedDict())
+            for k, v in self.dtypes.items():
+                l_obs[idx][k] = getattr(__builtin__, v)()
+        df_append = pd.concat([df_append.reset_index(drop=True), pd.DataFrame(columns=self.observation_names, data=l_obs)], axis=1) #NECESSARY! Reason: sorting issues when appending df with missing columns
         if len(self.df) == 0:
-            l_obs = []
-            for idx in range(len(df_append)):
-                l_obs.append(collections.OrderedDict())
-                for k, v in self.dtypes.items():
-                    l_obs[idx][k] = getattr(__builtin__, v)()
-            df_append_obs = pd.DataFrame(columns=self.observation_names, data=l_obs)
-            self._df = pd.concat([df_append, df_append_obs], axis=1)
+            self._df = df_append
         else:
             self._df = self._df.append(df_append, ignore_index=True)
 
@@ -367,6 +367,7 @@ class Data:
             return df[functools.reduce(np.logical_or, [functools.reduce(np.logical_and, [df[key] == val for key, val in d.items()]) for d in l])]
 
     def dict_delete(self, l, df=None):
+        raise Exception("WARNING: reset_index() might create column 'index'. If thats the case, add 'drop=True'")
         df = self.df if df is None else df
         if len(l) > 0:
             df.drop(self.dict_access(l=l, df=df).index, inplace=True)
