@@ -24,11 +24,10 @@ import datetime
 
 class DataGeneration:
 
-    def __init__(self, logger=None):
+    def __init__(self):
         super(DataGeneration, self).__init__()
         self.date_of_creation = datetime.datetime.now()
         self.remeasure_df = None
-        self.logger = logger
 
     current_idx_str = data_handling.ret_property_typecheck('current_idx_str', str) #######
     current_parameter_str = data_handling.ret_property_typecheck('current_parameter_str', str) #######
@@ -98,10 +97,6 @@ class DataGeneration:
         if ldf - len(self.data.df) > self.number_of_simultaneous_measurements:
             raise Exception('Error: there seem to be more nan values than can be expected from unfinished measurements ({}, {}). Whats wrong?'.format(ldf, len(self.data.df)))
 
-    def bug_fix_protocol_data_column_names(self, prefix):
-        if self.logger is not None:
-            self.logger.info("{}: {}".format(prefix, self.data.df.columns))
-
     def set_iterator_df_done(self):
         if len(self.data.df) > 0:
             self.iterator_df_done = self.data.df.iloc[:, :len(self.parameters.keys())]
@@ -161,11 +156,8 @@ class DataGeneration:
         self.reinit()
         self.set_iterator_df()
         self.init_data(**kwargs)
-        self.bug_fix_protocol_data_column_names("ainit")
         self.set_iterator_df_done()
-        self.bug_fix_protocol_data_column_names("adone")
         self.iterator_df_drop_done()
-        self.bug_fix_protocol_data_column_names("adropped")
 
     def iterator_df_pop(self, n):
         out = self.iterator_df.head(n)
@@ -179,21 +171,13 @@ class DataGeneration:
         while len(self.iterator_df) > 0:
             if hasattr(self, 'current_iterator_df'):
                 self.iterator_df_done = self.iterator_df_done.append(self.current_iterator_df)
-            self.bug_fix_protocol_data_column_names("b")
             self.set_iterator_df()
-            self.bug_fix_protocol_data_column_names("bdf")
             self.iterator_df_drop_done()
-            self.bug_fix_protocol_data_column_names("bdrop")
             self.process_remeasure_items()
-            self.bug_fix_protocol_data_column_names("bremeasure")
             self.update_progress()
-            self.bug_fix_protocol_data_column_names("bprocess")
             self.current_iterator_df = self.iterator_df_pop(min(self.number_of_simultaneous_measurements, len(self.iterator_df)))
-            self.bug_fix_protocol_data_column_names("bcidf")
             self.data.append(self.current_iterator_df)
-            self.bug_fix_protocol_data_column_names("bappend")
             self.update_current_str()
-            self.bug_fix_protocol_data_column_names("bcstr")
             yield self.current_iterator_df
         self.update_progress()
 

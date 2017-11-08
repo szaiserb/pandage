@@ -13,7 +13,6 @@ import traceback
 import collections
 import subprocess
 from PyQt5.QtWidgets import QListWidgetItem, QTableWidgetItem, QMainWindow
-
 from PyQt5.QtCore import Qt, pyqtSignal, QObject
 from PyQt5.uic import compileUi
 
@@ -352,19 +351,14 @@ class Data:
         else:
             self._df = self._df.append(df_append, ignore_index=True)
 
-
-    def parse_l(self, l):
-        if type(l) in [collections.OrderedDict, dict]:
-            l = [l]
-        return l
-
     def dict_access(self, l, df=None):
         df = self.df if df is None else df
         if len(l) == 0:
             raise Exception('Nope!')
         else:
-            l = self.parse_l(l)
-            return df[functools.reduce(np.logical_or, [functools.reduce(np.logical_and, [df[key] == val for key, val in d.items()]) for d in l])]
+            if type(l) in [collections.OrderedDict, dict]:
+                l = [l]
+            return df[functools.    reduce(np.logical_or, [functools.reduce(np.logical_and, [df[key] == val for key, val in d.items()]) for d in l])]
 
     def dict_delete(self, l, df=None):
         raise Exception("WARNING: reset_index() might create column 'index'. If thats the case, add 'drop=True'")
@@ -495,6 +489,12 @@ class PlotData:
                 self.gui.clear()
             self._data = val
             self.new_data_arrived()
+            df = self.data.df.drop('trace', axis=1)
+            df = df.drop('thresholds', axis=1)
+            for col in df.columns:
+                if len(df[col].unique()) == 1:
+                    df.drop(col, inplace=True, axis=1)
+            self.gui.dataframe.setDataFrame(df)
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
@@ -509,6 +509,17 @@ class PlotData:
             self.update_observation_list_selected_indices()
             if len(self.data.df) < 5000:
                 self.update_plot()
+            df = self.data.df.copy()
+            for col in df.columns:
+                drop = False
+                try:
+                    if len(df[col].unique()) == 1:
+                        drop = True
+                except:  # drops for example columns with numpy arrays
+                    drop = True
+                if drop:
+                    df.drop(col, inplace=True, axis=1)
+            self.gui.dataframe.setDataFrame(df)
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)

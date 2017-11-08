@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1324</width>
-    <height>999</height>
+    <width>1827</width>
+    <height>1026</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -16,9 +16,9 @@
   <widget class="QTabWidget" name="parameter_tab">
    <property name="geometry">
     <rect>
-     <x>6</x>
-     <y>-1</y>
-     <width>1101</width>
+     <x>30</x>
+     <y>0</y>
+     <width>1761</width>
      <height>1001</height>
     </rect>
    </property>
@@ -32,7 +32,7 @@
     <widget class="QListWidget" name="observation_widget">
      <property name="geometry">
       <rect>
-       <x>770</x>
+       <x>1420</x>
        <y>0</y>
        <width>331</width>
        <height>261</height>
@@ -47,7 +47,7 @@
       <rect>
        <x>0</x>
        <y>0</y>
-       <width>761</width>
+       <width>1411</width>
        <height>261</height>
       </rect>
      </property>
@@ -60,7 +60,7 @@
       <rect>
        <x>0</x>
        <y>270</y>
-       <width>851</width>
+       <width>1511</width>
        <height>631</height>
       </rect>
      </property>
@@ -71,7 +71,7 @@
       <rect>
        <x>0</x>
        <y>900</y>
-       <width>851</width>
+       <width>1511</width>
        <height>71</height>
       </rect>
      </property>
@@ -84,7 +84,7 @@
     <widget class="QPushButton" name="update_plot_button">
      <property name="geometry">
       <rect>
-       <x>860</x>
+       <x>1520</x>
        <y>270</y>
        <width>231</width>
        <height>51</height>
@@ -97,7 +97,7 @@
     <widget class="QComboBox" name="x_axis_parameter_comboBox">
      <property name="geometry">
       <rect>
-       <x>860</x>
+       <x>1520</x>
        <y>350</y>
        <width>231</width>
        <height>22</height>
@@ -116,7 +116,7 @@
     <widget class="QLabel" name="label">
      <property name="geometry">
       <rect>
-       <x>860</x>
+       <x>1520</x>
        <y>330</y>
        <width>231</width>
        <height>21</height>
@@ -154,7 +154,7 @@
       <rect>
        <x>0</x>
        <y>0</y>
-       <width>421</width>
+       <width>1081</width>
        <height>261</height>
       </rect>
      </property>
@@ -165,7 +165,7 @@
     <widget class="QTableWidgetEnhanced" name="fit_result_table">
      <property name="geometry">
       <rect>
-       <x>430</x>
+       <x>1090</x>
        <y>0</y>
        <width>661</width>
        <height>261</height>
@@ -180,7 +180,7 @@
       <rect>
        <x>0</x>
        <y>900</y>
-       <width>851</width>
+       <width>1511</width>
        <height>71</height>
       </rect>
      </property>
@@ -195,7 +195,7 @@
       <rect>
        <x>0</x>
        <y>270</y>
-       <width>851</width>
+       <width>1511</width>
        <height>631</height>
       </rect>
      </property>
@@ -204,10 +204,10 @@
     <widget class="QPushButton" name="update_fit_result_button">
      <property name="geometry">
       <rect>
-       <x>860</x>
+       <x>1520</x>
        <y>270</y>
        <width>231</width>
-       <height>51</height>
+       <height>111</height>
       </rect>
      </property>
      <property name="text">
@@ -215,11 +215,26 @@
      </property>
     </widget>
    </widget>
+   <widget class="QWidget" name="dataframe_tab">
+    <attribute name="title">
+     <string>DataFrame</string>
+    </attribute>
+    <widget class="DataFrameWidget" name="dataframe">
+     <property name="geometry">
+      <rect>
+       <x>-5</x>
+       <y>1</y>
+       <width>1761</width>
+       <height>981</height>
+      </rect>
+     </property>
+    </widget>
+   </widget>
   </widget>
   <widget class="QPlainTextEdit" name="info">
    <property name="geometry">
     <rect>
-     <x>873</x>
+     <x>1550</x>
      <y>410</y>
      <width>231</width>
      <height>481</height>
@@ -241,9 +256,9 @@
   <widget class="QPushButton" name="open_code_button">
    <property name="geometry">
     <rect>
-     <x>870</x>
+     <x>1550</x>
      <y>902</y>
-     <width>241</width>
+     <width>231</width>
      <height>41</height>
     </rect>
    </property>
@@ -254,9 +269,9 @@
   <widget class="QPushButton" name="open_explorer_button">
    <property name="geometry">
     <rect>
-     <x>870</x>
+     <x>1550</x>
      <y>950</y>
-     <width>241</width>
+     <width>231</width>
      <height>41</height>
     </rect>
    </property>
@@ -264,6 +279,10 @@
     <string>Open Explorer Window</string>
    </property>
   </widget>
+  <zorder>open_explorer_button</zorder>
+  <zorder>open_code_button</zorder>
+  <zorder>parameter_tab</zorder>
+  <zorder>info</zorder>
  </widget>
  <customwidgets>
   <customwidget>
@@ -274,6 +293,11 @@
   <customwidget>
    <class>QTableWidgetEnhancedDrop</class>
    <extends>QTableWidget</extends>
+   <header>qutip_enhanced/qtgui/custom_widgets.h</header>
+  </customwidget>
+  <customwidget>
+   <class>DataFrameWidget</class>
+   <extends>QTableView</extends>
    <header>qutip_enhanced/qtgui/custom_widgets.h</header>
   </customwidget>
  </customwidgets>
