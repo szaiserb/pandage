@@ -52,7 +52,7 @@ class DataGeneration:
             _ = data_handling.check_array_like(v, 'value_in_{}'.format(k))
             if len(v) == 0:
                 raise Exception("Error: parameter {} has length zero {}".format(k))
-            items_occuring_more_than_once = [k for k, c in collections.Counter(v).iteritems() if c > 1]
+            items_occuring_more_than_once = [item_val for item_val, number_of_occurences in collections.Counter(v).iteritems() if number_of_occurences > 1]
             if len(items_occuring_more_than_once) > 0:
                 raise Exception("Error: parameter {} has duplicate items {}".format(k, items_occuring_more_than_once))
         self._parameters = val

@@ -37,8 +37,9 @@ def test_states(dims=None, pure=False, **kwargs):
     """
     if 'names_multi_list' in kwargs:
         names_multi_list = kwargs.get('names_multi_list')
-        if not all(len(i) == len(dims) for i in names_multi_list):#:for i in names_multi_list:
-            raise Exception('Error: {}, {}, {}'.format(len(dims), dims, names_multi_list))
+        l_ok_list = [len(i) == len(dims) for i in names_multi_list]
+        if not all(l_ok_list):#:for i in names_multi_list:
+            raise Exception('Error: {}, {}, {}, {}'.format(len(dims), dims, names_multi_list, l_ok_list))
     elif 'names_multi_list_str' in kwargs:
         nmls = kwargs.get('names_multi_list_str')
         names_multi_list = []
