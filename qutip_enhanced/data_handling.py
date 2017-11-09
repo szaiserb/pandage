@@ -358,7 +358,7 @@ class Data:
         else:
             if type(l) in [collections.OrderedDict, dict]:
                 l = [l]
-            return df[functools.    reduce(np.logical_or, [functools.reduce(np.logical_and, [df[key] == val for key, val in d.items()]) for d in l])]
+            return df[functools.reduce(np.logical_or, [functools.reduce(np.logical_and, [df[key] == val for key, val in d.items()]) for d in l])]
 
     def dict_delete(self, l, df=None):
         raise Exception("WARNING: reset_index() might create column 'index'. If thats the case, add 'drop=True'")
@@ -489,12 +489,6 @@ class PlotData:
                 self.gui.clear()
             self._data = val
             self.new_data_arrived()
-            df = self.data.df.drop('trace', axis=1)
-            df = df.drop('thresholds', axis=1)
-            for col in df.columns:
-                if len(df[col].unique()) == 1:
-                    df.drop(col, inplace=True, axis=1)
-            self.gui.dataframe.setDataFrame(df)
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
@@ -519,7 +513,8 @@ class PlotData:
                     drop = True
                 if drop:
                     df.drop(col, inplace=True, axis=1)
-            self.gui.dataframe.setDataFrame(df)
+            if hasattr(self, '_gui'):
+                self.gui.dataframe.setDataFrame(df)
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)

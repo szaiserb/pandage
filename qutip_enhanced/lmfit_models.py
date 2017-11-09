@@ -85,12 +85,12 @@ class TripLorentzModel(lmfit.Model):
     def __init__(self, splitting, *args, **kwargs):
 
         self.splitting = np.abs(splitting)
-        def trip_lorentz_n14(x, center, g, a1, a2, a3, c):
+        def trip_lorentz(x, center, g, a1, a2, a3, c):
             """Lorentzian centered at x0, with amplitude a, offset y0 and HWHM g."""
             x2 = center - self.splitting
             x3 = center + self.splitting
             return -abs(a1) / np.pi * (g ** 2 / ((x - center) ** 2 + g ** 2)) - abs(a2) / np.pi * (g ** 2 / ((x - x2) ** 2 + g ** 2)) - abs(a3) / np.pi * (g ** 2 / ((x - x3) ** 2 + g ** 2)) + c
-        super(TripLorentzModel, self).__init__(trip_lorentz_n14, *args, **kwargs)
+        super(TripLorentzModel, self).__init__(trip_lorentz, *args, **kwargs)
 
     def guess(self, data, x=None, **kwargs):
         def trip_lorentz_estimator(y=None, x=None):
@@ -103,7 +103,7 @@ class TripLorentzModel(lmfit.Model):
             trip_mean = np.array(trip_mean)
             c = trip_mean.max()
             center = x[trip_mean.argmin()] + self.splitting
-            g = 0.5  # HWHM
+            g = self.splitting/4.
             a1 = a2 = a3 = (trip_mean.min() - c) * np.pi
             return center, g, a1, a2, a3, c
 

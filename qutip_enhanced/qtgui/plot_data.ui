@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1827</width>
-    <height>1026</height>
+    <width>1673</width>
+    <height>998</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -18,7 +18,7 @@
     <rect>
      <x>30</x>
      <y>0</y>
-     <width>1761</width>
+     <width>1641</width>
      <height>1001</height>
     </rect>
    </property>
@@ -32,7 +32,7 @@
     <widget class="QListWidget" name="observation_widget">
      <property name="geometry">
       <rect>
-       <x>1420</x>
+       <x>1300</x>
        <y>0</y>
        <width>331</width>
        <height>261</height>
@@ -47,7 +47,7 @@
       <rect>
        <x>0</x>
        <y>0</y>
-       <width>1411</width>
+       <width>1291</width>
        <height>261</height>
       </rect>
      </property>
@@ -60,7 +60,7 @@
       <rect>
        <x>0</x>
        <y>270</y>
-       <width>1511</width>
+       <width>1391</width>
        <height>631</height>
       </rect>
      </property>
@@ -71,7 +71,7 @@
       <rect>
        <x>0</x>
        <y>900</y>
-       <width>1511</width>
+       <width>1391</width>
        <height>71</height>
       </rect>
      </property>
@@ -84,7 +84,7 @@
     <widget class="QPushButton" name="update_plot_button">
      <property name="geometry">
       <rect>
-       <x>1520</x>
+       <x>1400</x>
        <y>270</y>
        <width>231</width>
        <height>51</height>
@@ -97,7 +97,7 @@
     <widget class="QComboBox" name="x_axis_parameter_comboBox">
      <property name="geometry">
       <rect>
-       <x>1520</x>
+       <x>1400</x>
        <y>350</y>
        <width>231</width>
        <height>22</height>
@@ -116,7 +116,7 @@
     <widget class="QLabel" name="label">
      <property name="geometry">
       <rect>
-       <x>1520</x>
+       <x>1400</x>
        <y>330</y>
        <width>231</width>
        <height>21</height>
@@ -234,10 +234,10 @@
   <widget class="QPlainTextEdit" name="info">
    <property name="geometry">
     <rect>
-     <x>1550</x>
-     <y>410</y>
+     <x>1430</x>
+     <y>400</y>
      <width>231</width>
-     <height>481</height>
+     <height>491</height>
     </rect>
    </property>
    <property name="acceptDrops">
@@ -256,7 +256,7 @@
   <widget class="QPushButton" name="open_code_button">
    <property name="geometry">
     <rect>
-     <x>1550</x>
+     <x>1430</x>
      <y>902</y>
      <width>231</width>
      <height>41</height>
@@ -269,7 +269,7 @@
   <widget class="QPushButton" name="open_explorer_button">
    <property name="geometry">
     <rect>
-     <x>1550</x>
+     <x>1430</x>
      <y>950</y>
      <width>231</width>
      <height>41</height>
@@ -279,10 +279,6 @@
     <string>Open Explorer Window</string>
    </property>
   </widget>
-  <zorder>open_explorer_button</zorder>
-  <zorder>open_code_button</zorder>
-  <zorder>parameter_tab</zorder>
-  <zorder>info</zorder>
  </widget>
  <customwidgets>
   <customwidget>
