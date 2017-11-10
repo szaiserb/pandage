@@ -209,34 +209,6 @@ def get_rot_operator(dim, angle=np.pi / 2.0, **kwargs):
     U = (-1j * angle * rot_mat).expm()
     return U
 
-# def get_rot_operator_all_spins(dims=None, selective_to=None, rotated_spin=None, **kwargs):
-#     """
-#     - selective_to[0] names a list of spins. selective_to[1] gives the levels of spin i that the rotation should be selective on,
-#     if a spin is omitted here in this dictionary, rotated_spin will be rotated in all spin states
-#     example: given a system with three spins, spin 1, 1, 1/2.0, transition = [0,1], rotated spin = 1 and selective_to = {0:[1,2],2:[1]} will rotate the second spins transition 1 < - > 0,
-#     if spin 0 is in spin states 1 or 2 but not if it is in spin state 0 and if spin 2 is in spin state 1 but not if it is in spin state 0
-#     """
-#     selective_to = {} if selective_to is None else selective_to
-#     if rotated_spin in selective_to:
-#         raise Exception('Error: rotated_spin must not be in selective_to!!\n{}, {}'.format(dims, selective_to))
-#     for idx, val in selective_to.items():
-#         if len(val) == 0 or len(val) > dims[idx]:
-#             raise Exception('Error: {}, {}'.format(dims, selective_to))
-#     l = []
-#     for i, dim in enumerate(dims):
-#         if i == rotated_spin:
-#             l.append([kwargs.get('rot_op', get_rot_operator(dim=dims[rotated_spin], **kwargs))])
-#         else:
-#             try:
-#                 sl = selective_to[i]
-#             except:
-#                 sl = range(dim)
-#             for idx, item in enumerate(sl):
-#                 sl[idx] = ket2dm(basis(dim, item))
-#             l.append(sl)
-#     out = qsum([tensor(*items) for items in itertools.product(*l)])
-#     return out
-
 def get_rot_operator_all_spins(dims=None, selective_to=None, rotated_spin=None, **kwargs):
     """
     - selective_to[0] names a list of spins. selective_to[1] gives the levels of spin i that the rotation should be selective on,
@@ -276,8 +248,6 @@ def get_rot_operator_all_spins(dims=None, selective_to=None, rotated_spin=None, 
                 for item in sl:
                     sll.append(fock_dm(dim, item))
                 l.append(sll)
-                print("L", l)
-        print("A", qsum([tensor(*items) for items in itertools.product(*l)]))
         out.append(qsum([tensor(*items) for items in itertools.product(*l)]))
     return qsum(out)
 
