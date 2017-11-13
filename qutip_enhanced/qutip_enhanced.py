@@ -10,10 +10,14 @@ from . import coordinates
 import copy
 import scipy.linalg
 
-from numpy import *
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import os, sys
 from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d import proj3d
 import itertools
+
 
 np.set_printoptions(linewidth=1e5)  # matrices are displayd much more clearly
 
@@ -209,13 +213,19 @@ def get_rot_operator(dim, angle=np.pi / 2.0, **kwargs):
     U = (-1j * angle * rot_mat).expm()
     return U
 
-def get_rot_operator_all_spins(dims=None, selective_to=None, rotated_spin=None, **kwargs):
+def get_rot_operator_all_spins(**kwargs):
     """
     - selective_to[0] names a list of spins. selective_to[1] gives the levels of spin i that the rotation should be selective on,
     if a spin is omitted here in this dictionary, rotated_spin will be rotated in all spin states
     example: given a system with three spins, spin 1, 1, 1/2.0, transition = [0,1], rotated spin = 1 and selective_to = {0:[1,2],2:[1]} will rotate the second spins transition 1 < - > 0,
     if spin 0 is in spin states 1 or 2 but not if it is in spin state 0 and if spin 2 is in spin state 1 but not if it is in spin state 0
     """
+    selective_to = kwargs.pop('seletive_to', None)
+    rotated_spin = kwargs.pop('rotated_spin', None)
+    if 'dims' in kwargs:
+        dims = kwargs.pop('dims')
+    elif 'dim' in kwargs:
+        dims = [kwargs.pop('dim')]
     if rotated_spin is None:
         if len(dims) == 1:
             rotated_spin = 0
@@ -224,6 +234,7 @@ def get_rot_operator_all_spins(dims=None, selective_to=None, rotated_spin=None, 
     selective_to = {} if selective_to is None else selective_to
     if rotated_spin in selective_to:
         raise Exception('Error: rotated_spin must not be in selective_to!!\n{}, {}'.format(dims, selective_to))
+    print(selective_to)
     for idx, val in selective_to.items():
         if len(val) == 0 or len(val) > dims[idx]:
             raise Exception('Error: {}, {}'.format(dims, selective_to))

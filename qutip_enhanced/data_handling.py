@@ -309,8 +309,8 @@ class Data:
 
     @df.setter
     def df(self, value):
-        if value is not None:
-            raise Exception("You must not change the data!")
+        self._df = value
+        self.reinstate_integrity()
 
     def save(self, filepath):
         if filepath.endswith('.csv'):
@@ -392,6 +392,23 @@ class Data:
                 sub = self.dict_access(d)
             yield d, d_idx, idx, sub
 
+    @property
+    def non_unary_parameter_names(self):
+        out = []
+        for cn in self.parameter_names:
+            try:
+                if len(self.df[cn].unique()) > 1:
+                    out.append(cn)
+            except:  # drops for example columns with numpy arrays
+                pass
+        return out
+
+    def reinstate_integrity(self):
+        self.parameter_names = [i for i in self.parameter_names if i in self.df.columns]
+        self.observation_names = [i for i in self.observation_names if i in self.df.columns]
+        for key in self.dtypes.keys():
+            if key in self.dtypes and key not in self.df.columns:
+                del self.dtypes[key]
 
 def recompile_plotdata_ui_file():
     fold = "{}/qtgui".format(os.path.dirname(__file__))
