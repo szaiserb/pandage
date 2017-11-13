@@ -216,6 +216,11 @@ def get_rot_operator_all_spins(dims=None, selective_to=None, rotated_spin=None, 
     example: given a system with three spins, spin 1, 1, 1/2.0, transition = [0,1], rotated spin = 1 and selective_to = {0:[1,2],2:[1]} will rotate the second spins transition 1 < - > 0,
     if spin 0 is in spin states 1 or 2 but not if it is in spin state 0 and if spin 2 is in spin state 1 but not if it is in spin state 0
     """
+    if rotated_spin is None:
+        if len(dims) == 1:
+            rotated_spin = 0
+        else:
+            raise Exception('If the total dimensionality is greater than 1 (dims={}), rotated_spin must be given.'.format(dims))
     selective_to = {} if selective_to is None else selective_to
     if rotated_spin in selective_to:
         raise Exception('Error: rotated_spin must not be in selective_to!!\n{}, {}'.format(dims, selective_to))
