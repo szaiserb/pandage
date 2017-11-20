@@ -222,7 +222,6 @@ class DynPython(sequence_creator.Arbitrary):
 
     def set_projector(self, bin, P=None, n_ens=None, clear_workspace=True):
         self.eng.workspace["Projector_from_python"] = matlab.double(np.array(P, dtype=np.complex64).tolist(), is_complex=True)
-        # n_ens_list = range(1, self.n_ensemble+1) if n_ens is None else [n_ens+1]
         n_ens_list = range(1, self.n_ensemble+1) if n_ens is None else [n_ens+1]
         for n_ens in n_ens_list:
             self.eng.eval("dyn.cache.set_P({}, {}, Projector_from_python)".format(bin+1, n_ens), nargout=0)

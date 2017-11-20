@@ -288,7 +288,6 @@ class Data:
                     self.hdf_filepath = init_from_file
                 elif init_from_file.endswith('.csv'):
                     df = pd.read_csv(init_from_file, compression='gzip')
-
             self._df = df[pd.notnull(df)]
             if False in [hasattr(self, i) for i in ['_parameter_names', '_observation_names', '_dtypes']]:
                 if last_parameter is None:
@@ -394,6 +393,9 @@ class Data:
 
     @property
     def non_unary_parameter_names(self):
+        """
+        :return: all parameter_names that are indeed varied (with at least two different values in self.df)
+        """
         out = []
         for cn in self.parameter_names:
             try:
@@ -404,6 +406,9 @@ class Data:
         return out
 
     def reinstate_integrity(self):
+        """
+        After columns of self.df have been removed, remove these from other variables as well.
+        """
         self.parameter_names = [i for i in self.parameter_names if i in self.df.columns]
         self.observation_names = [i for i in self.observation_names if i in self.df.columns]
         for key in self.dtypes.keys():

@@ -137,6 +137,54 @@
       <string>x-axis parameter</string>
      </property>
     </widget>
+    <widget class="QPushButton" name="open_explorer_button">
+     <property name="geometry">
+      <rect>
+       <x>1400</x>
+       <y>928</y>
+       <width>231</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Open Explorer Window</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="open_code_button">
+     <property name="geometry">
+      <rect>
+       <x>1400</x>
+       <y>880</y>
+       <width>231</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Measurement Code</string>
+     </property>
+    </widget>
+    <widget class="QPlainTextEdit" name="info">
+     <property name="geometry">
+      <rect>
+       <x>1400</x>
+       <y>380</y>
+       <width>231</width>
+       <height>491</height>
+      </rect>
+     </property>
+     <property name="acceptDrops">
+      <bool>false</bool>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::NoFrame</enum>
+     </property>
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+     <property name="backgroundVisible">
+      <bool>false</bool>
+     </property>
+    </widget>
     <zorder>parameter_table</zorder>
     <zorder>observation_widget</zorder>
     <zorder>gridLayoutWidget</zorder>
@@ -144,6 +192,9 @@
     <zorder>update_plot_button</zorder>
     <zorder>x_axis_parameter_comboBox</zorder>
     <zorder>label</zorder>
+    <zorder>open_explorer_button</zorder>
+    <zorder>open_code_button</zorder>
+    <zorder>info</zorder>
    </widget>
    <widget class="QWidget" name="fit_tab">
     <attribute name="title">
@@ -180,7 +231,7 @@
       <rect>
        <x>0</x>
        <y>900</y>
-       <width>1511</width>
+       <width>1391</width>
        <height>71</height>
       </rect>
      </property>
@@ -195,7 +246,7 @@
       <rect>
        <x>0</x>
        <y>270</y>
-       <width>1511</width>
+       <width>1391</width>
        <height>631</height>
       </rect>
      </property>
@@ -204,7 +255,7 @@
     <widget class="QPushButton" name="update_fit_result_button">
      <property name="geometry">
       <rect>
-       <x>1520</x>
+       <x>1400</x>
        <y>270</y>
        <width>231</width>
        <height>111</height>
@@ -230,54 +281,6 @@
      </property>
     </widget>
    </widget>
-  </widget>
-  <widget class="QPlainTextEdit" name="info">
-   <property name="geometry">
-    <rect>
-     <x>1430</x>
-     <y>400</y>
-     <width>231</width>
-     <height>491</height>
-    </rect>
-   </property>
-   <property name="acceptDrops">
-    <bool>false</bool>
-   </property>
-   <property name="frameShape">
-    <enum>QFrame::NoFrame</enum>
-   </property>
-   <property name="readOnly">
-    <bool>true</bool>
-   </property>
-   <property name="backgroundVisible">
-    <bool>false</bool>
-   </property>
-  </widget>
-  <widget class="QPushButton" name="open_code_button">
-   <property name="geometry">
-    <rect>
-     <x>1430</x>
-     <y>902</y>
-     <width>231</width>
-     <height>41</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Measurement Code</string>
-   </property>
-  </widget>
-  <widget class="QPushButton" name="open_explorer_button">
-   <property name="geometry">
-    <rect>
-     <x>1430</x>
-     <y>950</y>
-     <width>231</width>
-     <height>41</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Open Explorer Window</string>
-   </property>
   </widget>
  </widget>
  <customwidgets>

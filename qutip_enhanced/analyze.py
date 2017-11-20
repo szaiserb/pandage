@@ -3,14 +3,20 @@ from __future__ import print_function, absolute_import, division
 
 __metaclass__ = type
 from qutip import tensor, ket2dm, sigmax, sigmay, sigmaz, expect, jmat
-import itertools
+from .data_generation import DataGeneration
+from .data_handling import PlotData
+from .sequence_creator import unitary_propagator_list_mult
+from .qutip_enhanced import dim2spin
+from collections import OrderedDict
+from itertools import chain, combinations, product, izip, count
 
+import traceback, sys
 import matplotlib.pyplot as plt
 
 def purity(dm):
     """should work for qudits also"""
     s = range(len(dm.dims[0]))
-    comb = list(itertools.chain.from_iterable(itertools.combinations(s, r) for r in range(len(s) + 1)))[1:]
+    comb = list(chain.from_iterable(combinations(s, r) for r in range(len(s) + 1)))[1:]
     return dict((i, ((dm.ptrace(i)) ** 2).tr()) for i in comb)
 
 def test_states_single(dim, pure=False):
@@ -100,11 +106,11 @@ def single_quantum_transition_hf_spins(states_list, hf_spin_list='all'):
     states_list_non_hf_spins = [state for idx, state in enumerate(states_list) if idx not in hf_spin_list]
 
     out = []
-    for nhfl in itertools.product(*states_list_non_hf_spins):
+    for nhfl in product(*states_list_non_hf_spins):
         state_list_sub = states_list[:]
         for idx, state in zip(non_hf_spins, nhfl):
             state_list_sub[idx] = [state]
-        for s in itertools.product(*state_list_sub):
+        for s in product(*state_list_sub):
             for sn in hf_spin_list:
                 if s[sn] + 1 in state_list_sub[sn]:
                     ts = list(s)
@@ -131,14 +137,14 @@ def single_quantum_transitions_non_hf_spins(states_list, hf_spin_list='all'):
     non_hf_spins = [i for i in range(len(states_list)) if i not in hf_spin_list]
     states_list_hf_spins = [states_list[i] for i in hf_spin_list]
     out = []
-    for nhfl in itertools.product(*states_list_hf_spins):
+    for nhfl in product(*states_list_hf_spins):
         state_list_sub = states_list[:]
         for hf_spin, state in zip(hf_spin_list, nhfl):
             state_list_sub[hf_spin] = [state]
         for sn in non_hf_spins:
             for i in [k for k in non_hf_spins if k != sn]:
                 state_list_sub[i] = [state_list_sub[i][0]]
-            for s in itertools.product(*state_list_sub):
+            for s in product(*state_list_sub):
                 if s[sn] + 1 in states_list[sn]:
                     ts = list(s)
                     ts[sn] += 1
@@ -183,7 +189,7 @@ def state_num_name(state, name_list):
 
 def get_transition_frequency(h, **kwargs):
     dims = h.dims[0]
-    m_list = list(itertools.product(*[range(i) for i in dims]))
+    m_list = list(product(*[range(i) for i in dims]))
     h_diag = h.diag()
 
     def t(s0, s1):
@@ -246,4 +252,82 @@ def plot_state(dml, var=None, qubit_names=None, vertical_lines_at=None):
     fig.set_size_inches(24, 12)
     return fig, arr
 
-# from qutip_enhanced.data_handling import PlotData
+class Simulate(DataGeneration):
+
+    def __init__(self, gui=False, progress_bar=None, **kwargs):
+        DataGeneration.__init__(self)
+        self.parameters = kwargs.pop('parameters')
+        self.times = kwargs.pop('times')  # dp.times_full
+        self.fields = kwargs.pop('fields')  # dp.fields_full
+        self.ret_h_mhz = kwargs.pop('ret_h_mhz')
+        self.L_Bc = kwargs.pop('L_Bc')
+        self.dims = kwargs.pop('dims')
+        self.gui = gui
+        self.pld = PlotData('analyze_pulse', gui=self.gui)
+        self.pld.x_axis_parameter = 'to_bin'
+        self.progress_bar = progress_bar
+        self.number_of_simultaneous_measurements = len(self.parameters['to_bin']) * len(self.parameters['initial_state']) * len(self.parameters['spin_num']) * len(self.parameters['axis'])
+
+    @property
+    def observation_names(self):
+        return ["expect"]
+
+    @property
+    def dtypes(self):
+        return None
+
+    def run(self, abort=None):
+        self.init_run(init_from_file=None, iff=None)
+        try:
+            for idx, self.current_iterator_df in izip(count(0), self.iterator()):
+                if abort is not None and abort.is_set(): break
+                obs = self.f(current_iterator_df=self.current_iterator_df, abort=abort)
+                self.data.set_observations(obs)
+                if self.gui:
+                    self.pld.new_data_arrived()
+            # self.save()
+        except Exception:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
+        finally:
+            self.state = 'idle'
+            self.update_current_str()
+
+    def update_progress(self):
+        super(Simulate, self).update_progress()
+        if self.progress_bar is None:
+            print(self.progress)
+        else:
+            self.progress_bar.value = self.progress
+
+    def detunings(self, iterator_df_row):
+        return dict([(key, val) for key, val in iterator_df_row.iteritems() if 'detuning' in key])
+
+    def f(self, current_iterator_df, abort):
+        observation_dict_list = []
+        u_list_generated = False
+        for idx, _I_ in current_iterator_df.iterrows():
+            if abort.is_set(): break
+            if not u_list_generated:
+                u_list_mult = unitary_propagator_list_mult(
+                    h_mhz=self.ret_h_mhz(**self.detunings(_I_)),
+                    times_full=self.times,
+                    fields_full=self.fields,
+                    L_Bc=[_I_['ps'] * i for i in self.L_Bc],
+                )
+                u_list_generated = True
+            ts = test_states(dims=self.dims, pure=False, names_multi_list=[[_I_['initial_state']]]).values()[0]
+            pts = propagate_test_states([u_list_mult[_I_['to_bin']]], ts)
+            obse = OrderedDict(
+                [
+                    ('expect',
+                     expect(
+                         jmat(
+                             dim2spin(self.dims[_I_['spin_num']]),
+                             _I_['axis']),
+                         pts[0].ptrace(_I_['spin_num']))
+                     )
+                ]
+            )
+            observation_dict_list.append(obse)
+        return observation_dict_list

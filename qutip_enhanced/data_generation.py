@@ -1,26 +1,11 @@
 from __future__ import print_function, absolute_import, division
 __metaclass__ = type
 
-import sys
-if sys.version_info.major == 2:
-    from imp import reload
-else:
-    from importlib import reload
+from . import data_handling
 
 import numpy as np
 import pandas as pd
-import errno
-import shutil
-import traceback
-import datetime
-import time
-import zipfile
-from . import data_handling
-import qutip_enhanced.analyze as qta; reload(qta)
-import os
-import itertools
-import collections
-import datetime
+import errno, shutil, traceback, zipfile, itertools, collections, datetime, sys, os
 
 class DataGeneration:
 
@@ -83,13 +68,13 @@ class DataGeneration:
     def data(self, val):
         self.pld.data = val
 
-    @property
-    def pld(self):
-        return self._pld
-
-    @pld.setter
-    def pld(self, val):
-        self._pld = val
+    # @property
+    # def pld(self):
+    #     return self._pld
+    #
+    # @pld.setter
+    # def pld(self, val):
+    #     self._pld = val
 
     def dropnan_data(self):
         ldf = len(self.data.df)
