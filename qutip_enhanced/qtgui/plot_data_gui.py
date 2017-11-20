@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'd:\dropbox\dokumente\pi3\code\python\qutip_enhanced\qutip_enhanced/qtgui/plot_data.ui'
+# Form implementation generated from reading ui file 'D:\Python\qutip_enhanced\qutip_enhanced/qtgui/plot_data.ui'
 #
 # Created by: PyQt5 UI code generator 5.6
 #
@@ -11,7 +11,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_window(object):
     def setupUi(self, window):
         window.setObjectName("window")
-        window.resize(1673, 998)
+        window.resize(1985, 998)
         self.parameter_tab = QtWidgets.QTabWidget(window)
         self.parameter_tab.setGeometry(QtCore.QRect(30, 0, 1641, 1001))
         self.parameter_tab.setObjectName("parameter_tab")
@@ -57,7 +57,7 @@ class Ui_window(object):
         self.label.setFrameShadow(QtWidgets.QFrame.Raised)
         self.label.setObjectName("label")
         self.open_explorer_button = QtWidgets.QPushButton(self.plot_tab)
-        self.open_explorer_button.setGeometry(QtCore.QRect(1400, 928, 231, 41))
+        self.open_explorer_button.setGeometry(QtCore.QRect(1400, 930, 231, 41))
         self.open_explorer_button.setObjectName("open_explorer_button")
         self.open_code_button = QtWidgets.QPushButton(self.plot_tab)
         self.open_code_button.setGeometry(QtCore.QRect(1400, 880, 231, 41))
@@ -107,7 +107,7 @@ class Ui_window(object):
         self.plot_fit_layout.setContentsMargins(0, 0, 0, 0)
         self.plot_fit_layout.setObjectName("plot_fit_layout")
         self.update_fit_result_button = QtWidgets.QPushButton(self.fit_tab)
-        self.update_fit_result_button.setGeometry(QtCore.QRect(1400, 270, 231, 111))
+        self.update_fit_result_button.setGeometry(QtCore.QRect(1400, 270, 231, 101))
         self.update_fit_result_button.setObjectName("update_fit_result_button")
         self.parameter_tab.addTab(self.fit_tab, "")
         self.dataframe_tab = QtWidgets.QWidget()
@@ -115,10 +115,11 @@ class Ui_window(object):
         self.dataframe = DataFrameWidget(self.dataframe_tab)
         self.dataframe.setGeometry(QtCore.QRect(-5, 1, 1761, 981))
         self.dataframe.setObjectName("dataframe")
+        self.dataframe.raise_()
         self.parameter_tab.addTab(self.dataframe_tab, "")
 
         self.retranslateUi(window)
-        self.parameter_tab.setCurrentIndex(0)
+        self.parameter_tab.setCurrentIndex(1)
         QtCore.QMetaObject.connectSlotsByName(window)
 
     def retranslateUi(self, window):

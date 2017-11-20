@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1673</width>
+    <width>1985</width>
     <height>998</height>
    </rect>
   </property>
@@ -23,7 +23,7 @@
     </rect>
    </property>
    <property name="currentIndex">
-    <number>0</number>
+    <number>1</number>
    </property>
    <widget class="QWidget" name="plot_tab">
     <attribute name="title">
@@ -141,7 +141,7 @@
      <property name="geometry">
       <rect>
        <x>1400</x>
-       <y>928</y>
+       <y>930</y>
        <width>231</width>
        <height>41</height>
       </rect>
@@ -258,7 +258,7 @@
        <x>1400</x>
        <y>270</y>
        <width>231</width>
-       <height>111</height>
+       <height>101</height>
       </rect>
      </property>
      <property name="text">
@@ -280,6 +280,8 @@
       </rect>
      </property>
     </widget>
+    <zorder>dataframe</zorder>
+    <zorder>open_code_button_2</zorder>
    </widget>
   </widget>
  </widget>
