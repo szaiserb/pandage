@@ -285,6 +285,7 @@ class Simulate(DataGeneration):
                 self.data.set_observations(obs)
                 if self.gui:
                     self.pld.new_data_arrived()
+            self.pld.new_data_arrived()
             # self.save()
         except Exception:
             exc_type, exc_value, exc_tb = sys.exc_info()

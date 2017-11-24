@@ -430,7 +430,7 @@ class PlotData:
     def __init__(self, title=None, parent=None, gui=True, **kwargs):
         super(PlotData, self).__init__()
         if gui:
-            self._gui = PlotDataQt(plot_data_no_qt=self, parent=parent)
+            self.init_gui(parent)
             self.gui.show()
         if 'path' in kwargs:
             self.set_data_from_path(path=kwargs['path'])
@@ -438,6 +438,11 @@ class PlotData:
             self.data = kwargs['data']
         if title is not None:
             self.update_window_title(title)
+
+    def init_gui(self, parent=None):
+        del self._observation_list_data
+        self._gui = PlotDataQt(plot_data_no_qt=self, parent=parent)
+        self.new_data_arrived()
 
     fit_function = 'cosine'
     show_legend = False
