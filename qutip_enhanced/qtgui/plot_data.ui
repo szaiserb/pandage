@@ -23,7 +23,7 @@
     </rect>
    </property>
    <property name="currentIndex">
-    <number>1</number>
+    <number>0</number>
    </property>
    <widget class="QWidget" name="plot_tab">
     <attribute name="title">
@@ -280,8 +280,6 @@
       </rect>
      </property>
     </widget>
-    <zorder>dataframe</zorder>
-    <zorder>open_code_button_2</zorder>
    </widget>
   </widget>
  </widget>

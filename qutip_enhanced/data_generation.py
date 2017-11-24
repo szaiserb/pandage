@@ -68,13 +68,13 @@ class DataGeneration:
     def data(self, val):
         self.pld.data = val
 
-    # @property
-    # def pld(self):
-    #     return self._pld
-    #
-    # @pld.setter
-    # def pld(self, val):
-    #     self._pld = val
+    @property
+    def pld(self):
+        return self._pld
+
+    @pld.setter
+    def pld(self, val):
+        self._pld = val
 
     def dropnan_data(self):
         ldf = len(self.data.df)

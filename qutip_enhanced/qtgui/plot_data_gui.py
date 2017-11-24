@@ -115,11 +115,10 @@ class Ui_window(object):
         self.dataframe = DataFrameWidget(self.dataframe_tab)
         self.dataframe.setGeometry(QtCore.QRect(-5, 1, 1761, 981))
         self.dataframe.setObjectName("dataframe")
-        self.dataframe.raise_()
         self.parameter_tab.addTab(self.dataframe_tab, "")
 
         self.retranslateUi(window)
-        self.parameter_tab.setCurrentIndex(1)
+        self.parameter_tab.setCurrentIndex(0)
         QtCore.QMetaObject.connectSlotsByName(window)
 
     def retranslateUi(self, window):

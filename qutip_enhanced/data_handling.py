@@ -440,9 +440,9 @@ class PlotData:
             self.update_window_title(title)
 
     def init_gui(self, parent=None):
-        del self._observation_list_data
+        # del self._observation_list_data
         self._gui = PlotDataQt(plot_data_no_qt=self, parent=parent)
-        self.new_data_arrived()
+        # self.new_data_arrived()
 
     fit_function = 'cosine'
     show_legend = False
