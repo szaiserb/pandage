@@ -221,7 +221,7 @@ def get_rot_operator_all_spins(**kwargs):
     example: given a system with three spins, spin 1, 1, 1/2.0, transition = [0,1], rotated spin = 1 and selective_to = {0:[1,2],2:[1]} will rotate the second spins transition 1 < - > 0,
     if spin 0 is in spin states 1 or 2 but not if it is in spin state 0 and if spin 2 is in spin state 1 but not if it is in spin state 0
     """
-    selective_to = kwargs.pop('seletive_to', None)
+    selective_to = kwargs.pop('selective_to', None)
     rotated_spin = kwargs.pop('rotated_spin', None)
     if 'dims' in kwargs:
         dims = kwargs.pop('dims')
