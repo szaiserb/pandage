@@ -235,7 +235,6 @@ def get_rot_operator_all_spins(**kwargs):
     selective_to = {} if selective_to is None else selective_to
     if rotated_spin in selective_to:
         raise Exception('Error: rotated_spin must not be in selective_to!!\n{}, {}'.format(dims, selective_to))
-    print(selective_to)
     for idx, val in selective_to.items():
         if len(val) == 0 or len(val) > dims[idx]:
             raise Exception('Error: {}, {}'.format(dims, selective_to))
