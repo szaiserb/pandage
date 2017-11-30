@@ -29,6 +29,39 @@ def exp_decay(x, amplitude, t1, c):
 def t2_decay(x, amplitude, t2, c, p):
     return amplitude * np.exp(-(x / t2) ** p) + c
 
+def sinc(x, amplitude, center, rabi_frequency, y0):
+    """
+
+    :param x: detuning
+    :param amplitude:
+    :param x0:
+    :param rabi_frequency:
+    :param y0:
+    :return:
+    """
+    a = (rabi_frequency ** 2 + (x - center) ** 2)
+    return amplitude * rabi_frequency ** 2 / a * np.sin(np.sqrt(a) * np.pi / (2 * rabi_frequency)) ** 2 + y0
+
+
+class TripleSincHfModel(lmfit.Model):
+    def __init__(self, hf, rabi_frequency, *args, **kwargs):
+        self.hf = hf
+        self.rabi_frequency = rabi_frequency
+
+        def triple_sinc_hf(x, amplitude, center, y0):
+            hf = self.hf
+            s0 = sinc(x, .5 * amplitude, center - hf, self.rabi_frequency, y0)
+            s1 = sinc(x, amplitude, center, self.rabi_frequency, y0)
+            s2 = sinc(x, .5 * amplitude, center + hf, self.rabi_frequency, y0)
+            return (s0 + s1 + s2) / 3.
+
+        super(TripleSincHfModel, self).__init__(triple_sinc_hf, *args, **kwargs)
+
+    def guess(self, data, x=None, **kwargs):
+        center = 0.
+        y0 = data.max()
+        amplitude = -(y0-data.min())
+        return lmfit.models.update_param_vals(self.make_params(center=center, y0=y0, amplitude=amplitude), self.prefix, **kwargs)
 # def double_gaussian(x, amplitude_1, amplitude_2, center_1, center_2, sigma_1, sigma_2, c):
 #     return amplitude_1 * np.exp(-0.5 * ((x - center_1) / sigma_1) ** 2) + amplitude_2 * np.exp(-0.5 * ((x - center_2) / sigma_2) ** 2) + c
 # def guess_from_peak(y, x, negative, ampscale=1.0, sigscale=1.0):

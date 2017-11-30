@@ -374,7 +374,7 @@ class Data:
             for obs, val in kwargs.items():
                 if obs not in self.observation_names:
                     raise Exception('Error: {}'.format(l))
-                self._df.set_value(start_idx - len(l) + idx + 1, obs, val)
+                self._df.at[start_idx - len(l) + idx + 1, obs] = val
 
     def column_product(self, column_names):
         return itertools.product(*[getattr(self.df, cn).unique() for cn in column_names])
@@ -906,10 +906,7 @@ class PlotData:
                 self.update_selected_plot_items()
                 self.update_fit_select_table_data()
                 if hasattr(self, '_gui'):
-                    try:
-                        self.gui.fig.clear()
-                    except:
-                        pass
+                    self.gui.fig.clear()
                     self.gui.ax = self.gui.fig.add_subplot(111)
                     for idx, pdi in enumerate(self.line_plot_data()):
                         self.gui.ax.plot(pdi['x'], pdi['y'], '-')
@@ -1201,14 +1198,9 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
         self.plot_fit_layout.addWidget(self.canvas_fit, 1, 1, 20, 20)
         self.toolbar_fit_layout.addWidget(self.toolbar_fit, 21, 1, 1, 20)
 
-        self.ax_fit = self.fig_fit.add_subplot(111)
-        self.ax_fit.plot(np.linspace(-2., 2., 100), np.linspace(-2, 2., 100) ** 2)
-        self.canvas_fit.draw()
-
         self.update_plot_button.clicked.connect(self.plot_data_no_qt.update_plot)
         self.update_fit_result_button.clicked.connect(self.plot_data_no_qt.update_plot_fit)
         self.update_plot_button.setAcceptDrops(True)
-        # self.parameter_tab.setCurrentIndex(0)
 
         self.parameter_table.hdf_file_dropped.connect(self.plot_data_no_qt.set_data_from_path)
         self.parameter_table.itemSelectionChanged.connect(self.update_parameter_table_selected_indices_from_gui)
