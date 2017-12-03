@@ -887,7 +887,7 @@ class Concatenated(Arbitrary):
 
     def set_fields_full(self):
         # self._fields_full = np.concatenate(
-        out = np.empty((self.n_bins, self.n_columns))
+        out = np.zeros((self.n_bins, self.n_columns))
         nbcs = np.cumsum(([0] + [i.n_bins for i in self.p_list]))
         for i in range(len(self.p_list)):
             for c in self.controls:
