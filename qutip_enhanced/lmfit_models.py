@@ -58,7 +58,7 @@ class TripleSincHfModel(lmfit.Model):
         super(TripleSincHfModel, self).__init__(triple_sinc_hf, *args, **kwargs)
 
     def guess(self, data, x=None, **kwargs):
-        center = 0.
+        center = x[data.argmin()]
         y0 = data.max()
         amplitude = -(y0-data.min())
         return lmfit.models.update_param_vals(self.make_params(center=center, y0=y0, amplitude=amplitude), self.prefix, **kwargs)
