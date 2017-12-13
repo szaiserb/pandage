@@ -221,50 +221,45 @@ def get_rot_operator_all_spins(**kwargs):
     example: given a system with three spins, spin 1, 1, 1/2.0, transition = [0,1], rotated spin = 1 and selective_to = {0:[1,2],2:[1]} will rotate the second spins transition 1 < - > 0,
     if spin 0 is in spin states 1 or 2 but not if it is in spin state 0 and if spin 2 is in spin state 1 but not if it is in spin state 0
     """
-    selective_to = kwargs.pop('selective_to', None)
-    rotated_spin = kwargs.pop('rotated_spin', None)
     if 'dims' in kwargs:
         dims = kwargs.pop('dims')
     elif 'dim' in kwargs:
+        if 'selective_to' in kwargs:
+            raise Exception('Error: {}'.format(kwargs))
         dims = [kwargs.pop('dim')]
+    rotated_spin = kwargs.pop('rotated_spin', None)
+    selective_to = kwargs.pop('selective_to', {})
+    for idx, dim in enumerate(dims):
+        if idx not in selective_to and idx != rotated_spin:
+            selective_to[idx] = range(dim)
     if rotated_spin is None:
         if len(dims) == 1:
             rotated_spin = 0
         else:
             raise Exception('If the total dimensionality is greater than 1 (dims={}), rotated_spin must be given.'.format(dims))
-    selective_to = {} if selective_to is None else selective_to
     if rotated_spin in selective_to:
         raise Exception('Error: rotated_spin must not be in selective_to!!\n{}, {}'.format(dims, selective_to))
+    selective_to_compl = {}
+    selective_to_all_levels = 0
     for idx, val in selective_to.items():
         if len(val) == 0 or len(val) > dims[idx]:
             raise Exception('Error: {}, {}'.format(dims, selective_to))
+        if len(val) == dims[idx]:
+            selective_to_compl[idx] = range(dims[idx])
+            selective_to_all_levels += 1
+        else:
+            selective_to_compl[idx] = [k for k in range(dims[idx]) if k not in val]
+
     out = []
-    for stl in [True, False]:
-        if stl is False and len(selective_to) == 0:
-            continue
-        l = []
-        for i, dim in enumerate(dims):
-            if i == rotated_spin:
-                if stl:
-                    l.append([kwargs.get('rot_op', get_rot_operator(dim=dims[rotated_spin], **kwargs))])
-                else:
-                    l.append([qeye(dim)])
-            else:
-                if stl:
-                    if i in selective_to:
-                        sl = selective_to[i]
-                    else:
-                        sl = range(dim)
-                else:
-                    if i in selective_to:
-                        sl = [k for k in range(dim) if k not in selective_to[i]]
-                    else:
-                        sl = []
-                sll = []
-                for item in sl:
-                    sll.append(fock_dm(dim, item))
-                l.append(sll)
-        out.append(qsum([tensor(*items) for items in itertools.product(*l)]))
+    for d, operation in zip([selective_to, selective_to_compl], [kwargs.get('rot_op', get_rot_operator(dim=dims[rotated_spin], **kwargs)), qeye([dims[rotated_spin]])]):
+        for key in d:
+            for idx, item in enumerate(d[key]):
+                d[key][idx] = fock_dm(dims[key], item)
+        d[rotated_spin] = [operation]  # rotate for the selective_to, perform qeye for selective_to_compl
+        d = collections.OrderedDict(sorted(d.items()))
+        out.append(qsum([tensor(*items) for items in itertools.product(*d.values())]))
+        if selective_to_all_levels == len(dims) - 1:
+            break
     return qsum(out)
 
 def get_rot_matrix_all_spins(*args, **kwargs):
