@@ -916,9 +916,12 @@ class PlotData:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
 
-    def update_plot_fit(self):
+    def update_plot_fit(self, fit_results=None):
         try:
-            self.update_fit_results()
+            if fit_results is None:
+                self.update_fit_results()
+            else:
+                self._fit_results = fit_results
             if hasattr(self, '_gui'):
                 self.gui.fig_fit.clear()
                 self.gui.ax_fit = self.gui.fig_fit.add_subplot(111)

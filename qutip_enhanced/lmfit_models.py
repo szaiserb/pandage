@@ -44,9 +44,10 @@ def sinc(x, amplitude, center, rabi_frequency, y0):
 
 
 class TripleSincHfModel(lmfit.Model):
-    def __init__(self, hf, rabi_frequency, *args, **kwargs):
+    def __init__(self, hf, rabi_frequency, sweep_guess=False, *args, **kwargs):
         self.hf = hf
         self.rabi_frequency = rabi_frequency
+        self.sweep_guess = sweep_guess
 
         def triple_sinc_hf(x, amplitude, center, y0):
             hf = self.hf
