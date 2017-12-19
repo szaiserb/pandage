@@ -18,9 +18,22 @@ import collections
 from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d import proj3d
 import itertools
-
+import zipfile
 
 np.set_printoptions(linewidth=1e5)  # matrices are displayd much more clearly
+
+def save_qutip_enhanced(destination_dir):
+    src = os.path.dirname(os.path.dirname(__file__))
+    f = '{}/qutip_enhanced.zip'.format(destination_dir)
+    if not os.path.isfile(f):
+        zf = zipfile.ZipFile(f, 'a')
+        for root, dirs, files in os.walk(src):
+            # if (not any([i in root for i in ['__pycache__', 'awg_settings', 'currently_unused', ".idea", ".hg", 'UserScripts', 'log']])) or root.endswith('transition_tracker_log') or root.endswith('helpers'):
+            if (not any([i in root for i in ['build']])):
+                for file in files:
+                    if any([file.endswith(i) for i in ['.py', '.dat', '.ui']]) and not file == 'setup.py':
+                        zf.write(os.path.join(root, file), os.path.join(root.replace(os.path.commonprefix([root, src]), ""), file))
+        zf.close()
 
 class Eigenvector:
     def __init__(self, dims):

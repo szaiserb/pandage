@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import itertools
 from numbers import Number
+import datetime
 import traceback
 import collections
 import subprocess
@@ -343,7 +344,10 @@ class Data:
         for idx in range(len(df_append)):
             l_obs.append(collections.OrderedDict())
             for k, v in self.dtypes.items():
-                l_obs[idx][k] = getattr(__builtin__, v)()
+                if v == 'datetime':
+                    l_obs[idx][k] = datetime.datetime.min
+                else:
+                    l_obs[idx][k] = getattr(__builtin__, v)()
         df_append = pd.concat([df_append.reset_index(drop=True), pd.DataFrame(columns=self.observation_names, data=l_obs)], axis=1) #NECESSARY! Reason: sorting issues when appending df with missing columns
         if len(self.df) == 0:
             self._df = df_append
@@ -368,13 +372,18 @@ class Data:
 
     def set_observations(self, l, start_idx=None):
         start_idx = len(self._df) - 1 if start_idx is None else start_idx
-        if type(l) in [collections.OrderedDict, dict]:
-            l = [l]
-        for idx, kwargs in enumerate(l):
-            for obs, val in kwargs.items():
-                if obs not in self.observation_names:
-                    raise Exception('Error: {}'.format(l))
-                self._df.at[start_idx - len(l) + idx + 1, obs] = val
+        if type(l) == pd.DataFrame:
+            for idx, row in l.iterrows():
+                for obs, val in zip(l.columns, row):
+                    self._df.at[start_idx - len(l) + idx + 1, obs] = val
+        else:
+            if type(l) in [collections.OrderedDict, dict]:
+                l = [l]
+            for idx, kwargs in enumerate(l):
+                for obs, val in kwargs.items():
+                    if obs not in self.observation_names:
+                        raise Exception('Error: {}'.format(l))
+                    self._df.at[start_idx - len(l) + idx + 1, obs] = val
 
     def column_product(self, column_names):
         return itertools.product(*[getattr(self.df, cn).unique() for cn in column_names])
@@ -945,6 +954,8 @@ class PlotData:
             if len(getattr(self.data.df, self.x_axis_parameter).unique()) == 1:
                 self.x_axis_parameter = self.x_axis_parameter_with_largest_dim()
             cn = self.parameter_names_reduced()
+            if cn[0] == 'sweeps':
+                del cn[0]
             cn.remove(self.x_axis_parameter)
             for d, d_idx, idx, df_sub in self.data.iterator(cn):
                 for observation in self.observation_list_selected_data:

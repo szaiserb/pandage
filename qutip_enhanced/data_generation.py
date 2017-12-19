@@ -128,13 +128,14 @@ class DataGeneration:
             shutil.move(current_folder, initial_folder)
 
     def update_current_str(self):
-        cid = self.current_iterator_df.iloc[-1, :].to_dict()
-        cps = ""
-        cis = ""
-        for key, val in cid.items():
-            cps += "{}: {}\n".format(key, val)
-            cis += "{}: {} ({})\n".format(key, list(self.parameters[key]).index(val), len(self.parameters[key]))
-        self.pld.update_info_text('State: ' + self.state + '\n\n' + 'Current parameters:\n' + cps + '\n\n' + 'Current indices\n' + cis)
+        if hasattr(self, 'current_iterator_df'):
+            cid = self.current_iterator_df.iloc[-1, :].to_dict()
+            cps = ""
+            cis = ""
+            for key, val in cid.items():
+                cps += "{}: {}\n".format(key, val)
+                cis += "{}: {} ({})\n".format(key, list(self.parameters[key]).index(val), len(self.parameters[key]))
+            self.pld.update_info_text('State: ' + self.state + '\n\n' + 'Current parameters:\n' + cps + '\n\n' + 'Current indices\n' + cis)
 
     def init_run(self, **kwargs):
         self.state = 'run'
@@ -170,6 +171,11 @@ class DataGeneration:
         self.start_time = datetime.datetime.now()
         if hasattr(self, '_file_path') and hasattr(self, '_file_name'):
             self.pld.data_path = "{}/data.hdf".format(self.save_dir)
+
+    def session_meas_count_fun(self):
+        after_start = self.data.df.start_time > self.start_time
+        print("CAREFUL: current_iterator_df remains the same even after it has been measured, thus this value is not true after the measurement has been saved but before a new measurement has begun. It should not be subtracted, when current_iterator_df is in iterator_df_done.")
+        return after_start.sum() - len(self.current_iterator_df)
 
     @property
     def save_dir(self):
@@ -252,7 +258,7 @@ class DataGeneration:
                 print("saved {} to '{}".format(name, self.save_dir))
 
     def remeasure(self, df):
-        indices = self.data.df.iloc[:, :len(self.parameters.keys())].isin(df).all(axis=1).index #get indices in self.df.data to be replaced
+        indices = self.data.df[self.data.df.iloc[:, :len(self.parameters.keys())].isin(df).all(axis=1)].index #get indices in self.df.data to be replaced
         if len(indices) != len(df):
             raise Exception('Not all rows in df could be found in self.data: (missing: {})'.format(len(df) - len(indices)))
         elif indices[0]% self.number_of_simultaneous_measurements != 0:
@@ -265,9 +271,6 @@ class DataGeneration:
 
     def process_remeasure_items(self):
         if self.remeasure_df is not None:
-            if self.remeasure_indices is None:
-                print('Something went horribly wrong! {}'.format(self.remeasure_items))
-                return
             self.iterator_df.append(self.remeasure_df)
             self.iterator_df_done.append(self.remeasure_df)
             self.iterator_df_done.drop_duplicates(keep=False, inplace=True)
