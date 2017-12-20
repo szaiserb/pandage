@@ -7,4 +7,6 @@ setup(name='qutip_enhanced',
       author_email='s.zaiser@physik.uni-stuttgart.de',
       license='BSD',
       packages=['qutip_enhanced'],
+      package_data={'qutip_enhanced': ['qtgui/*.ui', 'qtgui/*.py']},
+      include_package_data=True,
       zip_safe=False)
