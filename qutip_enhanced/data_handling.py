@@ -345,7 +345,7 @@ class Data:
             l_obs.append(collections.OrderedDict())
             for k, v in self.dtypes.items():
                 if v == 'datetime':
-                    l_obs[idx][k] = datetime.datetime.min
+                    l_obs[idx][k] = datetime.datetime(1900, 1, 1) # datetime.datetime.min is also an option, but leads to OutOfBoundsDatetime: Out of bounds nanosecond timestamp: 1-01-01 00:00:00, when calling data = self.df.iloc[index.row(), index.column()]
                 else:
                     l_obs[idx][k] = getattr(__builtin__, v)()
         df_append = pd.concat([df_append.reset_index(drop=True), pd.DataFrame(columns=self.observation_names, data=l_obs)], axis=1) #NECESSARY! Reason: sorting issues when appending df with missing columns
