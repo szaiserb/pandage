@@ -82,15 +82,14 @@ class DataGeneration:
         if ldf - len(self.data.df) > self.number_of_simultaneous_measurements:
             raise Exception('Error: there seem to be more nan values than can be expected from unfinished measurements ({}, {}). Whats wrong?'.format(ldf, len(self.data.df)))
 
-    def set_iterator_df_done(self):
+    def init_iterator_df_done(self):
         if len(self.data.df) > 0:
             self.iterator_df_done = self.data.df.iloc[:, :len(self.parameters.keys())]
         else:
             self.iterator_df_done = self.iterator_df.drop(self.iterator_df.index, inplace=False)
 
     def iterator_df_drop_done(self):
-        self.iterator_df = self.iterator_df.append(self.iterator_df_done)
-        self.iterator_df.drop_duplicates(keep=False, inplace=True)
+        self.iterator_df = data_handling.df_drop_duplicate_rows(self.iterator_df, self.iterator_df_done, keep=False)
 
     def set_iterator_df(self):
         self.iterator_df = pd.DataFrame(
@@ -142,7 +141,7 @@ class DataGeneration:
         self.reinit()
         self.set_iterator_df()
         self.init_data(**kwargs)
-        self.set_iterator_df_done()
+        self.init_iterator_df_done()
         self.iterator_df_drop_done()
 
     def iterator_df_pop(self, n):
@@ -165,6 +164,9 @@ class DataGeneration:
             self.data.append(self.current_iterator_df)
             self.update_current_str()
             yield self.current_iterator_df
+        if hasattr(self, 'current_iterator_df'):
+            self.iterator_df_done = self.iterator_df_done.append(self.current_iterator_df)
+            del self.current_iterator_df
         self.update_progress()
 
     def reinit(self):
@@ -172,10 +174,12 @@ class DataGeneration:
         if hasattr(self, '_file_path') and hasattr(self, '_file_name'):
             self.pld.data_path = "{}/data.hdf".format(self.save_dir)
 
-    def session_meas_count_fun(self):
-        after_start = self.data.df.start_time > self.start_time
-        print("CAREFUL: current_iterator_df remains the same even after it has been measured, thus this value is not true after the measurement has been saved but before a new measurement has begun. It should not be subtracted, when current_iterator_df is in iterator_df_done.")
-        return after_start.sum() - len(self.current_iterator_df)
+    @property
+    def session_meas_count(self):
+        if len(self.data.df) == 0 or len(self.iterator_df_done) == 0:
+            return 0
+        else:
+            return len(self.iterator_df_done) - self.data.df[self.data.df.start_time > self.start_time].index[0]
 
     @property
     def save_dir(self):

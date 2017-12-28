@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1985</width>
-    <height>998</height>
+    <width>1299</width>
+    <height>1016</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -18,12 +18,24 @@
     <rect>
      <x>30</x>
      <y>0</y>
-     <width>1641</width>
+     <width>1261</width>
      <height>1001</height>
     </rect>
    </property>
+   <property name="tabPosition">
+    <enum>QTabWidget::North</enum>
+   </property>
+   <property name="tabShape">
+    <enum>QTabWidget::Triangular</enum>
+   </property>
    <property name="currentIndex">
     <number>0</number>
+   </property>
+   <property name="documentMode">
+    <bool>true</bool>
+   </property>
+   <property name="movable">
+    <bool>false</bool>
    </property>
    <widget class="QWidget" name="plot_tab">
     <attribute name="title">
@@ -32,9 +44,9 @@
     <widget class="QListWidget" name="observation_widget">
      <property name="geometry">
       <rect>
-       <x>1300</x>
+       <x>1020</x>
        <y>0</y>
-       <width>331</width>
+       <width>231</width>
        <height>261</height>
       </rect>
      </property>
@@ -47,9 +59,12 @@
       <rect>
        <x>0</x>
        <y>0</y>
-       <width>1291</width>
+       <width>1011</width>
        <height>261</height>
       </rect>
+     </property>
+     <property name="verticalScrollBarPolicy">
+      <enum>Qt::ScrollBarAsNeeded</enum>
      </property>
      <property name="selectionMode">
       <enum>QAbstractItemView::MultiSelection</enum>
@@ -60,7 +75,7 @@
       <rect>
        <x>0</x>
        <y>270</y>
-       <width>1391</width>
+       <width>1011</width>
        <height>631</height>
       </rect>
      </property>
@@ -71,7 +86,7 @@
       <rect>
        <x>0</x>
        <y>900</y>
-       <width>1391</width>
+       <width>1011</width>
        <height>71</height>
       </rect>
      </property>
@@ -84,7 +99,7 @@
     <widget class="QPushButton" name="update_plot_button">
      <property name="geometry">
       <rect>
-       <x>1400</x>
+       <x>1020</x>
        <y>270</y>
        <width>231</width>
        <height>51</height>
@@ -97,7 +112,7 @@
     <widget class="QComboBox" name="x_axis_parameter_comboBox">
      <property name="geometry">
       <rect>
-       <x>1400</x>
+       <x>1020</x>
        <y>350</y>
        <width>231</width>
        <height>22</height>
@@ -116,7 +131,7 @@
     <widget class="QLabel" name="label">
      <property name="geometry">
       <rect>
-       <x>1400</x>
+       <x>1020</x>
        <y>330</y>
        <width>231</width>
        <height>21</height>
@@ -140,7 +155,7 @@
     <widget class="QPushButton" name="open_explorer_button">
      <property name="geometry">
       <rect>
-       <x>1400</x>
+       <x>1020</x>
        <y>930</y>
        <width>231</width>
        <height>41</height>
@@ -153,7 +168,7 @@
     <widget class="QPushButton" name="open_code_button">
      <property name="geometry">
       <rect>
-       <x>1400</x>
+       <x>1020</x>
        <y>880</y>
        <width>231</width>
        <height>41</height>
@@ -166,7 +181,7 @@
     <widget class="QPlainTextEdit" name="info">
      <property name="geometry">
       <rect>
-       <x>1400</x>
+       <x>1020</x>
        <y>380</y>
        <width>231</width>
        <height>491</height>
@@ -205,7 +220,7 @@
       <rect>
        <x>0</x>
        <y>0</y>
-       <width>1081</width>
+       <width>1011</width>
        <height>261</height>
       </rect>
      </property>
@@ -216,9 +231,9 @@
     <widget class="QTableWidgetEnhanced" name="fit_result_table">
      <property name="geometry">
       <rect>
-       <x>1090</x>
+       <x>1020</x>
        <y>0</y>
-       <width>661</width>
+       <width>231</width>
        <height>261</height>
       </rect>
      </property>
@@ -231,7 +246,7 @@
       <rect>
        <x>0</x>
        <y>900</y>
-       <width>1391</width>
+       <width>1251</width>
        <height>71</height>
       </rect>
      </property>
@@ -246,7 +261,7 @@
       <rect>
        <x>0</x>
        <y>270</y>
-       <width>1391</width>
+       <width>1251</width>
        <height>631</height>
       </rect>
      </property>
@@ -273,11 +288,20 @@
     <widget class="DataFrameWidget" name="dataframe">
      <property name="geometry">
       <rect>
-       <x>-5</x>
-       <y>1</y>
-       <width>1761</width>
-       <height>981</height>
+       <x>10</x>
+       <y>10</y>
+       <width>1241</width>
+       <height>961</height>
       </rect>
+     </property>
+     <property name="verticalScrollBarPolicy">
+      <enum>Qt::ScrollBarAlwaysOn</enum>
+     </property>
+     <property name="horizontalScrollBarPolicy">
+      <enum>Qt::ScrollBarAlwaysOn</enum>
+     </property>
+     <property name="sizeAdjustPolicy">
+      <enum>QAbstractScrollArea::AdjustToContents</enum>
      </property>
     </widget>
    </widget>
