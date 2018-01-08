@@ -68,7 +68,7 @@ class pd(dict):
             if len(bs) == 4:
                 raise Exception('Error: {} does not tell how many pi-pulses you want. Valid would be 5_cpmg8'.format(i))
             else:
-                bp = np.array(int(bs[4:]) * [0])
+                bp = np.array(int(bs[4:]) * [0], dtype=np.float64)
         else:
             bp = self.ddp[bs]
         bp = np.tile(bp, n)

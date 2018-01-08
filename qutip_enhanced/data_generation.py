@@ -106,6 +106,7 @@ class DataGeneration:
     def init_data(self, init_from_file=None, iff=None, move_folder=True):
         init_from_file = iff if iff is not None else init_from_file
         self.init_from_file = init_from_file
+        self.move_folder = move_folder
         self.pld._data = data_handling.Data(
             parameter_names=self.parameters.keys(),
             observation_names=self.observation_names,
@@ -113,18 +114,13 @@ class DataGeneration:
             init_from_file=init_from_file
         )
         self.dropnan_data()
-        if init_from_file is not None and move_folder:
-            # TODO: might be useful to use shutil.copy2 followed by shutil.rmtree to copy metadata (e.g. creation date)
-            folder = os.path.split(init_from_file)[0]
-            os.rename(folder, folder+'_tbc')
-            shutil.move(folder+'_tbc', self.save_dir)
 
-    def move_init_from_file_folder_back(self):
-        # TODO: might be useful to use shutil.copy2 followed by shutil.rmtree to copy metadata (e.g. creation date)
-        if self.init_from_file is not None:
-            initial_folder = os.path.split(self.init_from_file)[0]
-            current_folder = os.path.join(self.save_dir, "{}_tbc".format(os.path.split(initial_folder)[-1]))
-            shutil.move(current_folder, initial_folder)
+    # def move_init_from_file_folder_back(self):
+    #     # TODO: might be useful to use shutil.copy2 followed by shutil.rmtree to copy metadata (e.g. creation date)
+    #     if self.init_from_file is not None:
+    #         initial_folder = os.path.split(self.init_from_file)[0]
+    #         current_folder = os.path.join(self.save_dir, "{}_tbc".format(os.path.split(initial_folder)[-1]))
+    #         shutil.move(current_folder, initial_folder)
 
     def update_current_str(self):
         if hasattr(self, 'current_iterator_df'):
@@ -133,7 +129,10 @@ class DataGeneration:
             cis = ""
             for key, val in cid.items():
                 cps += "{}: {}\n".format(key, val)
-                cis += "{}: {} ({})\n".format(key, list(self.parameters[key]).index(val), len(self.parameters[key]))
+                try:
+                    cis += "{}: {} ({})\n".format(key, list(self.parameters[key]).index(val), len(self.parameters[key]))
+                except:
+                    pass
             self.pld.update_info_text('State: ' + self.state + '\n\n' + 'Current parameters:\n' + cps + '\n\n' + 'Current indices\n' + cis)
 
     def init_run(self, **kwargs):
@@ -183,28 +182,33 @@ class DataGeneration:
 
     @property
     def save_dir(self):
-        sts = self.start_time.strftime('%Y%m%d-h%Hm%Ms%S')
-        save_dir = "{}/{}_{}".format(self.file_path, sts, self.file_name)
+        return "{}/{}_{}".format(self.file_path, self.start_time.strftime('%Y%m%d-h%Hm%Ms%S'), self.file_name)
+
+    def make_save_dir(self):
         try:
-            os.makedirs(save_dir)
+            os.makedirs(self.save_dir)
         except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
         except Exception:
-            print(save_dir)
+            print(self.save_dir)
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
-        return save_dir
 
     @property
     def save_dir_tmp(self):
-        save_dir_tmp = "{}/tmp".format(self.save_dir)
+        return "{}/tmp".format(self.save_dir)
+
+    def make_save_dir_tmp(self):
         try:
-            os.makedirs(save_dir_tmp)
+            os.makedirs(self.save_dir_tmp)
         except OSError as e:
             if e.errno != errno.EEXIST:
                 raise
-        return save_dir_tmp
+        except Exception:
+            print(self.save_dir_tmp)
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
 
     @property
     def file_name(self):
@@ -248,6 +252,13 @@ class DataGeneration:
             zf.close()
 
     def save(self, name='', notify=False):
+        if not os.path.exists(self.save_dir):
+            self.make_save_dir()
+        if self.init_from_file is not None and self.move_folder:
+            # TODO: might be useful to use shutil.copy2 followed by shutil.rmtree to copy metadata (e.g. creation date)
+            folder = os.path.split(self.init_from_file)[0]
+            os.rename(folder, folder+'_tbc')
+            shutil.move(folder+'_tbc', self.save_dir)
         if len(self.iterator_df_done) >= 0:
             if hasattr(self, 'file_notes'):
                 with open("{}/notes.dat".format(self.save_dir), "w") as text_file:

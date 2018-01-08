@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1299</width>
+    <width>1314</width>
     <height>1016</height>
    </rect>
   </property>
@@ -220,7 +220,7 @@
       <rect>
        <x>0</x>
        <y>0</y>
-       <width>1011</width>
+       <width>481</width>
        <height>261</height>
       </rect>
      </property>
@@ -231,9 +231,9 @@
     <widget class="QTableWidgetEnhanced" name="fit_result_table">
      <property name="geometry">
       <rect>
-       <x>1020</x>
+       <x>490</x>
        <y>0</y>
-       <width>231</width>
+       <width>761</width>
        <height>261</height>
       </rect>
      </property>
@@ -246,7 +246,7 @@
       <rect>
        <x>0</x>
        <y>900</y>
-       <width>1251</width>
+       <width>1121</width>
        <height>71</height>
       </rect>
      </property>
@@ -261,7 +261,7 @@
       <rect>
        <x>0</x>
        <y>270</y>
-       <width>1251</width>
+       <width>1121</width>
        <height>631</height>
       </rect>
      </property>
@@ -270,10 +270,10 @@
     <widget class="QPushButton" name="update_fit_result_button">
      <property name="geometry">
       <rect>
-       <x>1400</x>
+       <x>1130</x>
        <y>270</y>
-       <width>231</width>
-       <height>101</height>
+       <width>121</width>
+       <height>701</height>
       </rect>
      </property>
      <property name="text">

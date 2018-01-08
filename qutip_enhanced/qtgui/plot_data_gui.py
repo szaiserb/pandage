@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'd:\python\qutip_enhanced\qutip_enhanced/qtgui/plot_data.ui'
+# Form implementation generated from reading ui file 'D:\Python\qutip_enhanced\qutip_enhanced/qtgui/plot_data.ui'
 #
 # Created by: PyQt5 UI code generator 5.6
 #
@@ -11,7 +11,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_window(object):
     def setupUi(self, window):
         window.setObjectName("window")
-        window.resize(1299, 1016)
+        window.resize(1314, 1016)
         self.parameter_tab = QtWidgets.QTabWidget(window)
         self.parameter_tab.setGeometry(QtCore.QRect(30, 0, 1261, 1001))
         self.parameter_tab.setTabPosition(QtWidgets.QTabWidget.North)
@@ -88,31 +88,31 @@ class Ui_window(object):
         self.fit_tab = QtWidgets.QWidget()
         self.fit_tab.setObjectName("fit_tab")
         self.fit_select_table = QTableWidgetEnhanced(self.fit_tab)
-        self.fit_select_table.setGeometry(QtCore.QRect(0, 0, 1011, 261))
+        self.fit_select_table.setGeometry(QtCore.QRect(0, 0, 481, 261))
         self.fit_select_table.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
         self.fit_select_table.setObjectName("fit_select_table")
         self.fit_select_table.setColumnCount(0)
         self.fit_select_table.setRowCount(0)
         self.fit_result_table = QTableWidgetEnhanced(self.fit_tab)
-        self.fit_result_table.setGeometry(QtCore.QRect(1020, 0, 231, 261))
+        self.fit_result_table.setGeometry(QtCore.QRect(490, 0, 761, 261))
         self.fit_result_table.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
         self.fit_result_table.setObjectName("fit_result_table")
         self.fit_result_table.setColumnCount(0)
         self.fit_result_table.setRowCount(0)
         self.gridLayoutWidget_3 = QtWidgets.QWidget(self.fit_tab)
-        self.gridLayoutWidget_3.setGeometry(QtCore.QRect(0, 900, 1251, 71))
+        self.gridLayoutWidget_3.setGeometry(QtCore.QRect(0, 900, 1121, 71))
         self.gridLayoutWidget_3.setObjectName("gridLayoutWidget_3")
         self.toolbar_fit_layout = QtWidgets.QGridLayout(self.gridLayoutWidget_3)
         self.toolbar_fit_layout.setContentsMargins(0, 0, 0, 0)
         self.toolbar_fit_layout.setObjectName("toolbar_fit_layout")
         self.gridLayoutWidget_4 = QtWidgets.QWidget(self.fit_tab)
-        self.gridLayoutWidget_4.setGeometry(QtCore.QRect(0, 270, 1251, 631))
+        self.gridLayoutWidget_4.setGeometry(QtCore.QRect(0, 270, 1121, 631))
         self.gridLayoutWidget_4.setObjectName("gridLayoutWidget_4")
         self.plot_fit_layout = QtWidgets.QGridLayout(self.gridLayoutWidget_4)
         self.plot_fit_layout.setContentsMargins(0, 0, 0, 0)
         self.plot_fit_layout.setObjectName("plot_fit_layout")
         self.update_fit_result_button = QtWidgets.QPushButton(self.fit_tab)
-        self.update_fit_result_button.setGeometry(QtCore.QRect(1400, 270, 231, 101))
+        self.update_fit_result_button.setGeometry(QtCore.QRect(1130, 270, 121, 701))
         self.update_fit_result_button.setObjectName("update_fit_result_button")
         self.parameter_tab.addTab(self.fit_tab, "")
         self.dataframe_tab = QtWidgets.QWidget()
