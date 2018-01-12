@@ -621,10 +621,11 @@ class DDAlpha(Arbitrary):
 
 
 class DD(Arbitrary):
-    def __init__(self, dd_type=None, rabi_period=None, time_digitization=None, **kwargs):
+    def __init__(self, dd_type=None, rabi_period=None, time_digitization=None, phase=0.0, **kwargs):
         self.dd_type = dd_type
         self.rabi_period = rabi_period
         self.time_digitization = time_digitization
+        self.phase = phase
         self.set_total_tau(**kwargs)
 
     column_dict = collections.OrderedDict([('mw', [0, 1]), ('wait', [2])])
@@ -672,7 +673,7 @@ class DD(Arbitrary):
         name = self.dd_type
         if name[-6:] == '_uhrig' in name:
             name = name[:-6]
-        return __PHASES_DD__[name]
+        return np.array(__PHASES_DD__[name]) + self.phase
 
     @property
     def n_wait(self):
