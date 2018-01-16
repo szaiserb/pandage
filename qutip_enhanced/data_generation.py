@@ -170,6 +170,8 @@ class DataGeneration:
 
     def reinit(self):
         self.start_time = datetime.datetime.now()
+        if hasattr(self, 'current_iterator_df'):
+            del self.current_iterator_df
         if hasattr(self, '_file_path') and hasattr(self, '_file_name'):
             self.pld.data_path = "{}/data.hdf".format(self.save_dir)
 

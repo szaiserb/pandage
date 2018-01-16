@@ -424,51 +424,58 @@ class Data:
                 del self.dtypes[key]
 
 
-# def append_fill(df, other):
-#     columns = other.columns
-#     if (columns == df.columns).sum() != len(columns):
-#         raise Exception('Error: {}, {}, {}'.format(columns, df.columns, len(columns)))
-#     other_missing_columns = df.columns.append(other.columns).drop_duplicates(keep=False)
-#     other_extended = pd.concat([other, pd.concat([df.loc[:, other_missing_columns].iloc[-len(other):, :]] * len(other)).reset_index(drop=True)], axis=1).reset_index(drop=True)
-#     return df.append(other_extended)
-#
-# def find_duplicates(df, other, columns, keep=False):
-#     return
 
-# def extend_columns(df, **kwargs):
-#     if 'other' in kwargs:
-#         for idx, ai, bi in itertools.izip(itertools.count(), df.columns, kwargs['other'].columns):
-#             if ai != bi:
-#                 raise Exception("Error: ", df, kwargs['other'], kwargs['other'].columns)
-#
-#         l_obs = []
-#         for idx in range(len(df_append)):
-#             l_obs.append(collections.OrderedDict())
-#             for k, v in self.dtypes.items():
-#                 if v == 'datetime':
-#                     l_obs[idx][k] = datetime.datetime(1900, 1, 1) # datetime.datetime.min is also an option, but leads to OutOfBoundsDatetime: Out of bounds nanosecond timestamp: 1-01-01 00:00:00, when calling data = self.df.iloc[index.row(), index.column()]
-#                 else:
-#                     l_obs[idx][k] = getattr(__builtin__, v)()
-#         df_append = pd.concat([df_append.reset_index(drop=True), pd.DataFrame(columns=self.observation_names, data=l_obs)], axis=1) #NECESSARY! Reason: sorting issues when appending df with missing columns
+def extend_columns(df, other, columns=None):
+    """
+    Extends df horizontally to include all columns of other
+    Necessary workaround due to pandas deficiencies regarding missing data (only float has a realy missing data type)
+    Order of columns is important.
 
+    Example:
+        df.columns = ['A', 'B', 'C']
+        other.columns = ['B', 'C', 'D']
+        result: df.columns = ['A', 'B', 'C', 'D']
 
-def df_drop_duplicate_rows(df, other, columns=None, keep=False):
+    :param df: pandas.DataFrame
+        DataFrame whose columns should be extended
+    :param other: pandas.DataFrame
+        DataFrame to take extra columns from
+    :return: pandas.DataFrame
+    """
+    columns = None
     columns = other.columns if columns is None else columns
     if type(columns) != pd.core.indexes.base.Index:
         raise Exception('Error: unexpected behaviour.')
-    if (columns == df.columns).sum() != len(columns):
-        raise Exception('Error: {}, {}, {}'.format(columns, df.columns, len(columns)))
-    if (columns == other.columns).sum() != len(columns):
-        raise Exception('Error: {}, {}, {}'.format(columns, df.columns, len(columns)))
-    if not (columns == df.columns).all():
-        other_missing_columns = df.columns.append(other.columns).drop_duplicates(keep=False)
-        other_extended = pd.concat([other, pd.concat([df.loc[:, other_missing_columns].iloc[-len(other):, :]] * len(other)).reset_index(drop=True)], axis=1).reset_index(drop=True)
+    if not all([i in other.columns for i in df.columns]):
+        raise Exception('Error: all columns of other ({}) must be in df ({})'.format(other.columns, df.columns))
+    if len(df.columns) == len(columns) and (df.columns == columns).all():
+        return df
     else:
-        other_extended = other
-    if not (df.columns == other_extended.columns).all():
-        raise Exception('Error: Something went wrong. {}, {}, {}, {}'.format(df.columns, other.columns, df, other))
-    df = df.append(other_extended)
-    return df.drop_duplicates(keep=keep)
+        print('This should work but is untested and to my knowledge not used right now. (data_handling.extend_columns)')
+        df_missing_columns = pd.Index([i for i in other.columns if i not in df.columns]) #df.columns.append(other.columns).drop_duplicates(keep=False)
+        return pd.concat([df, pd.concat([other.loc[:, df_missing_columns].iloc[0:1, :]] * len(df)).reset_index(drop=True)], axis=1).reset_index(drop=True)
+
+def df_drop_duplicate_rows(df, other, columns=None, **kwargs):
+    """
+    necessary to deal with missing data and preserve dtype
+
+    :param df: dataframe
+    :param other: dataframe
+    :param columns: pd.core.indexes.base.Index
+        columns to compare
+        default: right.columns
+    :return:
+    """
+    df_columns = df.columns
+    df_dtypes = df.dtypes
+    columns = other.columns if columns is None else columns
+    df_all = df.merge(other.drop_duplicates(), on=list(columns), how='left', indicator=True)
+    out = df_all[df_all._merge == 'left_only'].iloc[:, :-1].reset_index(drop=True)
+    if not (out.columns == df_columns).all():
+        print(out.columns, df_columns)
+    if not (out.dtypes == df_dtypes).all():
+        print(out.columns, df.columns)
+    return out
 
 def recompile_plotdata_ui_file():
     fold = "{}/qtgui".format(os.path.dirname(__file__))
