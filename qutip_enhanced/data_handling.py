@@ -886,6 +886,8 @@ class PlotData:
                 mod = lmfit_models.CosineModel()
             elif self.fit_function == 'exp':
                 pass
+            elif self.fit_function == 'lorentz':
+                mod = lmfit.models.LorentzianModel()
             self._fit_results = []
             for idx in self.fit_select_table_selected_rows:
                 i = spi[idx]
