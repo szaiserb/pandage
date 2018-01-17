@@ -600,13 +600,17 @@ class PlotData:
                         drop = True
                 except:  # drops for example columns with numpy arrays
                     drop = True
-                if drop:
-                    df.drop(col, inplace=True, axis=1)
-            if hasattr(self, '_gui'):
-                self.gui.dataframe.setDataFrame(df)
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+            except:  # drops for example columns with numpy arrays
+                drop = True
+            if drop:
+                df.drop(col, inplace=True, axis=1)
+        print('a9')
+        # if hasattr(self, '_gui'):
+        #     self.gui.dataframe.setDataFrame(df)
+        print('a10')
+        # except:
+        #     exc_type, exc_value, exc_tb = sys.exc_info()
+        #     traceback.print_exception(exc_type, exc_value, exc_tb)
 
     def delete_attributes(self):
         for attr_name in [
@@ -1009,7 +1013,7 @@ class PlotData:
             if len(getattr(self.data.df, self.x_axis_parameter).unique()) == 1:
                 self.x_axis_parameter = self.x_axis_parameter_with_largest_dim()
             cn = self.parameter_names_reduced()
-            if cn[0] == 'sweeps':
+            if cn[0] == 'sweeps' and self.x_axis_parameter != 'sweeps':
                 del cn[0]
             cn.remove(self.x_axis_parameter)
             for d, d_idx, idx, df_sub in self.data.iterator(cn):

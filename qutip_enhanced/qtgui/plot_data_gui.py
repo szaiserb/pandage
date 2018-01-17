@@ -115,15 +115,6 @@ class Ui_window(object):
         self.update_fit_result_button.setGeometry(QtCore.QRect(1130, 270, 121, 701))
         self.update_fit_result_button.setObjectName("update_fit_result_button")
         self.parameter_tab.addTab(self.fit_tab, "")
-        self.dataframe_tab = QtWidgets.QWidget()
-        self.dataframe_tab.setObjectName("dataframe_tab")
-        self.dataframe = DataFrameWidget(self.dataframe_tab)
-        self.dataframe.setGeometry(QtCore.QRect(10, 10, 1241, 961))
-        self.dataframe.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
-        self.dataframe.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
-        self.dataframe.setSizeAdjustPolicy(QtWidgets.QAbstractScrollArea.AdjustToContents)
-        self.dataframe.setObjectName("dataframe")
-        self.parameter_tab.addTab(self.dataframe_tab, "")
 
         self.retranslateUi(window)
         self.parameter_tab.setCurrentIndex(0)
@@ -139,6 +130,5 @@ class Ui_window(object):
         self.parameter_tab.setTabText(self.parameter_tab.indexOf(self.plot_tab), _translate("window", "Plot"))
         self.update_fit_result_button.setText(_translate("window", "UpdateFit"))
         self.parameter_tab.setTabText(self.parameter_tab.indexOf(self.fit_tab), _translate("window", "Fit"))
-        self.parameter_tab.setTabText(self.parameter_tab.indexOf(self.dataframe_tab), _translate("window", "DataFrame"))
 
-from qutip_enhanced.qtgui.custom_widgets import DataFrameWidget, QTableWidgetEnhanced, QTableWidgetEnhancedDrop
+from qutip_enhanced.qtgui.custom_widgets import QTableWidgetEnhanced, QTableWidgetEnhancedDrop

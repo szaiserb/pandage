@@ -281,30 +281,6 @@
      </property>
     </widget>
    </widget>
-   <widget class="QWidget" name="dataframe_tab">
-    <attribute name="title">
-     <string>DataFrame</string>
-    </attribute>
-    <widget class="DataFrameWidget" name="dataframe">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>10</y>
-       <width>1241</width>
-       <height>961</height>
-      </rect>
-     </property>
-     <property name="verticalScrollBarPolicy">
-      <enum>Qt::ScrollBarAlwaysOn</enum>
-     </property>
-     <property name="horizontalScrollBarPolicy">
-      <enum>Qt::ScrollBarAlwaysOn</enum>
-     </property>
-     <property name="sizeAdjustPolicy">
-      <enum>QAbstractScrollArea::AdjustToContents</enum>
-     </property>
-    </widget>
-   </widget>
   </widget>
  </widget>
  <customwidgets>
@@ -316,11 +292,6 @@
   <customwidget>
    <class>QTableWidgetEnhancedDrop</class>
    <extends>QTableWidget</extends>
-   <header>qutip_enhanced/qtgui/custom_widgets.h</header>
-  </customwidget>
-  <customwidget>
-   <class>DataFrameWidget</class>
-   <extends>QTableView</extends>
    <header>qutip_enhanced/qtgui/custom_widgets.h</header>
   </customwidget>
  </customwidgets>
