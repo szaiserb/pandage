@@ -600,17 +600,11 @@ class PlotData:
                         drop = True
                 except:  # drops for example columns with numpy arrays
                     drop = True
-            except:  # drops for example columns with numpy arrays
-                drop = True
-            if drop:
-                df.drop(col, inplace=True, axis=1)
-        print('a9')
-        # if hasattr(self, '_gui'):
-        #     self.gui.dataframe.setDataFrame(df)
-        print('a10')
-        # except:
-        #     exc_type, exc_value, exc_tb = sys.exc_info()
-        #     traceback.print_exception(exc_type, exc_value, exc_tb)
+                if drop:
+                    df.drop(col, inplace=True, axis=1)
+        except:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
 
     def delete_attributes(self):
         for attr_name in [
