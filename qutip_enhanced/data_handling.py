@@ -1016,6 +1016,7 @@ class PlotData:
                     ax.plot(getattr(dfagg, self.x_axis_parameter), getattr(dfagg, observation))
             fig.tight_layout()
             fig.savefig(filepath)
+            plt.close(fig)
             plt.ion()
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
