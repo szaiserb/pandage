@@ -13,6 +13,7 @@ import datetime
 import traceback
 import collections
 import subprocess
+import threading
 from PyQt5.QtWidgets import QListWidgetItem, QTableWidgetItem, QMainWindow
 from PyQt5.QtCore import Qt, pyqtSignal, QObject
 from PyQt5.uic import compileUi
@@ -24,6 +25,7 @@ from matplotlib.figure import Figure
 import matplotlib
 import matplotlib.pyplot as plt
 import functools
+import time
 
 if sys.version_info.major == 2:
     import __builtin__
@@ -187,15 +189,24 @@ def ret_property_array_like_types(name, types):
     return property(ret_getter(name), setter)
 
 
-def ptrepack(file, folder, tempfile=None):
+def ptrepack(file, folder, tempfile=None, lock=None):
     # C:\Users\yy3\AppData\Local\conda\conda\envs\py27\Scripts\ptrepack.exe -o --chunkshape=auto --propindexes --complevel=0 --complib=blosc data.hdf data_tmp.hdf
+    if lock is not None and not lock.acquire(False):
+        print('Trying to run ptrepack on {}'.format(os.path.join(folder, file)))
+        print('Waiting for hdf_lock..')
+        lock.acquire()
+        print('Ok.. hdf_lock acquired.')
     tempfile = 'temp.hdf' if tempfile is None else tempfile
     ptrepack = r"{}\Scripts\ptrepack.exe".format(os.path.dirname(sys.executable))
     command = [ptrepack, "-o", "--chunkshape=auto", "--propindexes", "--complevel=9", "--complib=blosc", file, tempfile]
     _ = subprocess.call(command, cwd=folder)
     os.remove(os.path.join(folder, file))
     os.rename(os.path.join(folder, tempfile), os.path.join(folder, file))
+    if lock is not None: lock.release()
 
+def ptrepack_thread(**kwargs):
+    t = threading.Thread(name='run_ptrepack', target=ptrepack, kwargs=kwargs)
+    t.start()
 
 def ptrepack_all(folder):
     for root, dirs, files in os.walk(folder):
@@ -214,6 +225,7 @@ class Data:
             self.dtypes = dtypes
         if len(kwargs) > 0:
             self.init(**kwargs)
+        self.hdf_lock = threading.Lock()
 
     parameter_names = ret_property_array_like_types('parameter_names', [str, unicode])
     observation_names = ret_property_array_like_types('observation_names', [str, unicode])
@@ -313,15 +325,30 @@ class Data:
 
     def save(self, filepath):
         if filepath.endswith('.csv'):
+            t0 = time.time()
             self._df.to_csv(filepath, index=False, compression='gzip')
+            print("csv data saved ({:.2f}s).\n If speed is an issue, use hdf. csv format is useful ony for py2-py3-compatibility.".format(time.time() - t0))
         elif filepath.endswith('.hdf'):
+            if not self.hdf_lock.acquire(False):
+                print('Trying to save data to hdf.')
+                print('Waiting for hdf_lock..')
+                self.hdf_lock.acquire()
+                print('Ok.. hdf_lock acquired.')
+            t0 = time.time()
             store = pd.HDFStore(filepath)
+            t1 = time.time() - t0
             store.put('df', self._df, table=True)
+            t2 = time.time() - t0 - t1
             for key in ["parameter_names", 'observation_names', 'dtypes']:
                 setattr(store.get_storer('df').attrs, key, getattr(self, key))
+            t3 = time.time() - t0 - t1 - t2
             store.close()
-            ptrepack(os.path.split(filepath)[1], os.path.split(filepath)[0])
+            t4 = time.time() - t0 - t1 - t2 - t3
+            self.hdf_lock.release()
+            ptrepack_thread(file=os.path.split(filepath)[1], folder=os.path.split(filepath)[0], lock=self.hdf_lock)
+            t5 = time.time() - t0 - t1 - t2 - t3 - t4
             self.hdf_filepath = filepath
+            print("hdf data saved in ({:.2f}, {:.2f}, {:.2f}, {:.2f}, {:.2f})".format(t1, t2, t3, t4, t5))
 
     def append(self, df_or_l):
         if type(df_or_l) == pd.DataFrame:
@@ -1001,26 +1028,27 @@ class PlotData:
             traceback.print_exception(exc_type, exc_value, exc_tb)
 
     def save_plot(self, filepath):
-        try:
-            plt.ioff()
-            fig, ax = plt.subplots(1, 1)
-            if len(getattr(self.data.df, self.x_axis_parameter).unique()) == 1:
-                self.x_axis_parameter = self.x_axis_parameter_with_largest_dim()
-            cn = self.parameter_names_reduced()
-            if cn[0] == 'sweeps' and self.x_axis_parameter != 'sweeps':
-                del cn[0]
-            cn.remove(self.x_axis_parameter)
-            for d, d_idx, idx, df_sub in self.data.iterator(cn):
-                for observation in self.observation_list_selected_data:
-                    dfagg = df_sub.groupby([self.x_axis_parameter]).agg({observation: np.mean}).reset_index()
-                    ax.plot(getattr(dfagg, self.x_axis_parameter), getattr(dfagg, observation))
-            fig.tight_layout()
-            fig.savefig(filepath)
-            plt.close(fig)
-            plt.ion()
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        if hasattr(self, '_gui'):
+            try:
+                plt.ioff()
+                fig, ax = plt.subplots(1, 1)
+                if len(getattr(self.data.df, self.x_axis_parameter).unique()) == 1:
+                    self.x_axis_parameter = self.x_axis_parameter_with_largest_dim()
+                cn = self.parameter_names_reduced()
+                if cn[0] == 'sweeps' and self.x_axis_parameter != 'sweeps':
+                    del cn[0]
+                cn.remove(self.x_axis_parameter)
+                for d, d_idx, idx, df_sub in self.data.iterator(cn):
+                    for observation in self.observation_list_selected_data:
+                        dfagg = df_sub.groupby([self.x_axis_parameter]).agg({observation: np.mean}).reset_index()
+                        ax.plot(getattr(dfagg, self.x_axis_parameter), getattr(dfagg, observation))
+                fig.tight_layout()
+                fig.savefig(filepath)
+                plt.close(fig)
+                plt.ion()
+            except:
+                exc_type, exc_value, exc_tb = sys.exc_info()
+                traceback.print_exception(exc_type, exc_value, exc_tb)
 
     @property
     def info_text(self):

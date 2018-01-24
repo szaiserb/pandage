@@ -123,7 +123,7 @@ class DataGeneration:
     #         shutil.move(current_folder, initial_folder)
 
     def update_current_str(self):
-        if hasattr(self, 'current_iterator_df'):
+        if hasattr(self, 'current_iterator_df') and len(self.current_iterator_df) > 0:
             cid = self.current_iterator_df.iloc[-1, :].to_dict()
             cps = ""
             cis = ""
@@ -257,22 +257,31 @@ class DataGeneration:
         if not os.path.exists(self.save_dir):
             self.make_save_dir()
         if self.init_from_file is not None and self.move_folder:
-            # TODO: might be useful to use shutil.copy2 followed by shutil.rmtree to copy metadata (e.g. creation date)
-            folder = os.path.split(self.init_from_file)[0]
-            os.rename(folder, folder+'_tbc')
-            shutil.move(folder+'_tbc', self.save_dir)
+            new_iff_path = os.path.join(self.save_dir, os.path.basename(os.path.dirname(self.init_from_file)) + '_tbc', os.path.basename(self.init_from_file))
+            if not os.path.exists(new_iff_path):
+                # TODO: might be useful to use shutil.copy2 followed by shutil.rmtree to copy metadata (e.g. creation date)
+                folder = os.path.dirname(self.init_from_file)
+                os.rename(folder, folder+'_tbc')
+                shutil.move(folder+'_tbc', self.save_dir)
         if len(self.iterator_df_done) >= 0:
+            import time
+            t0 = time.time()
             if hasattr(self, 'file_notes'):
                 with open("{}/notes.dat".format(self.save_dir), "w") as text_file:
                     text_file.write(self.file_notes)
+            t1 = time.time()-t0
             if hasattr(self, '_meas_code'):
                 with open("{}/meas_code.py".format(self.save_dir), "w") as text_file:
                     text_file.write(self.meas_code)
-            self.data.save("{}/data.csv".format(self.save_dir))
+            t2 = time.time() - t0 - t1
+            # self.data.save("{}/data.csv".format(self.save_dir)) #this takes forever
+            t3 = time.time() - t0 - t1 - t2
             self.data.save("{}/data.hdf".format(self.save_dir))
+            t4 = time.time() - t0 - t1 - t2 - t3
             self.pld.save_plot("{}/plot.png".format(self.save_dir))
+            t5 = time.time() - t0 - t1 - t2 - t3 - t4
             if notify:
-                print("saved {} to '{}".format(name, self.save_dir))
+                print("saved {} to '{} ({:.2f}, {:.2f}, {:.2f}, {:.2f}, {:.2f})".format(name, self.save_dir, t1, t2, t3, t4, t5))
 
     def remeasure(self, df):
         indices = self.data.df[self.data.df.iloc[:, :len(self.parameters.keys())].isin(df).all(axis=1)].index #get indices in self.df.data to be replaced
@@ -293,3 +302,4 @@ class DataGeneration:
             self.iterator_df_done.drop_duplicates(keep=False, inplace=True)
             self.data.df.drop_duplicates(keep=False, inplace=True, subset=self.data.parameter_names)
             self.remeasure_df = None
+

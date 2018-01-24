@@ -42,6 +42,19 @@ def sinc(x, amplitude, center, rabi_frequency, y0):
     a = (rabi_frequency ** 2 + (x - center) ** 2)
     return amplitude * rabi_frequency ** 2 / a * np.sin(np.sqrt(a) * np.pi / (2 * rabi_frequency)) ** 2 + y0
 
+class SincModel(lmfit.Model):
+    def __init__(self, *args, **kwargs):
+        super(SincModel, self).__init__(sinc, *args, **kwargs)
+
+    def guess(self, data, x=None, **kwargs):
+        mod = lmfit.models.LorentzianModel()
+        params = mod.guess(data=data, x=x)
+        result = mod.fit(data=data, params=params, x=x)
+        center = result.params['center'].value
+        y0 = data.max()
+        amplitude = -(y0-data.min())
+        rabi_frequency = params['fwhm'].value
+        return lmfit.models.update_param_vals(self.make_params(center=center, y0=y0, amplitude=amplitude, rabi_frequency=rabi_frequency), self.prefix, **kwargs)
 
 class TripleSincHfModel(lmfit.Model):
     def __init__(self, hf, rabi_frequency, sweep_guess=False, *args, **kwargs):
