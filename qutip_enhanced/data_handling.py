@@ -144,6 +144,7 @@ def check_list_element(val, name, l):
 def ret_getter(name):
     def getter(self):
         return getattr(self, '_' + name)
+
     return getter
 
 
@@ -204,15 +205,22 @@ def ptrepack(file, folder, tempfile=None, lock=None):
     os.rename(os.path.join(folder, tempfile), os.path.join(folder, file))
     if lock is not None: lock.release()
 
+
 def ptrepack_thread(**kwargs):
     t = threading.Thread(name='run_ptrepack', target=ptrepack, kwargs=kwargs)
     t.start()
+
 
 def ptrepack_all(folder):
     for root, dirs, files in os.walk(folder):
         for file in files:
             if file.endswith(".hdf"):
                 ptrepack(file, root)
+
+
+def df_pop(df, n):
+    out = df.head(n)
+    return df.iloc[n:, :], out
 
 
 class Data:
@@ -314,6 +322,12 @@ class Data:
         else:
             self._df = pd.DataFrame(columns=self.variables)
 
+    def dropnan(self, max_expected_rows=None):
+        ldf = len(self.df)
+        self.df.dropna(axis=0, how='any', inplace=True)
+        if max_expected_rows is not None and ldf - len(self.df) > max_expected_rows:
+            raise Exception('Error: A maximum of {} rows with nan values can be expected from unfinished measurements ({}, {}). Whats wrong?'.format(max_expected_rows, ldf, len(self.df)))
+
     @property
     def df(self):
         return self._df
@@ -323,7 +337,7 @@ class Data:
         self._df = value
         self.reinstate_integrity()
 
-    def save(self, filepath):
+    def save(self, filepath, notify=False):
         if filepath.endswith('.csv'):
             t0 = time.time()
             self._df.to_csv(filepath, index=False, compression='gzip')
@@ -348,7 +362,8 @@ class Data:
             ptrepack_thread(file=os.path.split(filepath)[1], folder=os.path.split(filepath)[0], lock=self.hdf_lock)
             t5 = time.time() - t0 - t1 - t2 - t3 - t4
             self.hdf_filepath = filepath
-            print("hdf data saved in ({:.2f}, {:.2f}, {:.2f}, {:.2f}, {:.2f})".format(t1, t2, t3, t4, t5))
+            if notify:
+                print("hdf data saved in ({:.2f}, {:.2f}, {:.2f}, {:.2f}, {:.2f})".format(t1, t2, t3, t4, t5))
 
     def append(self, df_or_l):
         if type(df_or_l) == pd.DataFrame:
@@ -371,10 +386,10 @@ class Data:
             l_obs.append(collections.OrderedDict())
             for k, v in self.dtypes.items():
                 if v == 'datetime':
-                    l_obs[idx][k] = datetime.datetime(1900, 1, 1) # datetime.datetime.min is also an option, but leads to OutOfBoundsDatetime: Out of bounds nanosecond timestamp: 1-01-01 00:00:00, when calling data = self.df.iloc[index.row(), index.column()]
+                    l_obs[idx][k] = datetime.datetime(1900, 1, 1)  # datetime.datetime.min is also an option, but leads to OutOfBoundsDatetime: Out of bounds nanosecond timestamp: 1-01-01 00:00:00, when calling data = self.df.iloc[index.row(), index.column()]
                 else:
                     l_obs[idx][k] = getattr(__builtin__, v)()
-        df_append = pd.concat([df_append.reset_index(drop=True), pd.DataFrame(columns=self.observation_names, data=l_obs)], axis=1) #NECESSARY! Reason: sorting issues when appending df with missing columns
+        df_append = pd.concat([df_append.reset_index(drop=True), pd.DataFrame(columns=self.observation_names, data=l_obs)], axis=1)  # NECESSARY! Reason: sorting issues when appending df with missing columns
         if len(self.df) == 0:
             self._df = df_append
         else:
@@ -451,7 +466,6 @@ class Data:
                 del self.dtypes[key]
 
 
-
 def extend_columns(df, other, columns=None):
     """
     Extends df horizontally to include all columns of other
@@ -479,12 +493,12 @@ def extend_columns(df, other, columns=None):
         return df
     else:
         print('This should work but is untested and to my knowledge not used right now. (data_handling.extend_columns)')
-        df_missing_columns = pd.Index([i for i in other.columns if i not in df.columns]) #df.columns.append(other.columns).drop_duplicates(keep=False)
+        df_missing_columns = pd.Index([i for i in other.columns if i not in df.columns])  # df.columns.append(other.columns).drop_duplicates(keep=False)
         return pd.concat([df, pd.concat([other.loc[:, df_missing_columns].iloc[0:1, :]] * len(df)).reset_index(drop=True)], axis=1).reset_index(drop=True)
 
-def df_drop_duplicate_rows(df, other, columns=None, **kwargs):
+
+def df_drop_duplicate_rows(df, other):
     """
-    necessary to deal with missing data and preserve dtype
 
     :param df: dataframe
     :param other: dataframe
@@ -493,16 +507,16 @@ def df_drop_duplicate_rows(df, other, columns=None, **kwargs):
         default: right.columns
     :return:
     """
-    df_columns = df.columns
-    df_dtypes = df.dtypes
-    columns = other.columns if columns is None else columns
-    df_all = df.merge(other.drop_duplicates(), on=list(columns), how='left', indicator=True)
+    df_columns = df.columns  # here for pure security reasons
+    df_dtypes = df.dtypes  # here for pure security reasons
+    df_all = df.merge(other.drop_duplicates(), on=list(other.columns), how='left', indicator=True)
     out = df_all[df_all._merge == 'left_only'].iloc[:, :-1].reset_index(drop=True)
-    if not (out.columns == df_columns).all():
+    if not (out.columns == df_columns).all():  # here for pure security reasons
         print(out.columns, df_columns)
-    if not (out.dtypes == df_dtypes).all():
+    if not (out.dtypes == df_dtypes).all():  # here for pure security reasons
         print(out.columns, df.columns)
     return out
+
 
 def recompile_plotdata_ui_file():
     fold = "{}/qtgui".format(os.path.dirname(__file__))
@@ -562,7 +576,6 @@ class PlotData:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
 
-
     @property
     def window_title(self):
         try:
@@ -579,7 +592,6 @@ class PlotData:
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
-
 
     @property
     def gui(self):
@@ -608,7 +620,6 @@ class PlotData:
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
-
 
     def new_data_arrived(self):
         try:

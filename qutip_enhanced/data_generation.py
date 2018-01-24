@@ -6,13 +6,13 @@ from . import data_handling
 import numpy as np
 import pandas as pd
 import errno, shutil, traceback, zipfile, itertools, collections, datetime, sys, os
+import time
 
 class DataGeneration:
 
     def __init__(self):
         super(DataGeneration, self).__init__()
         self.date_of_creation = datetime.datetime.now()
-        self.remeasure_df = None
 
     current_idx_str = data_handling.ret_property_typecheck('current_idx_str', str) #######
     current_parameter_str = data_handling.ret_property_typecheck('current_parameter_str', str) #######
@@ -76,20 +76,8 @@ class DataGeneration:
     def pld(self, val):
         self._pld = val
 
-    def dropnan_data(self):
-        ldf = len(self.data.df)
-        self.data.df.dropna(axis=0, how='any', inplace=True)
-        if ldf - len(self.data.df) > self.number_of_simultaneous_measurements:
-            raise Exception('Error: there seem to be more nan values than can be expected from unfinished measurements ({}, {}). Whats wrong?'.format(ldf, len(self.data.df)))
-
-    def init_iterator_df_done(self):
-        if len(self.data.df) > 0:
-            self.iterator_df_done = self.data.df.iloc[:, :len(self.parameters.keys())]
-        else:
-            self.iterator_df_done = self.iterator_df.drop(self.iterator_df.index, inplace=False)
-
     def iterator_df_drop_done(self):
-        self.iterator_df = data_handling.df_drop_duplicate_rows(self.iterator_df, self.iterator_df_done, keep=False)
+        self.iterator_df = data_handling.df_drop_duplicate_rows(self.iterator_df, self.iterator_df_done)
 
     def set_iterator_df(self):
         self.iterator_df = pd.DataFrame(
@@ -113,14 +101,7 @@ class DataGeneration:
             dtypes=self.dtypes,
             init_from_file=init_from_file
         )
-        self.dropnan_data()
-
-    # def move_init_from_file_folder_back(self):
-    #     # TODO: might be useful to use shutil.copy2 followed by shutil.rmtree to copy metadata (e.g. creation date)
-    #     if self.init_from_file is not None:
-    #         initial_folder = os.path.split(self.init_from_file)[0]
-    #         current_folder = os.path.join(self.save_dir, "{}_tbc".format(os.path.split(initial_folder)[-1]))
-    #         shutil.move(current_folder, initial_folder)
+        self.data.dropnan(max_expected_rows=self.number_of_simultaneous_measurements)
 
     def update_current_str(self):
         if hasattr(self, 'current_iterator_df') and len(self.current_iterator_df) > 0:
@@ -138,35 +119,23 @@ class DataGeneration:
     def init_run(self, **kwargs):
         self.state = 'run'
         self.reinit()
-        self.set_iterator_df()
         self.init_data(**kwargs)
-        self.init_iterator_df_done()
-        self.iterator_df_drop_done()
-
-    def iterator_df_pop(self, n):
-        out = self.iterator_df.head(n)
-        self.iterator_df = self.iterator_df.iloc[n:, :]
-        return out
 
     def update_progress(self):
         self._progress = len(self.iterator_df_done) / np.prod([len(i) for i in self.parameters.values()])
 
     def iterator(self):
-        while len(self.iterator_df) > 0:
-            if hasattr(self, 'current_iterator_df'):
-                self.iterator_df_done = self.iterator_df_done.append(self.current_iterator_df)
+        while True:
+            self.process_remeasure_items()
+            self.iterator_df_done = self.data.df.loc[:, self.data.parameter_names] #self.iterator_df_done.append(self.current_iterator_df)
             self.set_iterator_df()
             self.iterator_df_drop_done()
-            self.process_remeasure_items()
             self.update_progress()
-            self.current_iterator_df = self.iterator_df_pop(min(self.number_of_simultaneous_measurements, len(self.iterator_df)))
+            self.iterator_df, self.current_iterator_df = data_handling.df_pop(self.iterator_df, min(self.number_of_simultaneous_measurements, len(self.iterator_df)))
             self.data.append(self.current_iterator_df)
             self.update_current_str()
-            yield self.current_iterator_df
-        if hasattr(self, 'current_iterator_df'):
-            self.iterator_df_done = self.iterator_df_done.append(self.current_iterator_df)
-            del self.current_iterator_df
-        self.update_progress()
+            if len(self.current_iterator_df) > 0:
+                yield self.current_iterator_df
 
     def reinit(self):
         self.start_time = datetime.datetime.now()
@@ -241,50 +210,32 @@ class DataGeneration:
         else:
             self.file_path = str(folder)
 
-    def save_qutip_enhanced(self, destination_dir):
-        src = r'D:\Python\qutip_enhanced\qutip_enhanced'
-        f = r'{}/qutip_enhanced.zip'.format(destination_dir)
-        if not os.path.isfile(f):
-            zf = zipfile.ZipFile(f, 'a')
-            for root, dirs, files in os.walk(src):
-                if not '__pycach__' in root:
-                    for file in files:
-                        if not any([file.endswith(i) for i in ['.pyc', '.orig']]):
-                            zf.write(os.path.join(root, file), os.path.join(root.replace(os.path.commonprefix([root, src]), ""), file))
-            zf.close()
-
     def save(self, name='', notify=False):
+        t0 = time.time()
         if not os.path.exists(self.save_dir):
             self.make_save_dir()
         if self.init_from_file is not None and self.move_folder:
             new_iff_path = os.path.join(self.save_dir, os.path.basename(os.path.dirname(self.init_from_file)) + '_tbc', os.path.basename(self.init_from_file))
             if not os.path.exists(new_iff_path):
-                # TODO: might be useful to use shutil.copy2 followed by shutil.rmtree to copy metadata (e.g. creation date)
                 folder = os.path.dirname(self.init_from_file)
                 os.rename(folder, folder+'_tbc')
                 shutil.move(folder+'_tbc', self.save_dir)
         if len(self.iterator_df_done) >= 0:
-            import time
-            t0 = time.time()
             if hasattr(self, 'file_notes'):
                 with open("{}/notes.dat".format(self.save_dir), "w") as text_file:
                     text_file.write(self.file_notes)
-            t1 = time.time()-t0
             if hasattr(self, '_meas_code'):
                 with open("{}/meas_code.py".format(self.save_dir), "w") as text_file:
                     text_file.write(self.meas_code)
-            t2 = time.time() - t0 - t1
             # self.data.save("{}/data.csv".format(self.save_dir)) #this takes forever
-            t3 = time.time() - t0 - t1 - t2
             self.data.save("{}/data.hdf".format(self.save_dir))
-            t4 = time.time() - t0 - t1 - t2 - t3
             self.pld.save_plot("{}/plot.png".format(self.save_dir))
-            t5 = time.time() - t0 - t1 - t2 - t3 - t4
             if notify:
-                print("saved {} to '{} ({:.2f}, {:.2f}, {:.2f}, {:.2f}, {:.2f})".format(name, self.save_dir, t1, t2, t3, t4, t5))
+                print("saved {} to '{} ({:.3f})".format(name, self.save_dir, time.time()-t0))
+
 
     def remeasure(self, df):
-        indices = self.data.df[self.data.df.iloc[:, :len(self.parameters.keys())].isin(df).all(axis=1)].index #get indices in self.df.data to be replaced
+        indices = self.data.df[self.data.df.loc[:, self.data.parameter_names].isin(df).all(axis=1)].index #get indices in self.df.data to be replaced
         if len(indices) != len(df):
             raise Exception('Not all rows in df could be found in self.data: (missing: {})'.format(len(df) - len(indices)))
         elif indices[0]% self.number_of_simultaneous_measurements != 0:
@@ -296,10 +247,7 @@ class DataGeneration:
         self.remeasure_df = df
 
     def process_remeasure_items(self):
-        if self.remeasure_df is not None:
-            self.iterator_df.append(self.remeasure_df)
-            self.iterator_df_done.append(self.remeasure_df)
-            self.iterator_df_done.drop_duplicates(keep=False, inplace=True)
-            self.data.df.drop_duplicates(keep=False, inplace=True, subset=self.data.parameter_names)
-            self.remeasure_df = None
+        if hasattr(self, 'remeasure_df'):
+            self.data._df = data_handling.df_drop_duplicate_rows(self.data.df, self.remeasure_df)
+            del self.remeasure_df
 
