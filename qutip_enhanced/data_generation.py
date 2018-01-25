@@ -136,6 +136,8 @@ class DataGeneration:
             self.update_current_str()
             if len(self.current_iterator_df) > 0:
                 yield self.current_iterator_df
+            else:
+                break
 
     def reinit(self):
         self.start_time = datetime.datetime.now()
