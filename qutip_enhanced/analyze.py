@@ -279,6 +279,7 @@ class Simulate(DataGeneration):
     def run(self, abort=None):
         self.init_run(init_from_file=None, iff=None)
         try:
+            raise Exception('THE NEXT LINE PROBABLY IS BAD AND IT SHOULD BE for idx, self.current_iterator_df in enumerate(self.iterator()):')
             for idx, self.current_iterator_df in izip(count(0), self.iterator()):
                 if abort is not None and abort.is_set(): break
                 obs = self.f(current_iterator_df=self.current_iterator_df, abort=abort)

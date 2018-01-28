@@ -222,6 +222,37 @@ def df_pop(df, n):
     out = df.head(n)
     return df.iloc[n:, :], out
 
+def l_to_df(l):
+    """
+    creates DataFrame from list of OrderedDict
+
+    :param l: collections.OrderedDict, dict or list thereof
+    :return:
+    """
+    if type(l) == pd.DataFrame:
+        return l
+    else:
+        if type(l) in [collections.OrderedDict, dict]:
+            l = [l]
+        return pd.concat([pd.Series(i) for i in l], axis=1).transpose()
+
+def df_access(df, other):
+    if type(other) == pd.Series:
+        other = pd.DataFrame(other).transpose()
+    df_all = df.merge(other.drop_duplicates(), on=list(other.columns), how='left', indicator=True)
+    return df_all[df_all._merge == 'both'].iloc[:, :-1].reset_index(drop=True)
+
+def df_delete(df, other):
+    if type(other) == pd.Series:
+        other = pd.DataFrame(other).transpose()
+    df_all = df.merge(other.drop_duplicates(), on=list(other.columns), how='left', indicator=True)
+    return df_all[df_all._merge == 'left_only'].iloc[:, :-1].reset_index(drop=True)
+
+def dict_access(df, l):
+    return df_access(df=df, other=l_to_df(l))
+
+def dict_delete(df, l):
+    return df_delete(df=df, other=l_to_df(l))
 
 class Data:
     def __init__(self, parameter_names=None, observation_names=None, dtypes=None, **kwargs):
@@ -395,36 +426,24 @@ class Data:
         else:
             self._df = self._df.append(df_append, ignore_index=True)
 
-    def dict_access(self, l, df=None):
-        df = self.df if df is None else df
-        if len(l) == 0:
-            raise Exception('Nope!')
-        else:
-            if type(l) in [collections.OrderedDict, dict]:
-                l = [l]
-            return df[functools.reduce(np.logical_or, [functools.reduce(np.logical_and, [df[key] == val for key, val in d.items()]) for d in l])]
-
-    def dict_delete(self, l, df=None):
-        raise Exception("WARNING: reset_index() might create column 'index'. If thats the case, add 'drop=True'")
-        df = self.df if df is None else df
-        if len(l) > 0:
-            df.drop(self.dict_access(l=l, df=df).index, inplace=True)
-            df.reset_index(inplace=True)
-
     def set_observations(self, l, start_idx=None):
         start_idx = len(self._df) - 1 if start_idx is None else start_idx
-        if type(l) == pd.DataFrame:
-            for idx, row in l.iterrows():
-                for obs, val in zip(l.columns, row):
-                    self._df.at[start_idx - len(l) + idx + 1, obs] = val
-        else:
-            if type(l) in [collections.OrderedDict, dict]:
-                l = [l]
-            for idx, kwargs in enumerate(l):
-                for obs, val in kwargs.items():
-                    if obs not in self.observation_names:
-                        raise Exception('Error: {}'.format(l))
-                    self._df.at[start_idx - len(l) + idx + 1, obs] = val
+        l = l_to_df(l)
+        for idx, row in l.iterrows():
+            for obs, val in zip(l.columns, row):
+                self._df.at[start_idx - len(l) + idx + 1, obs] = val
+
+    def df_access(self, other):
+        return df_access(self.df, other)
+
+    def df_delete(self, other):
+        self._df = df_delete(self.df, other)
+
+    def dict_access(self, l):
+        return dict_access(df=self.df, l=l)
+
+    def dict_delete(self, l):
+        self._df = dict_delete(df=self.df, l=l)
 
     def column_product(self, column_names):
         return itertools.product(*[getattr(self.df, cn).unique() for cn in column_names])
@@ -496,6 +515,16 @@ def extend_columns(df, other, columns=None):
         df_missing_columns = pd.Index([i for i in other.columns if i not in df.columns])  # df.columns.append(other.columns).drop_duplicates(keep=False)
         return pd.concat([df, pd.concat([other.loc[:, df_missing_columns].iloc[0:1, :]] * len(df)).reset_index(drop=True)], axis=1).reset_index(drop=True)
 
+def df_take_duplicate_rows(df, other):
+    df_columns = df.columns  # here for pure security reasons
+    df_dtypes = df.dtypes  # here for pure security reasons
+    df_all = df.merge(other.drop_duplicates(), on=list(other.columns), how='left', indicator=True)
+    out = df_all[df_all._merge == 'both'].iloc[:, :-1].reset_index(drop=True)
+    if not (out.columns == df_columns).all():  # here for pure security reasons
+        print(out.columns, df_columns)
+    if not (out.dtypes == df_dtypes).all():  # here for pure security reasons
+        print(out.columns, df.columns)
+    return out
 
 def df_drop_duplicate_rows(df, other):
     """
@@ -1406,7 +1435,14 @@ def move_folder(folder_list_dict=None, destination_folder=None):
     print("Successfully moved: {}. Failed: {}".format(len(folder_list_dict) - failed, failed))
 
 
-if __name__ == '__main__':
-    from qutip_enhanced import *
-
-    self = dh.cpd()
+# if __name__ == '__main__':
+#     df = pd.DataFrame({'a': [1, 2], 'b': [.5, 1.5], 'c': ['alpha', 'beta']})
+#     other = pd.DataFrame({'a': [1], 'b': [.5]})
+#     reload(dh)
+#     data = dh.Data(parameter_names = ['a', 'b'], observation_names=['c'], dtypes=collections.OrderedDict([('c', "object")]))
+#     data.init()
+#     data.append(collections.OrderedDict([('a', 1), ('b', 13.5)]))
+#     data.set_observations(l=collections.OrderedDict([('c', 'ffff')]))
+#     data.append(collections.OrderedDict([('a', 1), ('b', 20.5)]))
+#     data.set_observations(l=collections.OrderedDict([('c', 'ggggg')]))
+#     data.dict_delete(l=collections.OrderedDict([('a', 1), ('b', 20.5)]))
