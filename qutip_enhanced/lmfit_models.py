@@ -8,6 +8,18 @@ import lmfit.lineshapes
 import itertools
 import scipy
 
+def guess_from_peak(model, y, x, ampscale=1.0, sigscale=1.0):
+    """Estimate amp, cen, sigma for a peak, create params."""
+    avgy = np.mean(y)
+    negative = True if len(y > avgy) > len(y)/2. else False
+    if 'intercept' in model.param_names:
+        intercept = np.median(y)
+        y -= intercept
+    pars = lmfit.models.guess_from_peak(model=model, y=y, x=x, negative=negative, ampscale=ampscale, sigscale=sigscale)
+    if 'intercept' in model.param_names:
+        pars['intercept'] = lmfit.Parameter(name='intercept', value=intercept)
+    return pars
+
 def cosine_no_decay_no_offset(x, amplitude, T, x0):
     return amplitude * np.cos(2 * np.pi * (x - x0) / float(T))
 
@@ -48,13 +60,12 @@ class SincModel(lmfit.Model):
         super(SincModel, self).__init__(sinc, *args, **kwargs)
 
     def guess(self, data, x=None, **kwargs):
-        mod = lmfit.models.LorentzianModel()
-        params = mod.guess(data=data, x=x)
-        result = mod.fit(data=data, params=params, x=x)
+        mod = lmfit.models.LorentzianModel() + lmfit.models.LinearModel()
+        result = mod.fit(data=data, x=x, params=guess_from_peak(model=mod, y=data, x=x))
         center = result.params['center'].value
-        y0 = data.max()
+        y0 = result.params['intercept'].value
         amplitude = -(y0-data.min())
-        rabi_frequency = params['fwhm'].value if self.rabi_frequency is None else self.rabi_frequency
+        rabi_frequency = result.params['fwhm'].value if self.rabi_frequency is None else self.rabi_frequency
         return lmfit.models.update_param_vals(self.make_params(center=center, y0=y0, amplitude=amplitude, rabi_frequency=rabi_frequency), self.prefix, **kwargs)
 
 class TripleSincHfModel(lmfit.Model):
