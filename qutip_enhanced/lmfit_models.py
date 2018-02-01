@@ -18,6 +18,8 @@ def guess_from_peak(model, y, x, ampscale=1.0, sigscale=1.0):
     pars = lmfit.models.guess_from_peak(model=model, y=y, x=x, negative=negative, ampscale=ampscale, sigscale=sigscale)
     if 'intercept' in model.param_names:
         pars['intercept'] = lmfit.Parameter(name='intercept', value=intercept)
+    if 'slope' in model.param_names:
+        pars['slope'] = lmfit.Parameter(name='intercept', value=0.0, vary=False)
     return pars
 
 def cosine_no_decay_no_offset(x, amplitude, T, x0):
