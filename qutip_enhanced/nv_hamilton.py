@@ -30,7 +30,7 @@ def hft_13c_dd(location):
                      [-3 * x * z, -3 * y * z, 1 - 3 * z * z]])
     return prefactor_mhz * mat
 
-class NVHam(object):
+class NVHam:
     """
     Hamiltonian describing a single NV + nuclear spins.
 
@@ -62,6 +62,13 @@ class NVHam(object):
         :param D: float
             Zero field splitting, default 2870 MHz.
         """
+        self.j = {'14n': 1, '15n': .5, 'e': 1, '13c': .5}
+        self._gamma = gamma  # gyromagnetic ratios given in 1/2pi MHz/T, i.e. f = gamma*B
+        self._qp = {'14n': -4.945745, '15n': 0.0, '13c': 0}
+        self._hf_para_n = {'14n': -2.165, '15n': +3.03}
+        self._hf_perp_n = {'14n': -2.7, '15n': +3.65}
+        self.D = 2870.3
+        self.dims = []
         self.magnet_field_cart = coordinates.Coord().coord(magnet_field, 'cart')  # magnet field in cartesian coordinates
         self.n_type = n_type
         self.nitrogen_levels = nitrogen_levels
@@ -79,15 +86,6 @@ class NVHam(object):
             self._n_type = val
         else:
             raise Exception("Chosen 'n_type' is not allowed.")
-
-
-    j = {'14n': 1, '15n': .5, 'e': 1, '13c': .5}
-    _gamma = gamma # gyromagnetic ratios given in 1/2pi MHz/T, i.e. f = gamma*B
-    _qp = {'14n': -4.945745, '15n': 0.0, '13c': 0}
-    _hf_para_n = {'14n': -2.165, '15n': +3.03}
-    _hf_perp_n = {'14n': -2.7, '15n': +3.65}
-    D = 2870.3
-    dims = []
 
     @property
     def nitrogen_dim(self):
@@ -223,7 +221,7 @@ class NVHam(object):
         self.spin_levels = [self.electron_levels]
         self.h_nv = get_sub_matrix(self.h_electron(), self.electron_levels)
         if self.n_type is not None:
-            self.dims.append(self.nitrogen_dim)
+            # self.dims.append(self.nitrogen_dim)
             self.add_spin(hft=self.hft_nitrogen(), h_ns=self.h_nitrogen(), nslvl_l=self.nitrogen_levels)
 
     def add_spin(self, hft, h_ns, nslvl_l):
