@@ -11,7 +11,6 @@ from collections import OrderedDict
 from itertools import chain, combinations, product, izip, count
 
 import traceback, sys
-import matplotlib.pyplot as plt
 
 def purity(dm):
     """should work for qudits also"""
@@ -187,10 +186,14 @@ def state_num_name(state, name_list):
     else:
         return f(state, name_list)
 
-def get_transition_frequency(h, **kwargs):
-    dims = h.dims[0]
+def get_transition_frequency(**kwargs):
+    if 'h' in kwargs:
+        dims = kwargs['h'].dims[0]
+        h_diag = kwargs['h'].diag()
+    else:
+        dims = kwargs['dims']
+        h_diag = kwargs['h_diag']
     m_list = list(product(*[range(i) for i in dims]))
-    h_diag = h.diag()
 
     def t(s0, s1):
         return h_diag[m_list.index(s1)] - h_diag[m_list.index(s0)]

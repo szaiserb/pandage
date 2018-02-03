@@ -8,7 +8,10 @@ np.set_printoptions(suppress=True, linewidth=500, threshold=np.nan)
 
 from qutip_enhanced.qutip_enhanced import *
 
-gamma = {'e': -2.80249536e4, '13c': 10.705, '14n': +3.0766, '15n': -4.3156}
+gamma = {'e': -2.0028 * 1.6021766208e-19 / (4 * np.pi * 9.10938356e-31) * 1e-6,
+         '13c': 10.705,
+         '14n': +3.0766,
+         '15n': -4.3156}
 
 def hft_13c_dd(location):
     """
@@ -68,7 +71,7 @@ class NVHam:
         self._hf_para_n = {'14n': -2.165, '15n': +3.03}
         self._hf_perp_n = {'14n': -2.7, '15n': +3.65}
         self.D = 2870.3
-        self.dims = []
+        self.dims = [3]
         self.magnet_field_cart = coordinates.Coord().coord(magnet_field, 'cart')  # magnet field in cartesian coordinates
         self.n_type = n_type
         self.nitrogen_levels = nitrogen_levels
@@ -117,6 +120,7 @@ class NVHam:
     @property
     def hf_para_n(self):
         return self._hf_para_n
+
     @hf_para_n.setter
     def hf_para_n(self, val):
         if type(val) is dict:
@@ -206,9 +210,9 @@ class NVHam:
         h_hf = 0*qeye(list(np.append(self.h_nv.dims[0], len(nslvl_l))))
         eye_mat = None if self.h_nv.dims[0][1:] == [] else qeye(self.h_nv.dims[0][1:])  # unity matrix for spinsnot involved in HF
         for i in range(3):
-            electron = get_sub_matrix(jmat(self.spins[0], coordinates.Coord().cart_coord[i]), self.spin_levels[0])
+            electron = jmat(self.spins[0], coordinates.Coord().cart_coord[i]).extract_states(self.spin_levels[0])
             for j in range(3):
-                new = get_sub_matrix(jmat(dim2spin(nsd), coordinates.Coord().cart_coord[j]), nslvl_l)
+                new = jmat(dim2spin(nsd), coordinates.Coord().cart_coord[j]).extract_states(nslvl_l)
                 tmp = tensor(electron, eye_mat, new) if eye_mat is not None else tensor(electron, new)
                 h_hf = h_hf + hft[i, j] * tmp
         return h_hf
@@ -219,9 +223,8 @@ class NVHam:
         """
         self.spins = np.array([1])
         self.spin_levels = [self.electron_levels]
-        self.h_nv = get_sub_matrix(self.h_electron(), self.electron_levels)
+        self.h_nv = self.h_electron().extract_states(self.electron_levels)
         if self.n_type is not None:
-            # self.dims.append(self.nitrogen_dim)
             self.add_spin(hft=self.hft_nitrogen(), h_ns=self.h_nitrogen(), nslvl_l=self.nitrogen_levels)
 
     def add_spin(self, hft, h_ns, nslvl_l):
@@ -240,11 +243,10 @@ class NVHam:
 
         nsd = h_ns.shape[0]  # multiplicity of new spin
         nsq = dim2spin(nsd)  # quantum number of new spin
-        self.dims.append(h_ns.shape[0])
+        self.dims.append(int(h_ns.shape[0]))
         h_nv_ext = tensor(self.h_nv,
                           qeye(len(nslvl_l)))  # nv hamilton operator extended with qeye of dimension of new spin
-        h_ns_ext = tensor(qeye(self.h_nv.dims[0]),
-                          get_sub_matrix(h_ns, nslvl_l))  # extended hamilton operator of the new spin
+        h_ns_ext = tensor(qeye(self.h_nv.dims[0]), h_ns.extract_states(nslvl_l))  # extended hamilton operator of the new spin
         h_hf = self.h_hf(hft, nsd, nslvl_l)  # new spin - electron hyperfine interaction tensor
         self.h_nv = h_nv_ext + h_ns_ext + h_hf
         self.spins = np.append(self.spins, nsq)
