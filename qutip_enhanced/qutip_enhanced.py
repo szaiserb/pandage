@@ -36,7 +36,7 @@ def save_qutip_enhanced(destination_dir):
         zf.close()
 
 class Eigenvector:
-    def __init__(self, dims):
+    def __init__(self, dims, track_evals=False):
         """
         Eigenvalues are not sorted in any way which makes plotting or
         following special level at anticrossings difficult. This class follows energy levels
@@ -46,32 +46,33 @@ class Eigenvector:
 
         """
         self.dims = np.array(dims)
-        self.evecs_old = make_vector_basis(dims)
-        self.idx = np.array(range(self.dims.prod()))
-        self.evals_sorted_list = None
+        self.evecs_old_transposed = np.eye(self.dims.prod())
+        self.idx = np.arange(self.dims.prod())
+        self.track_evals = track_evals
 
-    def sort(self, evecs_new, evals_new):
+    def update_evals_sorted_list(self):
+        if self.track_evals:
+            if not hasattr(self, 'evals_sorted_list'):
+                self.evals_sorted_list = np.array([self.evals_sorted])
+            else:
+                self.evals_sorted_list = np.append(self.evals_sorted_list, np.array([self.evals_sorted]), axis=0)
+
+    def sort(self, evec_matrix_new, evals_new):
         """
         keep order of eigenvalues by comparing the
         eigenvectors from former and current run
         -evecs_new is a numpy array of qutip eigenvectors in arbitrary order like given by evals, evec = Qobj.eigenstates()
         -evals_new is numpy array of eigenvalues like given by evals, evec = Qobj.eigenstates()
         """
-        self.idx_new = copy.deepcopy(self.idx)
-        for i in range(self.dims.prod()):
-            for j in range(self.dims.prod()):
-                if (self.evecs_old[i].trans() * evecs_new[j]).norm() >= 0.5 and (
-                            self.evecs_old[1].trans() * evecs_new[j]).norm() <= 1.5:
-                    self.idx_new[i] = j
-                    break
-                elif j == self.dims.prod() - 1:
-                    raise Exception("No two orthonormal EV have been found. Try to make more steps. {}".format((self.evecs_old[i].trans() * evecs_new[j]).norm() ))
-        self.evals_sorted = np.take(evals_new, self.idx_new)
-        self.evecs_old = np.take(evecs_new, self.idx_new)
-        if self.evals_sorted_list is None:
-            self.evals_sorted_list = np.array([self.evals_sorted])
-        else:
-            self.evals_sorted_list = np.append(self.evals_sorted_list, np.array([self.evals_sorted]), axis=0)
+        self.idx = np.array(np.dot(self.evecs_old_transposed, evec_matrix_new).argmax(axis=1))[:,0]
+        self.evecs_old_transposed = evec_matrix_new.transpose()[self.idx, :]
+        self.evals_sorted = evals_new[self.idx]
+        self.update_evals_sorted_list()
+
+def sort_eigenvalues_standard_basis(dims, evec, evals):
+    ev = Eigenvector(dims=dims)
+    ev.sort(evec, evals)
+    return np.real(ev.evals_sorted)
 
 class Arrow3D(FancyArrowPatch):
     def __init__(self, xs, ys, zs, *args, **kwargs):
@@ -173,28 +174,8 @@ def do_zero(h):
     np.fill_diagonal(h, d)
     return Qobj(h, dims=dims)
 
-def get_sub_matrix(op, levels):
-    """
-    :param op: Qobj operator
-        Qobj operator describing a single, non-concatenated system, e.g. the NV electron spin.
-        This implies op.dim == op.shape
-    :param levels: list of int
-        list of  levels of system described by operator 'op' that should be included in the output operator
-        maximum list size is range(op.dims[0]). Minimum list size is [] (then an empty operator is returned)
-
-    :return: Qobj operator
-        output operator has same characteristics as 'op' but describes a system with size specified in 'levels'
-        Example: 'op' describes a spin 1 system, i.e. op.dims = 3. Given levels=[1,2], in the returned operator,
-        line and column 0 are removed, i.e. the returned operator has dim = [2,2]
-    """
-    matrix = op.data.todense()
-    levels = np.sort(levels)
-    for i in range(len(matrix) - 1, -1, -1):
-        if not i in levels:
-            for j in range(2):
-                matrix = np.delete(matrix, i, j)
-    op = Qobj(matrix)
-    return op
+# def get_sub_matrix(op, levels):
+#     return op.eliminate_states([i for i in range(op.dims[0][0]) if i not in levels])
 
 def get_rot_matrix(dim, rotation_axis=None, **kwargs):
     """
