@@ -8,12 +8,13 @@ import lmfit.lineshapes
 import itertools
 import scipy
 
-def guess_from_peak(model, y, x, ampscale=1.0, sigscale=1.0):
+def guess_from_peak(model, y, x, negative, ampscale=1.0, sigscale=1.0):
     """Estimate amp, cen, sigma for a peak, create params."""
-    avgy = np.mean(y)
-    negative = True if len(y > avgy) > len(y)/2. else False
     if 'intercept' in model.param_names:
-        intercept = np.median(y)
+        if negative:
+            intercept = np.max(y)
+        else:
+            intercept = np.min(y)
         y -= intercept
     pars = lmfit.models.guess_from_peak(model=model, y=y, x=x, negative=negative, ampscale=ampscale, sigscale=sigscale)
     if 'intercept' in model.param_names:
@@ -63,7 +64,7 @@ class SincModel(lmfit.Model):
 
     def guess(self, data, x=None, **kwargs):
         mod = lmfit.models.LorentzianModel() + lmfit.models.LinearModel()
-        result = mod.fit(data=data, x=x, params=guess_from_peak(model=mod, y=data, x=x))
+        result = mod.fit(data=data, x=x, params=guess_from_peak(model=mod, y=data, x=x, **kwargs))
         center = result.params['center'].value
         y0 = result.params['intercept'].value
         amplitude = -(y0-data.min())

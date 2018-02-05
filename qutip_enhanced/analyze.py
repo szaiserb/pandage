@@ -209,52 +209,6 @@ def get_transition_frequency(**kwargs):
             states_list_string = kwargs['states_list']
         return dict([(str(sstr), t(s[0], s[1])) for sstr, s in zip(states_list_string, kwargs.get('states_list'))])
 
-def plot_state(dml, var=None, qubit_names=None, vertical_lines_at=None):
-    dims = dml[0][0].dims[0]
-    n = len(dims)
-    qubit_names = ['Qubit {}'.format(i) for i in range(n)] if qubit_names is None else qubit_names
-
-    x_val = range(len(dml[0])) if (var is None or type(var[0]) is str) else var
-    x_ticks = var if (var is not None and type(var[0]) is str) else x_val
-
-    opl = [sigmax, sigmay, sigmaz]
-    y_labels = ['x', 'y', 'z', 'purity']
-
-    lim = [[-1.05, 1.05]] * (len(y_labels) - 1) + [[-0.05, 1.05]]
-    fig, arr = plt.subplots(4, n, sharex='col', sharey='row')
-
-    for i, ylabel in enumerate(y_labels):
-        for j, x_label in enumerate(qubit_names):
-            for k in range(len(dml)):
-                if i < len(y_labels) - 1:
-                    y_val = [expect(opl[i](), dm.ptrace(j)) for dm in dml[k]]
-                else:
-                    y_val = [(dm.ptrace(j) ** 2).tr() for dm in dml[k]]
-                arr[i][j].plot(x_val, y_val, linewidth=2)
-                if type(var) is list and type(var[0]) is str:
-                    arr[i][j].set_xticks(x_val)
-                    arr[i][j].set_xticklabels(x_ticks, fontdict=None, minor=False, size='small', rotation='vertical')
-                if vertical_lines_at is not None:
-                    for vla in vertical_lines_at:
-                        arr[i][j].axvline(x=vla, linewidth=1, color='r')
-                arr[i][j].grid(True)
-                arr[i][j].set_ylim(lim[i])
-                if i != len(y_labels) - 1:
-                    arr[i][j].tick_params(
-                        axis='x',  # changes apply to the x-axis
-                        which='both',  # both major and minor ticks are affected
-                        bottom='on',  # ticks along the bottom edge are off
-                        top='off',  # ticks along the top edge are off
-                        labelbottom='off')  # labels along the bottom edge are off
-                if i == len(y_labels) - 1:
-                    arr[i][j].axhline(y=0.5, linewidth=.5, color='r', linestyle='dashed')
-                if j == 0:
-                    arr[i][j].set_ylabel('{}'.format(ylabel))
-                if i == len(y_labels) - 1:
-                    arr[i][j].set_xlabel('{}'.format(qubit_names[j]))
-    fig.set_size_inches(24, 12)
-    return fig, arr
-
 class Simulate(DataGeneration):
 
     def __init__(self, gui=False, progress_bar=None, **kwargs):
