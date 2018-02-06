@@ -58,13 +58,14 @@ def sinc(x, amplitude, center, rabi_frequency, y0):
     return amplitude * rabi_frequency ** 2 / a * np.sin(np.sqrt(a) * np.pi / (2 * rabi_frequency)) ** 2 + y0
 
 class SincModel(lmfit.Model):
-    def __init__(self, rabi_frequency=None, *args, **kwargs):
+    def __init__(self, rabi_frequency=None, negative=False, *args, **kwargs):
         self.rabi_frequency = rabi_frequency
+        self.negative = negative
         super(SincModel, self).__init__(sinc, *args, **kwargs)
 
     def guess(self, data, x=None, **kwargs):
         mod = lmfit.models.LorentzianModel() + lmfit.models.LinearModel()
-        result = mod.fit(data=data, x=x, params=guess_from_peak(model=mod, y=data, x=x, **kwargs))
+        result = mod.fit(data=data, x=x, params=guess_from_peak(model=mod, y=data, x=x, negative=self.negative, **kwargs))
         center = result.params['center'].value
         y0 = result.params['intercept'].value
         amplitude = -(y0-data.min())
