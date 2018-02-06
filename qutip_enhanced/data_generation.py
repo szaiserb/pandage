@@ -109,11 +109,12 @@ class DataGeneration:
             cps = ""
             cis = ""
             for key, val in cid.items():
-                cps += "{}: {}\n".format(key, val)
-                try:
-                    cis += "{}: {} ({})\n".format(key, list(self.parameters[key]).index(val), len(self.parameters[key]))
-                except:
-                    pass
+                if key in self.data.non_unary_parameter_names:
+                    cps += "{}: {}\n".format(key, val)
+                    try:
+                        cis += "{}: {} ({})\n".format(key, list(self.parameters[key]).index(val), len(self.parameters[key]))
+                    except:
+                        pass
             self.pld.update_info_text('State: ' + self.state + '\n\n' + 'Current parameters:\n' + cps + '\n\n' + 'Current indices\n' + cis)
 
     def init_run(self, **kwargs):
