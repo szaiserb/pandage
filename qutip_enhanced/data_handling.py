@@ -572,9 +572,7 @@ class PlotData:
             self.update_window_title(title)
 
     def init_gui(self, parent=None):
-        # del self._observation_list_data
         self._gui = PlotDataQt(plot_data_no_qt=self, parent=parent)
-        # self.new_data_arrived()
 
     fit_function = 'cosine'
     show_legend = False
@@ -653,6 +651,8 @@ class PlotData:
     def new_data_arrived(self):
         try:
             self.update_x_axis_parameter_list()
+            self.update_ax_parameter_list()
+            self.update_subtract_parameter_list()
             self.update_parameter_table_data()
             self.update_parameter_table_selected_indices()
             self.update_observation_list_data()
@@ -678,6 +678,8 @@ class PlotData:
             '_data_path',
             '_data',
             '_x_axis_parameter_list',
+            '_ax_parameter_list',
+            '_subtract_parameter_list',
             '_parameter_table_data',
             '_parameter_table_selected_data',
             '_observation_list_data',
@@ -730,6 +732,77 @@ class PlotData:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
 
+    def x_axis_parameter_with_largest_dim(self):
+        return self.x_axis_parameter_list[np.argmax([len(getattr(self.data.df, p).unique()) for p in self.x_axis_parameter_list])]
+
+    @property
+    def ax_parameter(self):
+        try:
+            return self._ax_parameter
+        except:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
+
+    @ax_parameter.setter
+    def ax_parameter(self, val):
+        try:
+            if getattr(self, '_ax_parameter', None) != val:
+                self._ax_parameter = val
+                if hasattr(self, '_gui'):
+                    self.gui.update_ax_parameter_comboBox()
+        except:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
+
+    @property
+    def ax_parameter_list(self):
+        return self._ax_parameter_list
+
+    def update_ax_parameter_list(self):
+        try:
+            self._ax_parameter_list = ['__none__'] + [cn for cn in self.parameter_names_reduced()]
+            self._ax_parameter = '__none__'
+            if hasattr(self, '_gui'):
+                self.gui.update_ax_parameter_comboBox()
+        except:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
+
+    @property
+    def subtract_parameter(self):
+        try:
+            return self._subtract_parameter
+        except:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
+
+    @subtract_parameter.setter
+    def subtract_parameter(self, val):
+        try:
+            if getattr(self, '_subtract_parameter', None) != val:
+                self._subtract_parameter = val
+                if hasattr(self, '_gui'):
+                    self.gui.update_subtract_parameter_comboBox()
+        except:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
+
+    @property
+    def subtract_parameter_list(self):
+        return self._subtract_parameter_list
+
+    def update_subtract_parameter_list(self):
+        try:
+            self._subtract_parameter_list = ['__none__'] + [cn for cn in self.parameter_names_reduced()]
+            self._subtract_parameter = '__none__'
+            if hasattr(self, '_gui'):
+                self.gui.update_subtract_parameter_comboBox()
+        except:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
+
+
+
     def parameter_names_reduced(self, data=None):
         try:
             data = self.data if data is None else data
@@ -737,9 +810,6 @@ class PlotData:
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
-
-    def x_axis_parameter_with_largest_dim(self):
-        return self.x_axis_parameter_list[np.argmax([len(getattr(self.data.df, p).unique()) for p in self.x_axis_parameter_list])]
 
     @property
     def parameter_table_data(self):
@@ -882,7 +952,7 @@ class PlotData:
                 self._selected_plot_items = []
                 return
             for key, val in out.items():
-                if key == self.x_axis_parameter or hasattr(self, 'subtract_parameter') and key == self.subtract_parameter:
+                if key == self.x_axis_parameter or key == self.subtract_parameter:
                     out[key] = ['__all__']
                 elif len(val) == 0:
                     out[key] = ['__average__']
@@ -1014,7 +1084,7 @@ class PlotData:
                 for p in self.selected_plot_items:
                     condition_dict = collections.OrderedDict([(ni, pi) for ni, pi in zip(self.parameter_names_reduced(), p)])
                     for observation_name in self.observation_list_selected_data:
-                        if not hasattr(self, 'subtract_parameter'):
+                        if self.subtract_parameter == '__none__':
                             dfxy = self.ret_line_plot_data_single(condition_dict, observation_name)
                             condition_dict_reduced = collections.OrderedDict([(key, val) for key, val in condition_dict.items() if val not in ['__average__', '__all__']])
                             plot_data.append(
@@ -1077,7 +1147,7 @@ class PlotData:
                 self.update_fit_select_table_data()
                 if hasattr(self, '_gui'):
                     self.gui.fig.clear()
-                    if hasattr(self, 'ax_parameter'):
+                    if self.ax_parameter != '__none__':
                         ax_p_list = self.data.df[self.ax_parameter].unique()
                         n_plots = len(ax_p_list)
                         nx = ny = int(np.ceil(np.sqrt(n_plots)))
@@ -1090,12 +1160,12 @@ class PlotData:
                     for i in range(n_plots):
                         self.gui.axes.append(self.gui.fig.add_subplot(nx, ny, i+1))
                     for idx, pdi in enumerate(self.line_plot_data()):
-                        if hasattr(self, 'ax_parameter'):
+                        if self.ax_parameter != '__none__':
                             i = np.argwhere(ax_p_list== (pdi['condition_dict_reduced'][self.ax_parameter]))[0,0]
                         else:
                             i = 0
                         self.gui.axes[i].plot(pdi['x'], pdi['y'], '-', label=self.plot_label(pdi['condition_dict_reduced']))
-                        if hasattr(self, 'ax_parameter'):
+                        if self.ax_parameter != '__none__':
                             self.gui.axes[i].set_title("{}: {}".format(self.ax_parameter, pdi['condition_dict_reduced'][self.ax_parameter]))
                     for i in range(n_plots):
                         if idx / float(n_plots) <= 6:  # NOT PYTHON 3 SAFE
@@ -1186,6 +1256,8 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
         self.init_gui()
 
     update_x_axis_parameter_comboBox_signal = pyqtSignal()
+    update_ax_parameter_comboBox_signal = pyqtSignal()
+    update_subtract_parameter_comboBox_signal = pyqtSignal()
     clear_signal = pyqtSignal()
     show_signal = pyqtSignal()
     close_signal = pyqtSignal()
@@ -1205,6 +1277,8 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
     def clear_signal_emitted(self):
         for item in [
             ['x_axis_parameter_comboBox', 'clear'],
+            ['ax_parameter_comboBox', 'clear'],
+            ['subtract_parameter_comboBox', 'clear'],
             ['parameter_table', 'clear_table_contents'],
             ['observation_widget', 'clear'],
             ['fit_select_table', 'clear_table_contents'],
@@ -1242,8 +1316,38 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
         self.x_axis_parameter_comboBox.blockSignals(False)
         self.update_parameter_table_item_flags()
 
-    def update_x_axis_parameteter_from_comboBox(self):
+    def update_x_axis_parameter_from_comboBox(self):
         self.plot_data_no_qt.x_axis_parameter = str(self.x_axis_parameter_comboBox.currentText())
+
+    def update_ax_parameter_comboBox(self):
+        self.update_ax_parameter_comboBox_signal.emit()
+
+    def update_ax_parameter_comboBox_signal_emitted(self):
+        self.ax_parameter_comboBox.blockSignals(True)
+        if hasattr(self.plot_data_no_qt, '_ax_parameter_list') and hasattr(self.plot_data_no_qt, '_ax_parameter'):
+            if self.ax_parameter_comboBox.count() == 0:
+                self.ax_parameter_comboBox.addItems(self.plot_data_no_qt.ax_parameter_list)  # currentIndexChanged is triggered, value is first item (e.g. sweeps)
+            self.ax_parameter_comboBox.setCurrentText(self.plot_data_no_qt.ax_parameter)
+        self.ax_parameter_comboBox.blockSignals(False)
+        # self.update_parameter_table_item_flags()
+
+    def update_ax_parameter_from_comboBox(self):
+        self.plot_data_no_qt.ax_parameter = str(self.ax_parameter_comboBox.currentText())
+
+    def update_subtract_parameter_comboBox(self):
+        self.update_subtract_parameter_comboBox_signal.emit()
+
+    def update_subtract_parameter_comboBox_signal_emitted(self):
+        self.subtract_parameter_comboBox.blockSignals(True)
+        if hasattr(self.plot_data_no_qt, '_subtract_parameter_list') and hasattr(self.plot_data_no_qt, '_subtract_parameter'):
+            if self.subtract_parameter_comboBox.count() == 0:
+                self.subtract_parameter_comboBox.addItems(self.plot_data_no_qt.subtract_parameter_list)  # currentIndexChanged is triggered, value is first item (e.g. sweeps)
+            self.subtract_parameter_comboBox.setCurrentText(self.plot_data_no_qt.subtract_parameter)
+        self.subtract_parameter_comboBox.blockSignals(False)
+        # self.update_parameter_table_item_flags()
+
+    def update_subtract_parameter_from_comboBox(self):
+        self.plot_data_no_qt.subtract_parameter = str(self.subtract_parameter_comboBox.currentText())
 
     def update_parameter_table_data(self, parameter_table_data):
         self.update_parameter_table_data_signal.emit(parameter_table_data)
@@ -1370,6 +1474,8 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
             'clear',
             'update_window_title',
             'update_x_axis_parameter_comboBox',
+            'update_ax_parameter_comboBox',
+            'update_subtract_parameter_comboBox',
             'update_parameter_table_data',
             'update_observation_list_data',
             'update_parameter_table_selected_indices',
@@ -1414,7 +1520,9 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
         self.open_code_button.clicked.connect(self.open_measurement_code)
         self.open_explorer_button.clicked.connect(self.open_explorer)
 
-        self.x_axis_parameter_comboBox.currentIndexChanged.connect(self.update_x_axis_parameteter_from_comboBox)
+        self.x_axis_parameter_comboBox.currentIndexChanged.connect(self.update_x_axis_parameter_from_comboBox)
+        self.ax_parameter_comboBox.currentIndexChanged.connect(self.update_ax_parameter_from_comboBox)
+        self.subtract_parameter_comboBox.currentIndexChanged.connect(self.update_subtract_parameter_from_comboBox)
 
     def show_gui(self):
         self.show_signal.emit()

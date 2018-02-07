@@ -182,9 +182,9 @@
      <property name="geometry">
       <rect>
        <x>1020</x>
-       <y>380</y>
+       <y>480</y>
        <width>231</width>
-       <height>491</height>
+       <height>391</height>
       </rect>
      </property>
      <property name="acceptDrops">
@@ -200,6 +200,92 @@
       <bool>false</bool>
      </property>
     </widget>
+    <widget class="QLabel" name="label_2">
+     <property name="geometry">
+      <rect>
+       <x>1020</x>
+       <y>380</y>
+       <width>231</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>10</pointsize>
+      </font>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::Panel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+     <property name="text">
+      <string>ax_parameter</string>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="ax_parameter_comboBox">
+     <property name="geometry">
+      <rect>
+       <x>1020</x>
+       <y>400</y>
+       <width>231</width>
+       <height>22</height>
+      </rect>
+     </property>
+     <property name="editable">
+      <bool>false</bool>
+     </property>
+     <property name="maxVisibleItems">
+      <number>30</number>
+     </property>
+     <property name="frame">
+      <bool>true</bool>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_3">
+     <property name="geometry">
+      <rect>
+       <x>1020</x>
+       <y>430</y>
+       <width>231</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>10</pointsize>
+      </font>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::Panel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+     <property name="text">
+      <string>subtract_parameter</string>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="subtract_parameter_comboBox">
+     <property name="geometry">
+      <rect>
+       <x>1020</x>
+       <y>450</y>
+       <width>231</width>
+       <height>22</height>
+      </rect>
+     </property>
+     <property name="editable">
+      <bool>false</bool>
+     </property>
+     <property name="maxVisibleItems">
+      <number>30</number>
+     </property>
+     <property name="frame">
+      <bool>true</bool>
+     </property>
+    </widget>
     <zorder>parameter_table</zorder>
     <zorder>observation_widget</zorder>
     <zorder>gridLayoutWidget</zorder>
@@ -210,6 +296,10 @@
     <zorder>open_explorer_button</zorder>
     <zorder>open_code_button</zorder>
     <zorder>info</zorder>
+    <zorder>label_2</zorder>
+    <zorder>ax_parameter_comboBox</zorder>
+    <zorder>label_3</zorder>
+    <zorder>subtract_parameter_comboBox</zorder>
    </widget>
    <widget class="QWidget" name="fit_tab">
     <attribute name="title">
