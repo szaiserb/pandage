@@ -109,7 +109,7 @@ class DataGeneration:
             cps = ""
             cis = ""
             for key, val in cid.items():
-                if key in self.data.non_unary_parameter_names:
+                if len(self.parameters[key]) > 1:
                     cps += "{}: {}\n".format(key, val)
                     try:
                         cis += "{}: {} ({})\n".format(key, list(self.parameters[key]).index(val), len(self.parameters[key]))

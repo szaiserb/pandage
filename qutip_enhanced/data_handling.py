@@ -1029,6 +1029,17 @@ class PlotData:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
 
+    def plot_label(self, condition_dict_reduced):
+        label = ""
+        for key in self.data.non_unary_parameter_names:
+            if key != self.x_axis_parameter:
+                val = condition_dict_reduced[key]
+                if type(val) is str:
+                    label += "{}:{}, ".format(key, val)
+                else:
+                    label += "{}:{:g}, ".format(key, val)
+        return label
+
     def update_plot(self):
         try:
             if hasattr(self, '_data'):
@@ -1038,7 +1049,9 @@ class PlotData:
                     self.gui.fig.clear()
                     self.gui.ax = self.gui.fig.add_subplot(111)
                     for idx, pdi in enumerate(self.line_plot_data()):
-                        self.gui.ax.plot(pdi['x'], pdi['y'], '-')
+                        self.gui.ax.plot(pdi['x'], pdi['y'], '-', label=self.plot_label(pdi['condition_dict_reduced']))
+                    if idx <= 6:# NOT PYTHON 3 SAFE
+                        self.gui.ax.legend()
                     self.gui.fig.tight_layout()
                     self.gui.canvas.draw()
         except:
