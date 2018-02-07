@@ -1032,7 +1032,7 @@ class PlotData:
     def plot_label(self, condition_dict_reduced):
         label = ""
         for key in self.data.non_unary_parameter_names:
-            if key != self.x_axis_parameter:
+            if key in condition_dict_reduced:
                 val = condition_dict_reduced[key]
                 if type(val) is str:
                     label += "{}:{}, ".format(key, val)
