@@ -882,7 +882,7 @@ class PlotData:
                 self._selected_plot_items = []
                 return
             for key, val in out.items():
-                if key == self.x_axis_parameter:
+                if key == self.x_axis_parameter or hasattr(self, 'subtract_parameter') and key == self.subtract_parameter:
                     out[key] = ['__all__']
                 elif len(val) == 0:
                     out[key] = ['__average__']
@@ -1014,16 +1014,46 @@ class PlotData:
                 for p in self.selected_plot_items:
                     condition_dict = collections.OrderedDict([(ni, pi) for ni, pi in zip(self.parameter_names_reduced(), p)])
                     for observation_name in self.observation_list_selected_data:
-                        dfxy = self.ret_line_plot_data_single(condition_dict, observation_name)
-                        condition_dict_reduced = collections.OrderedDict([(key, val) for key, val in condition_dict.items() if val not in ['__average__', '__all__']])
-                        plot_data.append(
-                            dict(
-                                condition_dict_reduced=condition_dict_reduced,
-                                observation_name=observation_name,
-                                x=getattr(dfxy, self.x_axis_parameter),
-                                y=getattr(dfxy, observation_name)
+                        if not hasattr(self, 'subtract_parameter'):
+                            dfxy = self.ret_line_plot_data_single(condition_dict, observation_name)
+                            condition_dict_reduced = collections.OrderedDict([(key, val) for key, val in condition_dict.items() if val not in ['__average__', '__all__']])
+                            plot_data.append(
+                                dict(
+                                    condition_dict_reduced=condition_dict_reduced,
+                                    observation_name=observation_name,
+                                    x=getattr(dfxy, self.x_axis_parameter),
+                                    y=getattr(dfxy, observation_name)
+                                )
                             )
-                        )
+                        else:
+                            # keys = [key for key, val in condition_dict.items() if val not in ['__average__', '__all__']]
+                            keys = [key for key, val in condition_dict.items() if val not in ['__average__', '__all__']] + [self.x_axis_parameter]
+
+                            dfxys = self.ret_line_plot_data_single(condition_dict, observation_name)
+                            dfxy = dfxys.groupby(keys).agg({'result_0': lambda x: -1 * np.diff(x)}).reset_index()
+                            condition_dict_reduced = collections.OrderedDict([(key, val) for key, val in condition_dict.items() if val not in ['__average__', '__all__']])
+                            plot_data.append(
+                                dict(
+                                    condition_dict_reduced=condition_dict_reduced,
+                                    observation_name=observation_name,
+                                    x=getattr(dfxy, self.x_axis_parameter),
+                                    y=getattr(dfxy, observation_name)
+                                )
+                            )
+                    # condition_dict = collections.OrderedDict([(ni, pi) for ni, pi in zip(self.parameter_names_reduced(), p)])
+                    # for observation_name in self.observation_list_selected_data:
+                    #     dfxy = self.ret_line_plot_data_single(condition_dict, observation_name)
+                    #     condition_dict_reduced = collections.OrderedDict([(key, val) for key, val in condition_dict.items() if val not in ['__average__', '__all__']])
+                    #     plot_data.append(
+                    #         dict(
+                    #             condition_dict_reduced=condition_dict_reduced,
+                    #             observation_name=observation_name,
+                    #             x=getattr(dfxy, self.x_axis_parameter),
+                    #             y=getattr(dfxy, observation_name)
+                    #         )
+                    #     )
+            # if hasattr(self, 'subtract_parameter') and self.subtract_parameter is True:
+
             return plot_data
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
@@ -1047,11 +1077,37 @@ class PlotData:
                 self.update_fit_select_table_data()
                 if hasattr(self, '_gui'):
                     self.gui.fig.clear()
-                    self.gui.ax = self.gui.fig.add_subplot(111)
+                    if hasattr(self, 'ax_parameter'):
+                        ax_p_list = self.data.df[self.ax_parameter].unique()
+                        n_plots = len(ax_p_list)
+                        nx = ny = int(np.ceil(np.sqrt(n_plots)))
+                        # ny = 1
+                        # nx = n_plots
+                    else:
+                        nx = ny = n_plots = 1
+                    print(nx, ny, n_plots)
+                    self.gui.axes = []
+                    for i in range(n_plots):
+                        self.gui.axes.append(self.gui.fig.add_subplot(nx, ny, i+1))
                     for idx, pdi in enumerate(self.line_plot_data()):
-                        self.gui.ax.plot(pdi['x'], pdi['y'], '-', label=self.plot_label(pdi['condition_dict_reduced']))
-                    if idx <= 6:# NOT PYTHON 3 SAFE
-                        self.gui.ax.legend()
+                        if hasattr(self, 'ax_parameter'):
+                            i = np.argwhere(ax_p_list== (pdi['condition_dict_reduced'][self.ax_parameter]))[0,0]
+                        else:
+                            i = 0
+                        self.gui.axes[i].plot(pdi['x'], pdi['y'], '-', label=self.plot_label(pdi['condition_dict_reduced']))
+                        if hasattr(self, 'ax_parameter'):
+                            self.gui.axes[i].set_title("{}: {}".format(self.ax_parameter, pdi['condition_dict_reduced'][self.ax_parameter]))
+                    for i in range(n_plots):
+                        if idx / float(n_plots) <= 6:  # NOT PYTHON 3 SAFE
+                            # self.gui.axes[i].legend()
+                            # Create the legend
+                            self.gui.fig.legend(
+                                self.gui.axes[0].lines,
+                                [l.get_label() for l in self.gui.axes[0].lines],
+                                loc="lower right",  # Position of legend
+                                borderaxespad=0.1,  # Small spacing around legend box
+                            )
+                        self.gui.axes[i].set_xlabel(self.x_axis_parameter)
                     self.gui.fig.tight_layout()
                     self.gui.canvas.draw()
         except:
