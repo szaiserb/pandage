@@ -1140,53 +1140,137 @@ class PlotData:
                     label += "{}:{:g}, ".format(key, val)
         return label
 
+    @staticmethod
+    def get_subplot_grid_location_parameters(nx_tot, ny_tot, n_tot, **kwargs):
+        """
+        NOTE: index numbers (e.g. n, nx, ny start from 0 as is common in python, not from 1 as is common in matlab and partially in matplotlib
+        :param nx_tot: int
+            number of axes from left to right
+        :param ny_tot: int
+            number of axes from bottom to top
+        :param n_tot: int
+            total number of plots
+        :param kwargs: either give (nx, ny) or n
+            'nx': int
+                x (horizontal) position in grid
+            'ny': int
+                y position in grid
+            'n' : int
+                position in flattened grid
+        :return: dict
+        """
+        if nx_tot*ny_tot < n_tot:
+            raise Exception('Error: {}, {}, {}'.format(nx_tot, ny_tot, n_tot))
+        if 'n' in kwargs:
+            n = kwargs['n']
+            nx = n%nx_tot
+            ny = int(np.floor(n/float(nx_tot)))
+            # nx = n - nx_tot*ny
+        elif 'nx' in kwargs and 'ny' in kwargs:
+            nx = kwargs['nx']
+            ny = kwargs['ny']
+            n = nx_tot * ny + nx
+        else:
+            raise Exception('Error: {}'.format(kwargs))
+        if n > n_tot - 1:
+            raise Exception('Error: given n (or (nx, ny)) does not index an axis within the grid')
+        most_bottom_axis = True if n + nx_tot > n_tot - 1 else False
+        most_left_axis = True if nx == 0 else False
+        # return collections.OrderedDict([('n', n), ('nx', nx), ('ny', ny), ('most_bottom_axis', most_bottom_axis), ('most_left_axis', most_left_axis)])
+        return n, nx, ny, most_bottom_axis, most_left_axis
+
     def update_plot(self):
         try:
-            if hasattr(self, '_data'):
+            if hasattr(self, '_data') and hasattr(self, '_gui'):
                 self.update_selected_plot_items()
                 self.update_fit_select_table_data()
-                if hasattr(self, '_gui'):
-                    self.gui.fig.clear()
+                self.gui.fig.clear()
+                if self.ax_parameter != '__none__':
+                    ax_p_list = self.data.df[self.ax_parameter].unique()
+                    n_tot = len(ax_p_list)
+                    nx_tot = int(np.ceil(np.sqrt(n_tot)))
+                    m = ((nx_tot**2 - n_tot)/float(nx_tot))
+                    if m - np.around(m) == 0:
+                        m += 1
+                    ny_tot = int(nx_tot - np.floor(m))
+                else:
+                    nx_tot = ny_tot = n_tot = 1
+                plt.plot(nx_tot, ny_tot)
+                # self.gui.axes = self.gui.fig.subplots(nx_tot, ny_tot, squeeze=False, sharex='all', sharey='all').flatten()
+                self.gui.axes = []
+                for ni in range(1, n_tot+1):
+                    pd = {}if len(self.gui.axes) == 0 else {'sharex': self.gui.axes[0], 'sharey': self.gui.axes[0]}
+                    self.gui.axes.append(self.gui.fig.add_subplot(ny_tot, nx_tot, ni, **pd))
+                for idx, pdi in enumerate(self.line_plot_data()):
+                    n = np.argwhere(ax_p_list== (pdi['condition_dict_reduced'][self.ax_parameter]))[0,0] if self.ax_parameter != '__none__' else 0
+                    self.gui.axes[n].plot(pdi['x'], pdi['y'], '-', label=self.plot_label(pdi['condition_dict_reduced']))
                     if self.ax_parameter != '__none__':
-                        ax_p_list = self.data.df[self.ax_parameter].unique()
-                        n_plots = len(ax_p_list)
-                        n = int(np.ceil(np.sqrt(n_plots))) #nx = ny = n
-                        ny = n
-                        m = ((n**2 - n_plots)/float(n))
-                        if m - np.around(m) == 0:
-                            m += 1
-                        nx = n - np.floor(m)
+                        self.gui.axes[n].set_title("{}: {}".format(self.ax_parameter, pdi['condition_dict_reduced'][self.ax_parameter]))
+                for n in range(n_tot):
+                    n, nx, ny, most_bottom_axis, most_left_axis = self.get_subplot_grid_location_parameters(nx_tot, ny_tot, n_tot, n=n)
+                    self.gui.axes[n].set_xlabel(self.x_axis_parameter)
+                    if not most_left_axis:
+                        plt.setp(self.gui.axes[n].get_yticklabels(), visible=False)
                     else:
-                        nx = ny = n_plots = 1
-                    self.gui.axes = []
-                    for i in range(n_plots):
-                        if i == 0:
-                            self.gui.axes.append(self.gui.fig.add_subplot(nx, ny, i+1))
-                        else:
-                            ax0 = self.gui.axes[0]
-                            self.gui.axes.append(self.gui.fig.add_subplot(nx, ny, i + 1, sharex=ax0, sharey=ax0))
-                    for idx, pdi in enumerate(self.line_plot_data()):
-                        if self.ax_parameter != '__none__':
-                            i = np.argwhere(ax_p_list== (pdi['condition_dict_reduced'][self.ax_parameter]))[0,0]
-                        else:
-                            i = 0
-                        self.gui.axes[i].plot(pdi['x'], pdi['y'], '-', label=self.plot_label(pdi['condition_dict_reduced']))
-                        if self.ax_parameter != '__none__':
-                            self.gui.axes[i].set_title("{}: {}".format(self.ax_parameter, pdi['condition_dict_reduced'][self.ax_parameter]))
-                    for i in range(n_plots):
-                        if idx / float(n_plots) <= 6:  # NOT PYTHON 3 SAFE
-                            if self.ax_parameter == '__none__':
-                                self.gui.axes[i].legend()
-                            else:
-                                self.gui.fig.legend(
-                                    self.gui.axes[0].lines,
-                                    [l.get_label() for l in self.gui.axes[0].lines],
-                                    loc="lower right",  # Position of legend
-                                    borderaxespad=0.1,  # Small spacing around legend box
-                                )
-                        self.gui.axes[i].set_xlabel(self.x_axis_parameter)
-                    self.gui.fig.tight_layout()
-                    self.gui.canvas.draw()
+                        if len(self.observation_list_selected_data) == 1:
+                            self.gui.axes[n].set_ylabel(self.observation_list_selected_data[0])
+
+
+                #legend
+                if len(self.gui.axes[0].lines) <= 6:  # NOT PYTHON 3 SAFE
+                    if self.ax_parameter != '__none__':
+                        self.gui.axes.append(self.gui.fig.add_subplot(ny_tot, nx_tot, ny_tot*nx_tot))
+                        plt.setp(self.gui.axes[-1].get_xticklabels(), visible=False)
+                        plt.setp(self.gui.axes[-1].get_yticklabels(), visible=False)
+                        self.gui.axes[-1].xaxis.set_ticks_position('none')
+                        self.gui.axes[-1].yaxis.set_ticks_position('none')
+                        self.gui.axes[-1].axis('off')
+                        self.gui.axes[-1].legend(
+                            self.gui.axes[0].lines,
+                            [l.get_label() for l in self.gui.axes[0].lines],
+                            borderaxespad=0.1,  # Small spacing around legend box
+                            loc='upper left'
+                        )
+                    else:
+                        self.gui.axes[0].legend()
+
+                    # self.gui.axes[-1].legend()
+                    # else:
+                    #     # self.gui.fig.legend(
+                    #     #     self.gui.axes[0, 0].lines,
+                    #     #     [l.get_label() for l in self.gui.axes[0, 0].lines],
+                    #     #     loc="lower right",  # Position of legend
+                    #     #     borderaxespad=0.1,  # Small spacing around legend box
+                    #     # )
+
+
+                # for i in range(n_plots):
+                #     if idx / float(n_plots) <= 6:  # NOT PYTHON 3 SAFE
+                #         if self.ax_parameter == '__none__':
+                #             self.gui.axes.flatten()[i].legend()
+                #         else:
+                #             # self.gui.fig.legend(
+                #             #     self.gui.axes[0, 0].lines,
+                #             #     [l.get_label() for l in self.gui.axes[0, 0].lines],
+                #             #     loc="lower right",  # Position of legend
+                #             #     borderaxespad=0.1,  # Small spacing around legend box
+                #             # )
+                #             self.gui.axes[-1, -1].legend(
+                #                 self.gui.axes[0, 0].lines,
+                #                 [l.get_label() for l in self.gui.axes[0, 0].lines],
+                #                 loc="center",  # Position of legend
+                #                 borderaxespad=0.1,  # Small spacing around legend box
+                #             )
+                # for nyi in range(ny_tot):
+                #     self.gui.axes[-1, nyi].set_xlabel(self.x_axis_parameter)
+
+                # for n, ax in enumerate(self.gui.axes):
+                #     if idx > n_tot - 1:
+                #         ax.set_visible(False)
+                #     n, nx, ny, most_bottom_axis, most_left_axis = self.get_subplot_grid_location_parameters(nx_tot, ny_tot, n_tot, n=n)
+
+                self.gui.fig.tight_layout()
+                self.gui.canvas.draw()
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
