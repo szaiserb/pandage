@@ -1150,15 +1150,21 @@ class PlotData:
                     if self.ax_parameter != '__none__':
                         ax_p_list = self.data.df[self.ax_parameter].unique()
                         n_plots = len(ax_p_list)
-                        nx = ny = int(np.ceil(np.sqrt(n_plots)))
-                        # ny = 1
-                        # nx = n_plots
+                        n = int(np.ceil(np.sqrt(n_plots))) #nx = ny = n
+                        ny = n
+                        m = ((n**2 - n_plots)/float(n))
+                        if m - np.around(m) == 0:
+                            m += 1
+                        nx = n - np.floor(m)
                     else:
                         nx = ny = n_plots = 1
-                    print(nx, ny, n_plots)
                     self.gui.axes = []
                     for i in range(n_plots):
-                        self.gui.axes.append(self.gui.fig.add_subplot(nx, ny, i+1))
+                        if i == 0:
+                            self.gui.axes.append(self.gui.fig.add_subplot(nx, ny, i+1))
+                        else:
+                            ax0 = self.gui.axes[0]
+                            self.gui.axes.append(self.gui.fig.add_subplot(nx, ny, i + 1, sharex=ax0, sharey=ax0))
                     for idx, pdi in enumerate(self.line_plot_data()):
                         if self.ax_parameter != '__none__':
                             i = np.argwhere(ax_p_list== (pdi['condition_dict_reduced'][self.ax_parameter]))[0,0]
@@ -1169,14 +1175,15 @@ class PlotData:
                             self.gui.axes[i].set_title("{}: {}".format(self.ax_parameter, pdi['condition_dict_reduced'][self.ax_parameter]))
                     for i in range(n_plots):
                         if idx / float(n_plots) <= 6:  # NOT PYTHON 3 SAFE
-                            # self.gui.axes[i].legend()
-                            # Create the legend
-                            self.gui.fig.legend(
-                                self.gui.axes[0].lines,
-                                [l.get_label() for l in self.gui.axes[0].lines],
-                                loc="lower right",  # Position of legend
-                                borderaxespad=0.1,  # Small spacing around legend box
-                            )
+                            if self.ax_parameter == '__none__':
+                                self.gui.axes[i].legend()
+                            else:
+                                self.gui.fig.legend(
+                                    self.gui.axes[0].lines,
+                                    [l.get_label() for l in self.gui.axes[0].lines],
+                                    loc="lower right",  # Position of legend
+                                    borderaxespad=0.1,  # Small spacing around legend box
+                                )
                         self.gui.axes[i].set_xlabel(self.x_axis_parameter)
                     self.gui.fig.tight_layout()
                     self.gui.canvas.draw()
