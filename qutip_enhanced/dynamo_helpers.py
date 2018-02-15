@@ -341,9 +341,10 @@ class DynPython(sequence_creator.Arbitrary):
         self.save_matlab_workspace(dns + "\\workspace.mat")
         self.save_matlab_output(path=dns+"\\matlab_output.dat")
         self.save_gates(path=dns+"\\gates")
-        import qutip_enhanced
-        shutil.copytree(os.path.dirname(qutip_enhanced.__file__), dns + '\\qutip_enhanced')
-        print("qutip_enhanced saved.")
+        save_qutip_enhanced(os.path.join(dns))
+        # import qutip_enhanced
+        # shutil.copytree(os.path.dirname(qutip_enhanced.__file__), dns + '\\qutip_enhanced')
+        # print("qutip_enhanced saved.")
         self.save_dynamo_fields(directory=dns)
         # self.save_export_mask(path=dns+"\\export_mask.dat")
         self.save_export_sequence_steps(path=dns + "\\sequence_steps.dat")
