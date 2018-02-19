@@ -918,7 +918,7 @@ class PlotData:
         try:
             out = collections.OrderedDict()
             for cn, val in parameter_table_selected_data.items():
-                if val in ['__all__', '__average__']:
+                if isinstance(val, basestring) and val in ['__all__', '__average__']:
                     out[cn] = val
                 else:
                     indices = []
@@ -1424,7 +1424,7 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
         for cn, val in parameter_table_selected_indices.items():
             cidx = self.parameter_table.column_index(cn)
             for ridx in self.parameter_table.column_data_indices(cn):
-                if val == '__all__' or ridx in val:
+                if val == '__all__' or (not isinstance(val, basestring) and ridx in val):
                     self.parameter_table.item(ridx, cidx).setSelected(True)
                 else:
                     self.parameter_table.item(ridx, cidx).setSelected(False)
