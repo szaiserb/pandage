@@ -336,7 +336,7 @@ class Data:
                     else:
                         df = store.get('/a')
                     store.close()
-                    self.hdf_filepath = init_from_file
+                    self.filepath = init_from_file
                 elif init_from_file.endswith('.csv'):
                     df = pd.read_csv(init_from_file, compression='gzip')
             self._df = df[pd.notnull(df)]
@@ -387,7 +387,7 @@ class Data:
             store.close()
             self.hdf_lock.release()
             ptrepack_thread(file=os.path.split(filepath)[1], folder=os.path.split(filepath)[0], lock=self.hdf_lock)
-            self.hdf_filepath = filepath
+            self.filepath = filepath
             if notify:
                 print("hdf data saved in ({:.2f})".format(time.time() - t0))
 
@@ -469,6 +469,17 @@ class Data:
                 pass
         return out
 
+    def check_integrity(self):
+        if len(self.parameter_names) + len(self.observation_names) != len(self.df.columns):
+            raise Exception('Error!')
+        if not all([ i == j for i, j in zip(self.df.columns[:len(self.parameter_names)], self.parameter_names)]):
+            raise Exception('Error: Integrity corrupted: {}, {}'.format(self.df.columns, self.parameter_names))
+        if not all([ i == j for i, j in zip(self.df.columns[-len(self.observation_names):], self.observation_names)]):
+            raise Exception('Error: Integrity corrupted: {}, {}'.format(self.df.columns, self.observation_names))
+        for cn in self.df.columns:
+            if cn in self.parameter_names and cn in self.observation_names:
+                raise Exception('Error: Integrity corrupted! {}, {}'.format(self.parameter_names, self.observation_names))
+
     def reinstate_integrity(self):
         """
         After columns of self.df have been removed, remove these from other variables as well.
@@ -478,7 +489,22 @@ class Data:
         for key in self.dtypes.keys():
             if key in self.dtypes and key not in self.df.columns:
                 del self.dtypes[key]
+        self.check_integrity()
 
+    def observations_to_parameters(self, observation_names, new_names, new_parameter_name, new_observation_name):
+        """
+        NOTE: If the dtype of the new column should be anything but str, you need to change this manually after calling this method.
+        """
+        df = self.df.rename(dict([(old, new) for old, new in zip(observation_names, new_names)]), axis='columns')
+        df = df.melt(id_vars=[cn for cn in df.columns if cn not in new_names])
+        self._df = df.rename({'value': new_observation_name, 'variable': new_parameter_name}, axis=1)
+        self.parameter_names.append(new_parameter_name)
+        previous_observation_location = min([self.observation_names.index(i) for i in observation_names])
+        self.observation_names = [i for i in self.observation_names if i not in observation_names]
+        self.observation_names.insert(previous_observation_location, new_observation_name)
+        new_column_names = self.parameter_names + self.observation_names
+        self._df = self._df[new_column_names]
+        self.check_integrity()
 
 def extend_columns(df, other, columns=None):
     """
@@ -559,10 +585,8 @@ class PlotData:
         if gui:
             self.init_gui(parent)
             self.gui.show()
-        if 'path' in kwargs:
-            self.set_data_from_path(path=kwargs['path'])
-        elif 'data' in kwargs:
-            self.data = kwargs['data']
+        self.set_data(**kwargs)
+
         if title is not None:
             self.update_window_title(title)
 
@@ -572,31 +596,22 @@ class PlotData:
     fit_function = 'cosine'
     show_legend = False
 
+    def set_data(self, **kwargs):
+        try:
+            if 'path' in kwargs:
+                self.data = Data(iff=kwargs['path'])
+            elif 'data' in kwargs:
+                self.data = kwargs['data']
+            if hasattr(self.data, 'filepath'):
+                self.update_window_title(self.data.filepath)
+                matplotlib.rcParams["savefig.directory"] = os.path.dirname(self.data.filepath)
+        except:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
     def set_data_from_path(self, path):
-        try:
-            self.data = Data(iff=path)
-            self.data_path = path
-            self.update_window_title(self.data_path)
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
 
-    @property
-    def data_path(self):
-        try:
-            return self._data_path
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
 
-    @data_path.setter
-    def data_path(self, val):
-        try:
-            self._data_path = val
-            matplotlib.rcParams["savefig.directory"] = os.path.dirname(self.data_path)
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+            self.update_window_title(self.data.filepath)
 
     @property
     def window_title(self):
@@ -1563,23 +1578,29 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
         self.close_signal.emit()
 
     def open_measurement_code(self):
-        if hasattr(self.plot_data_no_qt.data, 'hdf_filepath'):
-            subprocess.Popen(r"start {}/meas_code.py".format(os.path.dirname(self.plot_data_no_qt.data.hdf_filepath)), shell=True)
+        if hasattr(self.plot_data_no_qt.data, 'filepath'):
+            subprocess.Popen(r"start {}/meas_code.py".format(os.path.dirname(self.plot_data_no_qt.data.filepath)), shell=True)
         else:
             print('No filepath.')
 
     def open_explorer(self):
-        if hasattr(self.plot_data_no_qt.data, 'hdf_filepath'):
-            subprocess.Popen("explorer {}".format(os.path.abspath(os.path.dirname(self.plot_data_no_qt.data.hdf_filepath))), shell=True)
+        if hasattr(self.plot_data_no_qt.data, 'filepath'):
+            subprocess.Popen("explorer {}".format(os.path.abspath(os.path.dirname(self.plot_data_no_qt.data.filepath))), shell=True)
         else:
             print('No filepath.')
 
 
 def cpd():
-    for fn in os.listdir(os.getcwd()):
-        if fn.endswith('.hdf'):
-            out = PlotData(path=os.path.join(os.getcwd(), fn))
-            out.gui.show_gui()
+    hdfl = [fn for fn in os.listdir(os.getcwd()) if fn.endswith('.hdf')]
+    if not 'data.hdf' in hdfl and len(hdfl) != 1:
+        raise Exception('Error: {}'.format(hdfl))
+    data = Data(iff=os.path.join(os.getcwd(), hdfl[0]))
+    if 'prepare_data.py' in os.listdir(os.getcwd()):
+        from prepare_data import prepare_data
+        data = prepare_data(data)
+    # out = PlotData(path=os.path.join(os.getcwd(), hdfl[0]))
+    out = PlotData(data=data)
+    out.gui.show_gui()
     return out
 
 
