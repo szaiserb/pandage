@@ -182,9 +182,9 @@
      <property name="geometry">
       <rect>
        <x>1020</x>
-       <y>480</y>
+       <y>600</y>
        <width>231</width>
-       <height>391</height>
+       <height>271</height>
       </rect>
      </property>
      <property name="acceptDrops">
@@ -221,10 +221,10 @@
       <enum>QFrame::Raised</enum>
      </property>
      <property name="text">
-      <string>ax_parameter</string>
+      <string>col_ax_parameter</string>
      </property>
     </widget>
-    <widget class="QComboBox" name="ax_parameter_comboBox">
+    <widget class="QComboBox" name="col_ax_parameter_comboBox">
      <property name="geometry">
       <rect>
        <x>1020</x>
@@ -247,7 +247,7 @@
      <property name="geometry">
       <rect>
        <x>1020</x>
-       <y>430</y>
+       <y>480</y>
        <width>231</width>
        <height>21</height>
       </rect>
@@ -268,6 +268,49 @@
      </property>
     </widget>
     <widget class="QComboBox" name="subtract_parameter_comboBox">
+     <property name="geometry">
+      <rect>
+       <x>1020</x>
+       <y>500</y>
+       <width>231</width>
+       <height>22</height>
+      </rect>
+     </property>
+     <property name="editable">
+      <bool>false</bool>
+     </property>
+     <property name="maxVisibleItems">
+      <number>30</number>
+     </property>
+     <property name="frame">
+      <bool>true</bool>
+     </property>
+    </widget>
+    <widget class="QLabel" name="label_4">
+     <property name="geometry">
+      <rect>
+       <x>1020</x>
+       <y>430</y>
+       <width>231</width>
+       <height>21</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>10</pointsize>
+      </font>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::Panel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+     <property name="text">
+      <string>row_ax_parameter</string>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="row_ax_parameter_comboBox">
      <property name="geometry">
       <rect>
        <x>1020</x>
@@ -297,9 +340,11 @@
     <zorder>open_code_button</zorder>
     <zorder>info</zorder>
     <zorder>label_2</zorder>
-    <zorder>ax_parameter_comboBox</zorder>
+    <zorder>col_ax_parameter_comboBox</zorder>
     <zorder>label_3</zorder>
     <zorder>subtract_parameter_comboBox</zorder>
+    <zorder>label_4</zorder>
+    <zorder>row_ax_parameter_comboBox</zorder>
    </widget>
    <widget class="QWidget" name="fit_tab">
     <attribute name="title">
