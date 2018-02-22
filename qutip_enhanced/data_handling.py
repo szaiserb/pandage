@@ -586,7 +586,6 @@ class PlotData:
             self.init_gui(parent)
             self.gui.show()
         self.set_data(**kwargs)
-
         if title is not None:
             self.update_window_title(title)
 
@@ -608,10 +607,9 @@ class PlotData:
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
+
     def set_data_from_path(self, path):
-
-
-            self.update_window_title(self.data.filepath)
+        self.set_data(path=path)
 
     @property
     def window_title(self):
@@ -641,7 +639,8 @@ class PlotData:
     @property
     def data(self):
         try:
-            return self._data
+            if hasattr(self, '_data'):
+                return self._data
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
@@ -664,21 +663,19 @@ class PlotData:
             self.update_ax_parameter_list()
             self.update_subtract_parameter_list()
             self.update_parameter_table_data()
-            self.update_parameter_table_selected_indices()
             self.update_observation_list_data()
-            self.update_observation_list_selected_indices()
             if len(self.data.df) < 5000:
                 self.update_plot()
-            df = self.data.df.copy()
-            for col in df.columns:
-                drop = False
-                try:
-                    if len(df[col].unique()) == 1:
-                        drop = True
-                except:  # drops for example columns with numpy arrays
-                    drop = True
-                if drop:
-                    df.drop(col, inplace=True, axis=1)
+            # df = self.data.df.copy()
+            # for col in df.columns:
+            #     drop = False
+            #     try:
+            #         if len(df[col].unique()) == 1:
+            #             drop = True
+            #     except:  # drops for example columns with numpy arrays
+            #         drop = True
+            #     if drop:
+            #         df.drop(col, inplace=True, axis=1)
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
@@ -771,7 +768,8 @@ class PlotData:
     def update_ax_parameter_list(self):
         try:
             self._ax_parameter_list = ['__none__'] + [cn for cn in self.parameter_names_reduced()]
-            self._ax_parameter = '__none__'
+            if not hasattr(self, '_ax_parameter') or (self._ax_parameter not in self.ax_parameter_list and len(self.ax_parameter_list) > 0):
+                self._ax_parameter = '__none__'
             if hasattr(self, '_gui'):
                 self.gui.update_ax_parameter_comboBox()
         except:
@@ -804,14 +802,13 @@ class PlotData:
     def update_subtract_parameter_list(self):
         try:
             self._subtract_parameter_list = ['__none__'] + [cn for cn in self.parameter_names_reduced()]
-            self._subtract_parameter = '__none__'
+            if not hasattr(self, '_subtract_parameter') or (self._subtract_parameter not in self.subtract_parameter_list and len(self.subtract_parameter_list) > 0):
+                self._subtract_parameter = '__none__'
             if hasattr(self, '_gui'):
                 self.gui.update_subtract_parameter_comboBox()
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
-
-
 
     def parameter_names_reduced(self, data=None):
         try:
@@ -838,6 +835,7 @@ class PlotData:
             self._parameter_table_data = ptd
             if hasattr(self, '_gui'):
                 self.gui.update_parameter_table_data(parameter_table_data=self.parameter_table_data)
+            self.update_parameter_table_selected_indices()
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
@@ -854,6 +852,7 @@ class PlotData:
                     self.gui.update_observation_list_data(self.observation_list_data)
             elif self.observation_list_data != self.observation_names_reduced():
                 raise Exception('Error: Data of observation list must not be changed after data was given to PlotData.', self.observation_list_data, self.observation_names_reduced())
+            self.update_observation_list_selected_indices()
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
@@ -864,7 +863,12 @@ class PlotData:
 
     def update_observation_list_selected_indices(self, val=None):
         try:
-            self._observation_list_selected_indices = [0] if val is None else val
+            if val is not None:
+                self._observation_list_selected_indices = val
+            elif not hasattr(self, '_observation_list_selected_indices') or  any([i not in self.observation_list_data for i in self.observation_list_selected_data]):
+                self._observation_list_selected_indices = [0]
+            else:
+                return
             if hasattr(self, '_gui'):
                 self.gui.update_observation_list_selected_indices(self.observation_list_selected_indices)
         except:
@@ -897,9 +901,6 @@ class PlotData:
     def update_parameter_table_selected_indices(self, parameter_table_selected_indices=None):
         try:
             if parameter_table_selected_indices is None:
-                # if len(self.data.df) > 1000:
-                #     self._parameter_table_selected_data = collections.OrderedDict([(key, []) for key, val in self.parameter_table_data.items()])
-                #     return
                 self._parameter_table_selected_indices = collections.OrderedDict([(key, []) if key in ['sweeps', self.x_axis_parameter] else (key, '__all__') for key, val in self.parameter_table_data.items()])
             elif not isinstance(parameter_table_selected_indices, collections.OrderedDict):
                 raise Exception(type(parameter_table_selected_indices), parameter_table_selected_indices)
@@ -1036,7 +1037,6 @@ class PlotData:
             self._fit_results = []
             for idx in self.fit_select_table_selected_rows:
                 i = spi[idx]
-                # try:
                 params = mod.guess(data=np.array(i['y']), x=np.array(i['x']))
                 fp = getattr(self, 'fix_params', {})
                 if all(key in params for key in fp.keys()):
@@ -1044,8 +1044,6 @@ class PlotData:
                         params[key].vary = False
                         params[key].value = val
                 self._fit_results.append([i, mod.fit(np.array(i['y']), params, x=np.array(i['x']))])
-                # except:
-                #     print('fitting failed: {}'.format(i))
             self.update_fit_result_table_data()
         except ValueError:
             print("Can not fit, input contains nan values")
