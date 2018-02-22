@@ -1218,11 +1218,20 @@ class PlotData:
                 self.update_fit_select_table_data()
                 self.gui.fig.clear()
                 if self.col_ax_parameter != '__none__' and self.row_ax_parameter == '__none__':
-                    ax_p_list = self.data.df[self.col_ax_parameter].unique()
+                    # ax_p_list = self.data.df[self.col_ax_parameter].unique()
+                    ax_p_list = self.parameter_table_selected_data[self.col_ax_parameter]
                     n_tot = len(ax_p_list)
                     nx_tot = int(np.ceil(np.sqrt(n_tot)))
                     ny_tot = n_tot/float(nx_tot)
-                    ny_tot = ny_tot + 1 if int(ny_tot) == ny_tot else int(np.ceil(ny_tot))
+                    ny_tot = int(ny_tot + 1) if int(ny_tot) == ny_tot else int(np.ceil(ny_tot))
+                elif self.col_ax_parameter != '__none__' and self.row_ax_parameter != '__none__':
+                    # ax_p_list = list(itertools.product(self.data.df[self.row_ax_parameter].unique(), self.data.df[self.col_ax_parameter].unique()))
+                    ax_p_list = list(itertools.product(self.parameter_table_selected_data[self.row_ax_parameter], self.parameter_table_selected_data[self.col_ax_parameter]))
+                    n_tot = len(ax_p_list)
+                    nx_tot = len(self.parameter_table_selected_data[self.col_ax_parameter])
+                    ny_tot = len(self.parameter_table_selected_data[self.row_ax_parameter])
+                    if n_tot < len(self.line_plot_data()):# +1 is for legend
+                        ny_tot += 1
                 else:
                     ax_p_list = []
                     nx_tot = ny_tot = n_tot = 1
@@ -1231,14 +1240,27 @@ class PlotData:
                     pd = {}if len(self.gui.axes) == 0 else {'sharex': self.gui.axes[0], 'sharey': self.gui.axes[0]}
                     self.gui.axes.append(self.gui.fig.add_subplot(ny_tot, nx_tot, ni, **pd))
                 for idx, pdi in enumerate(self.line_plot_data()):
-                    if ax_p_list == [] or len(ax_p_list.shape) == 1:
+                    if len(ax_p_list) == 0 or self.row_ax_parameter == '__none__': #len(ax_p_list[0]) == 1:
                         n = np.argwhere(ax_p_list == (pdi['condition_dict_reduced'][self.col_ax_parameter]))[0,0] if self.col_ax_parameter != '__none__' else 0
                     else:
-                        pass
+                        for n, cr in enumerate(ax_p_list):
+                            if cr[1] == pdi['condition_dict_reduced'][self.col_ax_parameter] and cr[0] == pdi['condition_dict_reduced'][self.row_ax_parameter]:
+                                break
+                        else:
+                            continue
                     abcdefg = collections.OrderedDict([(key, val) for key, val in pdi['condition_dict_reduced'].items() if key not in [self.subtract_parameter, self.col_ax_parameter, self.row_ax_parameter]])
                     self.gui.axes[n].plot(pdi['x'], pdi['y'], '-', label=self.plot_label(abcdefg))#pdi['condition_dict_reduced']))
-                    if ax_p_list != [] and len(ax_p_list.shape) == 1:
-                        self.gui.axes[n].set_title("{}: {}".format(self.col_ax_parameter, pdi['condition_dict_reduced'][self.col_ax_parameter]))
+                    if len(ax_p_list) != 0:
+                        # if len(ax_p_list.shape) == 1:
+                        #     self.gui.axes[n].set_title("{}: {}".format(self.col_ax_parameter, pdi['condition_dict_reduced'][self.col_ax_parameter]))
+                        # else:
+                        title_list = []
+                        for column_name in [self.col_ax_parameter, self.row_ax_parameter]:
+                            if column_name != '__none__' and len(self.data.df[self.col_ax_parameter].unique()) > 1:
+                                title_list.append("{}: {}".format(column_name, pdi['condition_dict_reduced'][column_name]))
+                        if len(title_list) > 0:
+                            self.gui.axes[n].set_title(", ".join(title_list))
+
                 for n in range(n_tot):
                     n, nx, ny, most_bottom_axis, most_left_axis = self.get_subplot_grid_location_parameters(nx_tot, ny_tot, n_tot, n=n)
                     self.gui.axes[n].set_xlabel(self.x_axis_parameter)
@@ -1248,7 +1270,7 @@ class PlotData:
                         if len(self.observation_list_selected_data) == 1:
                             self.gui.axes[n].set_ylabel(self.observation_list_selected_data[0])
                 if 1 < len(self.gui.axes[0].lines) <= 6:  # NOT PYTHON 3 SAFE
-                    if ax_p_list != [] and len(ax_p_list.shape) == 1:
+                    if len(ax_p_list) != 0:
                         self.gui.axes.append(self.gui.fig.add_subplot(ny_tot, nx_tot, ny_tot*nx_tot))
                         plt.setp(self.gui.axes[-1].get_xticklabels(), visible=False)
                         plt.setp(self.gui.axes[-1].get_yticklabels(), visible=False)
