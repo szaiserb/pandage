@@ -1,28 +1,38 @@
 from __future__ import print_function, absolute_import, division
+
 __metaclass__ = type
 
-from . import data_handling
+from .util import ret_property_typecheck, ret_property_list_element, check_type, check_array_like
+from .data_handling import df_drop_duplicate_rows, df_pop, Data
+
+from collections import Counter, OrderedDict
 
 import numpy as np
 import pandas as pd
-import errno, shutil, traceback, zipfile, itertools, collections, datetime, sys, os
+import errno
+import shutil
+import traceback
+import itertools
+import datetime
+import sys
+import os
 import time
+
 
 class DataGeneration:
 
     def __init__(self):
-        super(DataGeneration, self).__init__()
         self.date_of_creation = datetime.datetime.now()
 
-    current_idx_str = data_handling.ret_property_typecheck('current_idx_str', str) #######
-    current_parameter_str = data_handling.ret_property_typecheck('current_parameter_str', str) #######
+    current_idx_str = ret_property_typecheck('current_idx_str', str)
+    current_parameter_str = ret_property_typecheck('current_parameter_str', str)
 
     # Save Data:
-    file_path = data_handling.ret_property_typecheck('file_path', str)
-    file_name = data_handling.ret_property_typecheck('file_name', str)
-    file_notes = data_handling.ret_property_typecheck('file_notes', str)
-    meas_code = data_handling.ret_property_typecheck('meas_code', str)
-    state = data_handling.ret_property_list_element('state', ['idle', 'run'])
+    file_path = ret_property_typecheck('file_path', str)
+    file_name = ret_property_typecheck('file_name', str)
+    file_notes = ret_property_typecheck('file_notes', str)
+    meas_code = ret_property_typecheck('meas_code', str)
+    state = ret_property_list_element('state', ['idle', 'run'])
 
     @property
     def parameters(self):
@@ -30,17 +40,33 @@ class DataGeneration:
 
     @parameters.setter
     def parameters(self, val):
-        if type(val) != collections.OrderedDict:
+        if type(val) != OrderedDict:
             raise Exception('Error: {}, {}'.format(type(val), val))
         for k, v in val.items():
-            _ = data_handling.check_type(k, 'key', str)
-            _ = data_handling.check_array_like(v, 'value_in_{}'.format(k))
+            _ = check_type(k, 'key', str)
+            _ = check_array_like(v, 'value_in_{}'.format(k))
             if len(v) == 0:
-                raise Exception("Error: parameter {} has length zero {}".format(k))
-            items_occuring_more_than_once = [item_val for item_val, number_of_occurences in collections.Counter(v).iteritems() if number_of_occurences > 1]
+                raise Exception("Error: parameter {} has length zero.".format(k))
+            items_occuring_more_than_once = [item_val for item_val, number_of_occurences in Counter(v).items() if number_of_occurences > 1]
             if len(items_occuring_more_than_once) > 0:
                 raise Exception("Error: parameter {} has duplicate items {}".format(k, items_occuring_more_than_once))
         self._parameters = val
+
+    @property
+    def dtypes(self):
+        return getattr(self, '_dtypes', None)
+
+    @dtypes.setter
+    def dtypes(self, val):
+        try:
+            if isinstance(val, dict):
+                for k, v in val.items():
+                    if not (k in self.parameters.keys() or isinstance(v, str)):
+                        raise Exception("Error: {}".format(val))
+                self._dtypes = val
+        except Exception:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
 
     @property
     def observation_names(self):
@@ -77,7 +103,7 @@ class DataGeneration:
         self._pld = val
 
     def iterator_df_drop_done(self):
-        self.iterator_df = data_handling.df_drop_duplicate_rows(self.iterator_df, self.iterator_df_done)
+        self.iterator_df = df_drop_duplicate_rows(self.iterator_df, self.iterator_df_done)
 
     def set_iterator_df(self):
         self.iterator_df = pd.DataFrame(
@@ -95,7 +121,7 @@ class DataGeneration:
         init_from_file = iff if iff is not None else init_from_file
         self.init_from_file = init_from_file
         self.move_folder = move_folder
-        self.pld._data = data_handling.Data(
+        self.pld._data = Data(
             parameter_names=self.parameters.keys(),
             observation_names=self.observation_names,
             dtypes=self.dtypes,
@@ -128,11 +154,11 @@ class DataGeneration:
     def iterator(self):
         while True:
             self.process_remeasure_items()
-            self.iterator_df_done = self.data.df.loc[:, self.data.parameter_names] #self.iterator_df_done.append(self.current_iterator_df)
+            self.iterator_df_done = self.data.df.loc[:, self.data.parameter_names]  # self.iterator_df_done.append(self.current_iterator_df)
             self.set_iterator_df()
             self.iterator_df_drop_done()
             self.update_progress()
-            self.iterator_df, self.current_iterator_df = data_handling.df_pop(self.iterator_df, min(self.number_of_simultaneous_measurements, len(self.iterator_df)))
+            self.iterator_df, self.current_iterator_df = df_pop(self.iterator_df, min(self.number_of_simultaneous_measurements, len(self.iterator_df)))
             self.data.append(self.current_iterator_df)
             self.update_current_str()
             if len(self.current_iterator_df) > 0:
@@ -184,21 +210,21 @@ class DataGeneration:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
 
-    @property
-    def file_name(self):
-        return self._file_name
+    # @property
+    # def file_name(self):
+    #     return self._file_name
+    #
+    # @file_name.setter
+    # def file_name(self, val):
+    #     self._file_name = val
 
-    @file_name.setter
-    def file_name(self, val):
-        self._file_name = val
-
-    @property
-    def file_path(self):
-        return self._file_path
-
-    @file_path.setter
-    def file_path(self, val):
-        self._file_path = val
+    # @property
+    # def file_path(self):
+    #     return self._file_path
+    #
+    # @file_path.setter
+    # def file_path(self, val):
+    #     self._file_path = val
 
     def make_save_location_params(self, script_path, **kwargs):
         script_path = os.path.abspath(script_path)
@@ -221,8 +247,8 @@ class DataGeneration:
             new_iff_path = os.path.join(self.save_dir, os.path.basename(os.path.dirname(self.init_from_file)) + '_tbc', os.path.basename(self.init_from_file))
             if not os.path.exists(new_iff_path):
                 folder = os.path.dirname(self.init_from_file)
-                os.rename(folder, folder+'_tbc')
-                shutil.move(folder+'_tbc', self.save_dir)
+                os.rename(folder, folder + '_tbc')
+                shutil.move(folder + '_tbc', self.save_dir)
         if len(self.iterator_df_done) >= 0:
             if hasattr(self, 'file_notes'):
                 with open("{}/notes.dat".format(self.save_dir), "w") as text_file:
@@ -234,14 +260,13 @@ class DataGeneration:
             self.data.save("{}/data.hdf".format(self.save_dir))
             self.pld.save_plot("{}/plot.png".format(self.save_dir))
             if notify:
-                print("saved {} to '{} ({:.3f})".format(name, self.save_dir, time.time()-t0))
-
+                print("saved {} to '{} ({:.3f})".format(name, self.save_dir, time.time() - t0))
 
     def remeasure(self, df):
-        indices = self.data.df[self.data.df.loc[:, self.data.parameter_names].isin(df).all(axis=1)].index #get indices in self.df.data to be replaced
+        indices = self.data.df[self.data.df.loc[:, self.data.parameter_names].isin(df).all(axis=1)].index  # get indices in self.df.data to be replaced
         if len(indices) != len(df):
             raise Exception('Not all rows in df could be found in self.data: (missing: {})'.format(len(df) - len(indices)))
-        elif indices[0]% self.number_of_simultaneous_measurements != 0:
+        elif indices[0] % self.number_of_simultaneous_measurements != 0:
             raise Exception('Error: The first index to be remeasured must be an integer multiple of number_of_simultaneous_measurements!\n{} {} {}'.format(df, indices, self.number_of_simultaneous_measurements))
         elif len(indices) % self.number_of_simultaneous_measurements != 0:
             raise Exception('Error: length of indices to be remeasured must be an integer multiple of number_of_simultaneous_measurements!\n{} {} {}'.format(df, indices, self.number_of_simultaneous_measurements))
@@ -251,6 +276,5 @@ class DataGeneration:
 
     def process_remeasure_items(self):
         if hasattr(self, 'remeasure_df'):
-            self.data._df = data_handling.df_drop_duplicate_rows(self.data.df, self.remeasure_df)
+            self.data._df = df_drop_duplicate_rows(self.data.df, self.remeasure_df)
             del self.remeasure_df
-

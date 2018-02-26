@@ -1,9 +1,11 @@
 # coding=utf-8
 from __future__ import print_function, absolute_import, division
+
 __metaclass__ = type
 
 import numpy as np
-from scipy.constants import *
+from scipy.constants import mu_0, pi, h
+
 np.set_printoptions(suppress=True, linewidth=500, threshold=np.nan)
 
 from qutip_enhanced.qutip_enhanced import *
@@ -12,6 +14,7 @@ gamma = {'e': -2.0028 * 1.6021766208e-19 / (4 * np.pi * 9.10938356e-31) * 1e-6,
          '13c': 10.705,
          '14n': +3.0766,
          '15n': -4.3156}
+
 
 def hft_13c_dd(location):
     """
@@ -33,6 +36,7 @@ def hft_13c_dd(location):
                      [-3 * x * z, -3 * y * z, 1 - 3 * z * z]])
     return prefactor_mhz * mat
 
+
 class NVHam:
     """
     Hamiltonian describing a single NV + nuclear spins.
@@ -47,12 +51,12 @@ class NVHam:
         evals, evecs = ham.h_nv.eigenstates() #calculate eigenvalues and eigenstates
     """
 
-
-    def __init__(self, magnet_field={'z': 0.1}, n_type=None, electron_levels=None, nitrogen_levels=None, **kwargs):
+    def __init__(self, magnet_field=None, n_type=None, electron_levels=None, nitrogen_levels=None, **kwargs):
         """
 
         :param magnet_field: dict
             The applied external magnetic field in [Tesla] must be given as dictionary like described in module coordinates. Cartesian and Spherical coordinates possible.
+            example: magnet_field={'z': 0.1}
         :param n_type: str
             The type of nitrogen atom : '14n', '15n', None
         :param electron_levels: list
@@ -83,6 +87,7 @@ class NVHam:
     @property
     def n_type(self):
         return self._n_type
+
     @n_type.setter
     def n_type(self, val):
         if val in ['14n', '15n', None]:
@@ -100,6 +105,7 @@ class NVHam:
     @property
     def gamma(self):
         return self._gamma
+
     @gamma.setter
     def gamma(self, val):
         if type(val) is dict:
@@ -110,6 +116,7 @@ class NVHam:
     @property
     def qp(self):
         return self._qp
+
     @qp.setter
     def qp(self, val):
         if type(val) is dict:
@@ -131,6 +138,7 @@ class NVHam:
     @property
     def hf_perp_n(self):
         return self._hf_perp_n
+
     @hf_perp_n.setter
     def hf_perp_n(self, val):
         if type(val) is dict:
@@ -145,7 +153,7 @@ class NVHam:
     @nitrogen_levels.setter
     def nitrogen_levels(self, val):
         if self.n_type is not None:
-            fl = range(2*self.j[self.n_type] + 1)
+            fl = range(2 * self.j[self.n_type] + 1)
             if val is None:
                 self._nitrogen_levels = fl
             elif set(fl).issuperset(set(val)):
@@ -197,7 +205,8 @@ class NVHam:
         """
         return self.calc_zeeman(self.gamma['13c'], 1 / 2.0)
 
-    def hft_13c_dd(self, *args, **kwargs):
+    @staticmethod
+    def hft_13c_dd(*args, **kwargs):
         return hft_13c_dd(*args, **kwargs)
 
     def h_hf(self, hft, nsd, nslvl_l):
@@ -207,7 +216,7 @@ class NVHam:
         'nsq' is the spin that is added, i.e. nsq = 1/2.0 for a 13c
         'nslvl_l' nuclear_spin_lvl_list (i guess that's what this variable name means)
         """
-        h_hf = 0*qeye(list(np.append(self.h_nv.dims[0], len(nslvl_l))))
+        h_hf = 0 * qeye(list(np.append(self.h_nv.dims[0], len(nslvl_l))))
         eye_mat = None if self.h_nv.dims[0][1:] == [] else qeye(self.h_nv.dims[0][1:])  # unity matrix for spinsnot involved in HF
         for i in range(3):
             electron = jmat(self.spins[0], coordinates.Coord().cart_coord[i]).extract_states(self.spin_levels[0])
@@ -254,10 +263,8 @@ class NVHam:
         return self.h_nv
 
 
-
 if __name__ == '__main__':
-
-    e = Eigenvector(dims=[2,3])
+    e = Eigenvector(dims=[2, 3])
     B_list = np.linspace(0.1, 0.105, 50)
     h_nv = NVHam(magnet_field={'z': 0.0}, n_type='14n', nitrogen_levels=[0, 1, 2], electron_levels=[1, 2])
     # for i in B_list:
@@ -278,9 +285,9 @@ if __name__ == '__main__':
     # C1390_ht = np.matrix([[0, 0, 0],
     #                       [0, 0, 0],
     #                       [0, 0, 0.089]])
-    #nvham.add_spin(C13414_ht, nvham.h_13c(), [0, 1])
+    # nvham.add_spin(C13414_ht, nvham.h_13c(), [0, 1])
     # nvham.add_spin(C1390_ht, nvham.h_13c(), [0, 1])
-    #print nvham.h_nv
+    # print nvham.h_nv
     # nvham = NVHam(magnet_field={'z': 0.55}, n_type='14n', nitrogen_levels=[0, 1, 2], electron_levels=[0, 1, 2])
     # C13_hyperfine_tensor = nvham.hft_13c_dd(location={'rho': 0.155e-9, 'elev': np.pi/2.})
     # print C13_hyperfine_tensor
@@ -294,12 +301,10 @@ if __name__ == '__main__':
     # C13_hamilton = ham.h_13c()
     # ham.add_spin(C13_hyperfine_tensor, C13_hamilton, nslvl_l=[0, 1])
 
-
     # print ham.hft_13c_dd(location={'rho': 1e-9, 'elev': np.pi / 2.})
     # # print ham.h_nv
     # print abs(ham.h_nv[0, 0] - ham.h_nv[1, 1]) - abs(ham.h_nv[2, 2] - ham.h_nv[3, 3])
     # print abs(ham.h_nv[4, 4] - ham.h_nv[5, 5]) - abs(ham.h_nv[2, 2] - ham.h_nv[3, 3])
-
 
     # ham = NVHam(magnet_field={'z': 0.52373915}, electron_levels=[0, 1, 2], n_type='14n', nitrogen_levels=[0, 1, 2])
     # print ham.h_nv

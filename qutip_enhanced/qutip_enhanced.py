@@ -1,26 +1,22 @@
 # coding=utf-8
 from __future__ import print_function, absolute_import, division
+
 __metaclass__ = type
 
 from qutip import *
-import numpy as np
-np.set_printoptions(suppress=True, linewidth=500)
 
 from . import coordinates
-import copy
 import scipy.linalg
 
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import os, sys
+import os
 import collections
 from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d import proj3d
 import itertools
 import zipfile
 
-np.set_printoptions(linewidth=1e5)  # matrices are displayd much more clearly
+np.set_printoptions(suppress=True, linewidth=100000)
 
 def save_qutip_enhanced(destination_dir):
     src = os.path.dirname(os.path.dirname(__file__))
@@ -34,6 +30,7 @@ def save_qutip_enhanced(destination_dir):
                     if any([file.endswith(i) for i in ['.py', '.dat', '.ui']]) and not file == 'setup.py':
                         zf.write(os.path.join(root, file), os.path.join(root.replace(os.path.commonprefix([root, src]), ""), file))
         zf.close()
+
 
 class Eigenvector:
     def __init__(self, dims, track_evals=False):
@@ -64,15 +61,17 @@ class Eigenvector:
         -evecs_new is a numpy array of qutip eigenvectors in arbitrary order like given by evals, evec = Qobj.eigenstates()
         -evals_new is numpy array of eigenvalues like given by evals, evec = Qobj.eigenstates()
         """
-        self.idx = np.array(np.dot(self.evecs_old_transposed, evec_matrix_new).argmax(axis=1))[:,0]
+        self.idx = np.array(np.dot(self.evecs_old_transposed, evec_matrix_new).argmax(axis=1))[:, 0]
         self.evecs_old_transposed = evec_matrix_new.transpose()[self.idx, :]
         self.evals_sorted = evals_new[self.idx]
         self.update_evals_sorted_list()
+
 
 def sort_eigenvalues_standard_basis(dims, evec, evals):
     ev = Eigenvector(dims=dims)
     ev.sort(evec, evals)
     return np.real(ev.evals_sorted)
+
 
 class Arrow3D(FancyArrowPatch):
     def __init__(self, xs, ys, zs, *args, **kwargs):
@@ -85,13 +84,14 @@ class Arrow3D(FancyArrowPatch):
         self.set_positions((xs[0], ys[0]), (xs[1], ys[1]))
         FancyArrowPatch.draw(self, renderer)
 
+
 class Bloch(Bloch):
 
-    def draw_arrow(self, rho, elev, azim, length=0.1, shorten_line_factor=0.98, n=100, arrowstyle="-|>",  **kwargs):
+    def draw_arrow(self, rho, elev, azim, length=0.1, shorten_line_factor=0.98, n=100, arrowstyle="-|>", **kwargs):
         if not self.axes:
             raise Exception('For this functionality axes must be given to Bloch() upon instantiation')
         x, y, z = coordinates.sph2cart(rho, elev, azim)
-        ahs = int(np.ceil(n*shorten_line_factor))
+        ahs = int(np.ceil(n * shorten_line_factor))
         self.axes.plot(x[:ahs], y[:ahs], z[:ahs], label='parametric curve', **kwargs)
         self.axes.add_artist(self.arrowhead(x, y, z, length=length, arrowstyle=arrowstyle, **kwargs))
 
@@ -122,12 +122,14 @@ def make_vector_basis(dims):
     sd = itertools.product(*[range(dim) for dim in dims])
     return [tensor([basis(dims[i], s) for i, s in enumerate(state)]) for state in sd]
 
+
 def dim2spin(dims):
     """
     always returns numpy matrix
     """
     if type(dims) is list:
         raise Exception("Insert numpy array, not list!")
+    spins = None
     if isinstance(dims, np.ndarray):
         if dims.ndim > 0:
             spins = (dims - 1) / 2.0
@@ -135,18 +137,21 @@ def dim2spin(dims):
         spins = (dims - 1) / 2.0
     return spins
 
+
 def spin2dim(spins):
     """
     always returns numpy matrix
     """
     if type(spins) is list:
         raise Exception("Insert numpy array, not list!")
+    dims = None
     if isinstance(spins, np.ndarray):
         if spins.ndim > 0:
             dims = (2 * spins + 1).astype(np.int32, copy=False)
     else:
         dims = int(2 * spins + 1)
     return dims
+
 
 def qsum(ql):
     """
@@ -161,18 +166,21 @@ def qsum(ql):
         sum_ql += qobj
     return sum_ql
 
+
 def qmul(ql):
     sum_ql = ql[0]
     for qobj in ql[1:]:
         sum_ql *= qobj
     return sum_ql
 
+
 def do_zero(h):
     dims = h.dims
     h = h.data.todense()
-    d = np.diag(h) - h[0,0]
+    d = np.diag(h) - h[0, 0]
     np.fill_diagonal(h, d)
     return Qobj(h, dims=dims)
+
 
 # def get_sub_matrix(op, levels):
 #     return op.eliminate_states([i for i in range(op.dims[0][0]) if i not in levels])
@@ -203,10 +211,12 @@ def get_rot_matrix(dim, rotation_axis=None, **kwargs):
             out[idxe0, idxe1] = rot_mat[idxrm0, idxrm1]
     return Qobj(out)
 
+
 def get_rot_operator(dim, angle=np.pi / 2.0, **kwargs):
     rot_mat = get_rot_matrix(dim, **kwargs)
     U = (-1j * angle * rot_mat).expm()
     return U
+
 
 def get_rot_operator_all_spins(**kwargs):
     """
@@ -256,10 +266,12 @@ def get_rot_operator_all_spins(**kwargs):
             break
     return qsum(out)
 
+
 def get_rot_matrix_all_spins(*args, **kwargs):
     o = get_rot_operator_all_spins(*args, **kwargs)
     dims = o.dims
     return Qobj(scipy.linalg.logm(o.data.todense()), dims=dims) / np.pi * 1.j
+
 
 def rotate(op, **kwargs):
     U = get_rot_operator_all_spins(op.dims[0], **kwargs)
@@ -269,26 +281,29 @@ def rotate(op, **kwargs):
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
+
     rho0 = ket2dm(tensor(basis(2, 0), basis(2, 0)))
+
 
     # print qte.get_rot_operator_all_spins(dims=[2], rotation_axis={'y':1}, angle=np.pi/2.)
 
     def r(phi):
-        rho = rotate(rho0, rotation_axis={'y': 1.}, rotated_spin=0, angle=np.pi/2.)
-        rho = rotate(rho, rotation_axis={'y': 1}, rotated_spin=1, angle=np.pi/2.)
+        rho = rotate(rho0, rotation_axis={'y': 1.}, rotated_spin=0, angle=np.pi / 2.)
+        rho = rotate(rho, rotation_axis={'y': 1}, rotated_spin=1, angle=np.pi / 2.)
         rho = rotate(rho, rotation_axis={'z': 1}, rotated_spin=0, angle=phi)
-        rho = rotate(rho, rotation_axis={'z': 1}, rotated_spin=1, angle=2*phi)
-        rho = rotate(rho, rotation_axis={'y': 1}, rotated_spin=1, angle=-np.pi/2)
-        rho = rotate(rho, rotation_axis={'z': 1}, rotated_spin=0, angle=-np.pi/2., selective_to={1: [1]})
-        rho = rotate(rho, rotation_axis={'y': 1}, rotated_spin=0, angle=-np.pi/2)
+        rho = rotate(rho, rotation_axis={'z': 1}, rotated_spin=1, angle=2 * phi)
+        rho = rotate(rho, rotation_axis={'y': 1}, rotated_spin=1, angle=-np.pi / 2)
+        rho = rotate(rho, rotation_axis={'z': 1}, rotated_spin=0, angle=-np.pi / 2., selective_to={1: [1]})
+        rho = rotate(rho, rotation_axis={'y': 1}, rotated_spin=0, angle=-np.pi / 2)
         return rho
 
-    cphase0 = get_rot_operator_all_spins(dims = [2, 2], rotation_axis={'z': 1}, rotated_spin=0, angle=np.pi/2., selective_to={1:[0]})
-    cphase1 = get_rot_operator_all_spins(dims = [2, 2], rotation_axis={'z': 1}, rotated_spin=0, angle=- np.pi/2., selective_to={1:[1]})
-    rotx = get_rot_operator_all_spins(dims=[2, 2], rotation_axis={'y': 1}, rotated_spin=1, angle=np.pi/2.)
-    print(rotx*cphase0*cphase1*rotx.dag())
 
-    a = np.array([[ 0.-1.j,  0.+0.j,  0.+0.j,  0.+0.j],
-                  [ 0.+0.j,  0.-1.j,  0.+0.j , 0.+0.j],
-                  [ 0.+0.j,  0.+0.j , 0.+1.j,  0.+0.j],
-                  [ 0.+0.,  0.+0.j , 0.+0.j,  0.+1.j]])
+    cphase0 = get_rot_operator_all_spins(dims=[2, 2], rotation_axis={'z': 1}, rotated_spin=0, angle=np.pi / 2., selective_to={1: [0]})
+    cphase1 = get_rot_operator_all_spins(dims=[2, 2], rotation_axis={'z': 1}, rotated_spin=0, angle=- np.pi / 2., selective_to={1: [1]})
+    rotx = get_rot_operator_all_spins(dims=[2, 2], rotation_axis={'y': 1}, rotated_spin=1, angle=np.pi / 2.)
+    print(rotx * cphase0 * cphase1 * rotx.dag())
+
+    a = np.array([[0. - 1.j, 0. + 0.j, 0. + 0.j, 0. + 0.j],
+                  [0. + 0.j, 0. - 1.j, 0. + 0.j, 0. + 0.j],
+                  [0. + 0.j, 0. + 0.j, 0. + 1.j, 0. + 0.j],
+                  [0. + 0., 0. + 0.j, 0. + 0.j, 0. + 1.j]])

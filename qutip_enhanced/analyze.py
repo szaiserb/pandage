@@ -2,15 +2,90 @@
 from __future__ import print_function, absolute_import, division
 
 __metaclass__ = type
-from qutip import tensor, ket2dm, sigmax, sigmay, sigmaz, expect, jmat
+from qutip import tensor, ket2dm, expect, jmat
 from .data_generation import DataGeneration
 from .data_handling import PlotData
 from .sequence_creator import unitary_propagator_list_mult
-from .qutip_enhanced import dim2spin
+from .qutip_enhanced import dim2spin, sort_eigenvalues_standard_basis
+import qutip_enhanced.nv_hamilton
 from collections import OrderedDict
-from itertools import chain, combinations, product, izip, count
+from itertools import chain, combinations, product
+import numpy as np
 
-import traceback, sys
+import traceback
+import sys
+
+class NVHamFit14nParams():
+
+    def __init__(self, diag=True):
+        """
+
+        :param diag: bool
+            diagonalize hamiltonian or just take diagonal used for testing or algorithm speedup
+        """
+        self.diag = diag
+        self.spin_name_list = ['e', '14n']
+        self.transition_name_list = [['+1', '0', '-1'], ['+1', '0', '-1']]
+        self.states_list = [range(len(i)) for i in self.transition_name_list]
+        self.set_ntd()
+
+    def nuclear_transition_name(self, transition):
+        ms = self.transition_name_list[0][transition[0][0]]
+        fsn = flipped_spin_numbers(transition)[0]
+        nuc = self.spin_name_list[fsn]
+        if ms == '0' and '13c' in nuc:
+            return '13c ms0'
+        else:
+            if fsn == 1:
+                if transition[0][1] == 0:  # initial transition is '+1'
+                    mn = '+1'
+                elif transition[1][1] == 2:  # initial transition is '0'
+                    mn = '-1'
+                nuc += mn
+            return "{} ms{}".format(nuc, ms)
+
+    def set_ntd(self):
+        ntd = {}
+        c13ms0_added = False
+        for t in single_quantum_transitions_non_hf_spins(self.states_list, hf_spin_list=[0]):
+            name = self.nuclear_transition_name(t)
+            if name == '13c ms0':
+                if c13ms0_added:
+                    continue
+                else:
+                    c13ms0_added = True
+            ntd[name] = t
+        self.ntd = OrderedDict(ntd)
+
+    def set_frequency_dict(self, fd):
+        if type(fd) != OrderedDict:
+            raise Exception('ERROR!')
+        self.frequency_dict = fd
+        self.transitions = [self.ntd[key] for key in self.frequency_dict]
+
+    def nvham(self, magnetic_field, gamma, qp, hf_para_n, hf_perp_n):
+        return qutip_enhanced.nv_hamilton.NVHam(
+            magnet_field={'z': magnetic_field},
+            electron_levels=[0, 1, 2],
+            nitrogen_levels=[0, 1, 2],
+            n_type='14n',
+            gamma=gamma,
+            qp=qp,
+            hf_para_n=hf_para_n,
+            hf_perp_n=hf_perp_n
+        )
+
+    def transition_frequencies(self, magnetic_field, transition_numbers, gamma, qp, hf_para_n, hf_perp_n):
+        nvham = self.nvham(magnetic_field=magnetic_field, gamma=gamma, qp=qp, hf_para_n=hf_para_n, hf_perp_n=hf_perp_n)
+        if self.diag:
+            h_diag = sort_eigenvalues_standard_basis(nvham.dims, *np.linalg.eig(nvham.h_nv.data.todense())[::-1])
+        else:
+            print('Not diagonalizing, just taking diagonal.')
+            h_diag = np.diag(nvham.h_nv.data.todense())
+        f = []
+        for i in transition_numbers:
+            f.append(-get_transition_frequency(h_diag=h_diag, dims=nvham.dims, transition=self.transitions[i]))
+        return f
 
 def purity(dm):
     """should work for qudits also"""
@@ -228,10 +303,6 @@ class Simulate(DataGeneration):
     @property
     def observation_names(self):
         return ["expect"]
-
-    @property
-    def dtypes(self):
-        return None
 
     def run(self, abort=None):
         self.init_run(init_from_file=None, iff=None)

@@ -3,12 +3,13 @@ from __future__ import print_function, absolute_import, division
 
 __metaclass__ = type
 
-import os, sys, subprocess
+
+import os, sys
 
 import numpy as np
 import pandas as pd
 import itertools
-from numbers import Number
+
 import datetime
 import traceback
 import collections
@@ -19,6 +20,7 @@ from PyQt5.QtCore import Qt, pyqtSignal, QObject
 from PyQt5.uic import compileUi
 
 from .qtgui import plot_data_gui
+from .util import ret_property_array_like_types
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
@@ -32,163 +34,6 @@ if sys.version_info.major == 2:
 else:
     import builtins as __builtin__
 import lmfit
-from . import lmfit_models
-
-
-class TC:
-    def __init__(self, **kwargs):
-        self.kwargs = kwargs
-
-
-def getter_setter_gen(name, type_):
-    def getter(self):
-        return getattr(self, "_" + name)
-
-    def setter(self, value):
-        if not isinstance(value, type_):
-            raise TypeError("{} attribute must be set to an instance of {} but was set to {}".format(name, type_, value))
-        setattr(self, "_" + name, value)
-
-    return property(getter, setter)
-
-
-def getter_setter_gen_tc(name, tc):
-    k = tc.kwargs
-
-    def getter(self):
-        return getattr(self, "_" + name)
-
-    getter = k.get('getter', getter)
-    if 'setter' in k:
-        return property(getter, k['setter'])
-    elif 'start' in k and 'stop' in k:
-        def setter(self, val):
-            setattr(self, '_' + name, check_range(check_type(val, name, k['typ']), name, k['start'], k['stop']))
-    elif 'list_type' in k:
-        def setter(self, val):
-            setattr(self, '_' + name, check_array_like_typ(val, name, k['list_type']))
-    elif 'list_element' in k:
-        def setter(self, val):
-            setattr(self, '_' + name, check_list_element(val, name, k['list_element']))
-    else:
-        raise ValueError('Error. {}'.format(k))
-    return property(getter, setter)
-
-
-def auto_attr_check(cls):
-    new_dct = {}
-    for key, val in cls.__dict__.items():
-        if isinstance(val, type):
-            val = getter_setter_gen(key, val)
-        elif type(val) == TC:
-            val = getter_setter_gen_tc(key, val)
-        new_dct[key] = val
-    # Creates a new class, using the modified dictionary as the class dict:
-    return type(cls)(cls.__name__, cls.__bases__, new_dct)
-
-
-def check_type(val, name, typ):
-    if issubclass(type(val), typ):
-        return val
-    else:
-        raise Exception("Property {} must be {} but is {}".format(name, typ, type(val)))
-
-
-def check_types(val, name, types):
-    if any([issubclass(type(val), typ) for typ in types]):
-        return val
-    else:
-        raise Exception("Property {} must be in {} but is {}".format(name, types, type(val)))
-
-
-def check_range(val, name, start, stop):
-    if start <= val <= stop:
-        return val
-    else:
-        raise Exception("Property {} must be in range ({}, {}) but has a value of {}".format(name, start, stop, val))
-
-
-def check_range_type(val, name, typ, start, stop):
-    return check_range(check_type(val, name, typ), name, start, stop)
-
-
-def check_array_like(val, name):
-    at = [list, np.ndarray]
-    if type(val) in at:
-        return val
-    else:
-        raise Exception("Type of property {} must be in list {}. Tried to assign val {} of type {}.".format(name, at, val, type(val)))
-
-
-def check_array_like_typ(val, name, typ):
-    val = [check_type(i, name + '_i', typ) for i in check_array_like(val, name)]
-    if typ in [float, int, Number]:
-        val = np.array(val)
-    return val
-
-
-def check_array_like_types(val, name, types):
-    val = [check_types(i, name + '_i', types) for i in check_array_like(val, name)]
-    if types[0] in [float, int, Number]:  # This assumes, that if type[0] is numeric, all items are numeric
-        val = np.array(val)
-    return val
-
-
-def check_list_element(val, name, l):
-    if val in l:
-        return val
-    else:
-        raise Exception("Property {} must be in list {} but has a value of {}".format(name, l, val))
-
-
-def ret_getter(name):
-    def getter(self):
-        return getattr(self, '_' + name)
-
-    return getter
-
-
-def ret_property_typecheck(name, typ):
-    def setter(self, val):
-        setattr(self, '_' + name, check_type(val, name, typ))
-
-    return property(ret_getter(name), setter)
-
-
-def ret_property_range(name, typ, start, stop):
-    def setter(self, val):
-        setattr(self, '_' + name, check_range(check_type(val, name, typ), name, start, stop))
-
-    return property(ret_getter(name), setter)
-
-
-def ret_property_list_element(name, l):
-    def setter(self, val):
-        setattr(self, '_' + name, check_list_element(val, name, l))
-
-    return property(ret_getter(name), setter)
-
-
-def ret_property_array_like(name):
-    def setter(self, val):
-        setattr(self, '_' + name, check_array_like(val, name))
-
-    return property(ret_getter(name), setter)
-
-
-def ret_property_array_like_typ(name, typ):
-    def setter(self, val):
-        setattr(self, '_' + name, check_array_like_typ(val, name, typ))
-
-    return property(ret_getter(name), setter)
-
-
-def ret_property_array_like_types(name, types):
-    def setter(self, val):
-        setattr(self, '_' + name, check_array_like_types(val, name, types))
-
-    return property(ret_getter(name), setter)
-
 
 def ptrepack(file, folder, tempfile=None, lock=None):
     # C:\Users\yy3\AppData\Local\conda\conda\envs\py27\Scripts\ptrepack.exe -o --chunkshape=auto --propindexes --complevel=0 --complib=blosc data.hdf data_tmp.hdf
@@ -665,8 +510,9 @@ class PlotData:
             self.update_subtract_parameter_list()
             self.update_parameter_table_data()
             self.update_observation_list_data()
-            if len(self.data.df) < 5000:
-                self.update_plot()
+            self.update_plot()
+            # if len(self.data.df) < 5000:
+            #
             # df = self.data.df.copy()
             # for col in df.columns:
             #     drop = False
@@ -1065,10 +911,12 @@ class PlotData:
             if hasattr(self, 'custom_model'):
                 mod = self.custom_model
             elif self.fit_function == 'cosine':
+                from . import lmfit_models
                 mod = lmfit_models.CosineModel()
             elif self.fit_function == 'exp':
                 pass
             elif self.fit_function == 'lorentz':
+                from . import lmfit_models
                 mod = lmfit.models.LorentzianModel()
             self._fit_results = []
             for idx in self.fit_select_table_selected_rows:
@@ -1269,7 +1117,7 @@ class PlotData:
                     else:
                         if len(self.observation_list_selected_data) == 1:
                             self.gui.axes[n].set_ylabel(self.observation_list_selected_data[0])
-                if 1 < len(self.gui.axes[0].lines) <= 6:  # NOT PYTHON 3 SAFE
+                if 1 < len(self.gui.axes[0].lines) <= 12:  # NOT PYTHON 3 SAFE
                     if len(ax_p_list) != 0:
                         self.gui.axes.append(self.gui.fig.add_subplot(ny_tot, nx_tot, ny_tot*nx_tot))
                         plt.setp(self.gui.axes[-1].get_xticklabels(), visible=False)

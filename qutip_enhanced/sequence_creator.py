@@ -5,7 +5,6 @@ __metaclass__ = type
 
 import numpy as np
 import itertools
-from .qutip_enhanced import coordinates
 import numbers
 import sys
 import more_itertools
