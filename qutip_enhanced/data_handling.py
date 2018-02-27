@@ -19,8 +19,9 @@ from PyQt5.QtWidgets import QListWidgetItem, QTableWidgetItem, QMainWindow
 from PyQt5.QtCore import Qt, pyqtSignal, QObject
 from PyQt5.uic import compileUi
 
-from .qtgui import plot_data_gui
+import qutip_enhanced.qtgui.plot_data_gui
 from .util import ret_property_array_like_types
+import qutip_enhanced.qtgui.gui_helpers
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
@@ -420,22 +421,16 @@ def recompile_plotdata_ui_file():
     pypath = r"{}/{}_gui.py".format(fold, name)
     with open(pypath, 'w') as f:
         compileUi(uipath, f)
-    reload(plot_data_gui)
+    reload(qutip_enhanced.qtgui.plot_data_gui)
 
 
-class PlotData:
+class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
 
     def __init__(self, title=None, parent=None, gui=True, **kwargs):
-        super(PlotData, self).__init__()
-        if gui:
-            self.init_gui(parent)
-            self.gui.show()
+        super(PlotData, self).__init__(title=title, parent=parent, gui=gui, QtGuiClass=PlotDataQt)
         self.set_data(**kwargs)
         if title is not None:
             self.update_window_title(title)
-
-    def init_gui(self, parent=None):
-        self._gui = PlotDataQt(plot_data_no_qt=self, parent=parent)
 
     fit_function = 'cosine'
     show_legend = False
@@ -455,31 +450,6 @@ class PlotData:
 
     def set_data_from_path(self, path):
         self.set_data(path=path)
-
-    @property
-    def window_title(self):
-        try:
-            return self._window_title
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
-
-    def update_window_title(self, val):
-        try:
-            self._window_title = str(val)
-            if hasattr(self, '_gui'):
-                self.gui.update_window_title(self.window_title)
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
-
-    @property
-    def gui(self):
-        try:
-            return self._gui
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
 
     @property
     def data(self):
@@ -1202,22 +1172,18 @@ class PlotData:
             traceback.print_exception(exc_type, exc_value, exc_tb)
 
 
-class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
+class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.get_QtGuiClass(qutip_enhanced.qtgui.plot_data_gui.Ui_window)):
 
-    def __init__(self, parent=None, plot_data_no_qt=None):
-        super(PlotDataQt, self).__init__(parent=parent)
-        self.plot_data_no_qt = plot_data_no_qt
-        self.setupUi(self)
-        self.init_gui()
+    # def __init__(self, parent=None, no_qt=None):
+    #     super(PlotDataQt, self).__init__(parent=parent)
+    #     self.plot_data_no_qt = no_qt
+    #     self.setupUi(self)
+    #     self.init_gui()
 
     update_x_axis_parameter_comboBox_signal = pyqtSignal()
     update_col_ax_parameter_comboBox_signal = pyqtSignal()
     update_row_ax_parameter_comboBox_signal = pyqtSignal()
     update_subtract_parameter_comboBox_signal = pyqtSignal()
-    clear_signal = pyqtSignal()
-    show_signal = pyqtSignal()
-    close_signal = pyqtSignal()
-    update_window_title_signal = pyqtSignal(str)
     update_parameter_table_data_signal = pyqtSignal(collections.OrderedDict)
     update_parameter_table_selected_indices_signal = pyqtSignal(collections.OrderedDict)
     update_observation_list_data_signal = pyqtSignal(list)
@@ -1226,9 +1192,6 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
     update_fit_select_table_selected_rows_signal = pyqtSignal(list)
     update_fit_result_table_data_signal = pyqtSignal(collections.OrderedDict)
     update_info_text_signal = pyqtSignal(str)
-
-    def clear(self):
-        self.clear_signal.emit()
 
     def clear_signal_emitted(self):
         for item in [
@@ -1254,12 +1217,6 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
             self.canvas_fit.draw()
         except:
             pass
-
-    def update_window_title(self, val):
-        self.update_window_title_signal.emit(val)
-
-    def update_window_title_signal_emitted(self, val):
-        self.setWindowTitle(val)
 
     def update_x_axis_parameter_comboBox(self):
         self.update_x_axis_parameter_comboBox_signal.emit()
@@ -1442,9 +1399,8 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
         self.canvas_fit.draw()
 
     def init_gui(self):
+        super(PlotDataQt, self).init_gui()
         for name in [
-            'clear',
-            'update_window_title',
             'update_x_axis_parameter_comboBox',
             'update_col_ax_parameter_comboBox',
             'update_row_ax_parameter_comboBox',
@@ -1460,8 +1416,6 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
         ]:
             getattr(getattr(self, "{}_signal".format(name)), 'connect')(getattr(self, "{}_signal_emitted".format(name)))
 
-        self.show_signal.connect(self.show)
-        self.close_signal.connect(self.close)
         # # Figure
         self.fig = Figure()
         self.canvas = FigureCanvas(self.fig)
@@ -1497,12 +1451,6 @@ class PlotDataQt(QMainWindow, plot_data_gui.Ui_window):
         self.col_ax_parameter_comboBox.currentIndexChanged.connect(self.update_col_ax_parameter_from_comboBox)
         self.row_ax_parameter_comboBox.currentIndexChanged.connect(self.update_row_ax_parameter_from_comboBox)
         self.subtract_parameter_comboBox.currentIndexChanged.connect(self.update_subtract_parameter_from_comboBox)
-
-    def show_gui(self):
-        self.show_signal.emit()
-
-    def close_gui(self):
-        self.close_signal.emit()
 
     def open_measurement_code(self):
         if hasattr(self.plot_data_no_qt.data, 'filepath'):

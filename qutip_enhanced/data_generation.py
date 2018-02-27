@@ -129,19 +129,31 @@ class DataGeneration:
         )
         self.data.dropnan(max_expected_rows=self.number_of_simultaneous_measurements)
 
-    def update_current_str(self):
+    def update_current_str(self, separate_parameters_indices=False):
         if hasattr(self, 'current_iterator_df') and len(self.current_iterator_df) > 0:
-            cid = self.current_iterator_df.iloc[-1, :].to_dict()
-            cps = ""
-            cis = ""
-            for key, val in cid.items():
-                if len(self.parameters[key]) > 1:
-                    cps += "{}: {}\n".format(key, val)
-                    try:
-                        cis += "{}: {} ({})\n".format(key, list(self.parameters[key]).index(val), len(self.parameters[key]))
-                    except:
-                        pass
-            self.pld.update_info_text('State: ' + self.state + '\n\n' + 'Current parameters:\n' + cps + '\n\n' + 'Current indices\n' + cis)
+            if separate_parameters_indices:
+                cid = self.current_iterator_df.iloc[-1, :].to_dict()
+                cps = ""
+                cis = ""
+                for key, val in cid.items():
+                    if len(self.parameters[key]) > 1:
+                        cps += "{}: {}\n".format(key, val)
+                        try:
+                            cis += "{}: {} ({})\n".format(key, list(self.parameters[key]).index(val), len(self.parameters[key]))
+                        except:
+                            pass
+                self.pld.update_info_text('State: ' + self.state + '\n\n' + 'Current parameters:\n' + cps + '\n\n' + 'Current indices\n' + cis)
+            else:
+                cid = self.current_iterator_df.iloc[-1, :].to_dict()
+                cps = ""
+                for key, val in cid.items():
+                    if len(self.parameters[key]) > 1:
+                        cps += "{}: {}\n".format(key, val)
+                        try:
+                            cps += "{}({}/ {})\n".format("\t", list(self.parameters[key]).index(val), len(self.parameters[key]))
+                        except:
+                            pass
+                self.pld.update_info_text('State: ' + self.state + '\n\n' + 'Current parameters:\n' + cps)
 
     def init_run(self, **kwargs):
         self.state = 'run'
