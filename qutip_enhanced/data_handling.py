@@ -932,7 +932,8 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
 
     def ret_line_plot_data_single(self, condition_dict, observation_name):
         try:
-            out = self.data.df[functools.reduce(np.logical_and, [self.data.df[key] == val for key, val in condition_dict.items() if val not in ['__all__', '__average__']])]
+            cl = [self.data.df[key] == val for key, val in condition_dict.items() if val not in ['__all__', '__average__']]
+            out = self.data.df[functools.reduce(np.logical_and, cl)] if len(cl) != 0 else self.data.df
             # TODO: wont work for dates as can not be averaged
             return out.groupby([key for key, val in condition_dict.items() if val != '__average__']).agg({observation_name: np.mean}).reset_index()
         except:

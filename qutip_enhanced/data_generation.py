@@ -148,11 +148,13 @@ class DataGeneration:
                 cps = ""
                 for key, val in cid.items():
                     if len(self.parameters[key]) > 1:
-                        cps += "{}: {}\n".format(key, val)
+                        # cps += "{}:\n   {}\t".format(key, val)
+                        cps += "{}: ".format(key, val)
                         try:
-                            cps += "{}({}/ {})\n".format("\t", list(self.parameters[key]).index(val), len(self.parameters[key]))
+                            cps += "({}/ {})".format(list(self.parameters[key]).index(val), len(self.parameters[key]))
                         except:
                             pass
+                        cps += "\n{}\n\n".format(val)
                 self.pld.update_info_text('State: ' + self.state + '\n\n' + 'Current parameters:\n' + cps)
 
     def init_run(self, **kwargs):
