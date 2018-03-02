@@ -15,11 +15,9 @@ import traceback
 import collections
 import subprocess
 import threading
-from PyQt5.QtWidgets import QListWidgetItem, QTableWidgetItem, QMainWindow
-from PyQt5.QtCore import Qt, pyqtSignal, QObject
-from PyQt5.uic import compileUi
+from PyQt5.QtWidgets import QListWidgetItem
+from PyQt5.QtCore import Qt, pyqtSignal
 
-import qutip_enhanced.qtgui.plot_data_gui
 from .util import ret_property_array_like_types
 import qutip_enhanced.qtgui.gui_helpers
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -413,21 +411,10 @@ def df_drop_duplicate_rows(df, other):
         print(out.columns, df.columns)
     return out
 
-
-def recompile_plotdata_ui_file():
-    fold = "{}/qtgui".format(os.path.dirname(__file__))
-    name = "plot_data"
-    uipath = r"{}/{}.ui".format(fold, name)
-    pypath = r"{}/{}_gui.py".format(fold, name)
-    with open(pypath, 'w') as f:
-        compileUi(uipath, f)
-    reload(qutip_enhanced.qtgui.plot_data_gui)
-
-
 class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
 
     def __init__(self, title=None, parent=None, gui=True, **kwargs):
-        super(PlotData, self).__init__(title=title, parent=parent, gui=gui, QtGuiClass=PlotDataQt)
+        super(PlotData, self).__init__(parent=parent, gui=gui, QtGuiClass=PlotDataQt)
         self.set_data(**kwargs)
         if title is not None:
             self.update_window_title(title)
@@ -1174,13 +1161,9 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             traceback.print_exception(exc_type, exc_value, exc_tb)
 
 
-class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.get_QtGuiClass(qutip_enhanced.qtgui.plot_data_gui.Ui_window)):
-
-    # def __init__(self, parent=None, no_qt=None):
-    #     super(PlotDataQt, self).__init__(parent=parent)
-    #     self.plot_data_no_qt = no_qt
-    #     self.setupUi(self)
-    #     self.init_gui()
+class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
+    def __init__(self, parent=None, no_qt=None):
+        super(PlotDataQt, self).__init__(parent=parent, no_qt=no_qt, ui_filepath=os.path.join(os.path.dirname(__file__), 'qtgui/plot_data.ui'))
 
     update_x_axis_parameter_comboBox_signal = pyqtSignal()
     update_col_ax_parameter_comboBox_signal = pyqtSignal()
@@ -1225,60 +1208,60 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.get_QtGuiClass(qutip_enhanced.
 
     def update_x_axis_parameter_comboBox_signal_emitted(self):
         self.x_axis_parameter_comboBox.blockSignals(True)
-        if hasattr(self.plot_data_no_qt, '_x_axis_parameter_list') and hasattr(self.plot_data_no_qt, '_x_axis_parameter'):
+        if hasattr(self.no_qt, '_x_axis_parameter_list') and hasattr(self.no_qt, '_x_axis_parameter'):
             if self.x_axis_parameter_comboBox.count() == 0:
-                self.x_axis_parameter_comboBox.addItems(self.plot_data_no_qt.x_axis_parameter_list)  # currentIndexChanged is triggered, value is first item (e.g. sweeps)
-            self.x_axis_parameter_comboBox.setCurrentText(self.plot_data_no_qt.x_axis_parameter)
+                self.x_axis_parameter_comboBox.addItems(self.no_qt.x_axis_parameter_list)  # currentIndexChanged is triggered, value is first item (e.g. sweeps)
+            self.x_axis_parameter_comboBox.setCurrentText(self.no_qt.x_axis_parameter)
         self.x_axis_parameter_comboBox.blockSignals(False)
         self.update_parameter_table_item_flags()
 
     def update_x_axis_parameter_from_comboBox(self):
-        self.plot_data_no_qt.x_axis_parameter = str(self.x_axis_parameter_comboBox.currentText())
+        self.no_qt.x_axis_parameter = str(self.x_axis_parameter_comboBox.currentText())
 
     def update_col_ax_parameter_comboBox(self):
         self.update_col_ax_parameter_comboBox_signal.emit()
 
     def update_col_ax_parameter_comboBox_signal_emitted(self):
         self.col_ax_parameter_comboBox.blockSignals(True)
-        if hasattr(self.plot_data_no_qt, '_col_ax_parameter_list') and hasattr(self.plot_data_no_qt, '_col_ax_parameter'):
+        if hasattr(self.no_qt, '_col_ax_parameter_list') and hasattr(self.no_qt, '_col_ax_parameter'):
             if self.col_ax_parameter_comboBox.count() == 0:
-                self.col_ax_parameter_comboBox.addItems(self.plot_data_no_qt.col_ax_parameter_list)  # currentIndexChanged is triggered, value is first item (e.g. sweeps)
-            self.col_ax_parameter_comboBox.setCurrentText(self.plot_data_no_qt.col_ax_parameter)
+                self.col_ax_parameter_comboBox.addItems(self.no_qt.col_ax_parameter_list)  # currentIndexChanged is triggered, value is first item (e.g. sweeps)
+            self.col_ax_parameter_comboBox.setCurrentText(self.no_qt.col_ax_parameter)
         self.col_ax_parameter_comboBox.blockSignals(False)
         # self.update_parameter_table_item_flags()
 
     def update_col_ax_parameter_from_comboBox(self):
-        self.plot_data_no_qt.col_ax_parameter = str(self.col_ax_parameter_comboBox.currentText())
+        self.no_qt.col_ax_parameter = str(self.col_ax_parameter_comboBox.currentText())
 
     def update_row_ax_parameter_comboBox(self):
         self.update_row_ax_parameter_comboBox_signal.emit()
 
     def update_row_ax_parameter_comboBox_signal_emitted(self):
         self.row_ax_parameter_comboBox.blockSignals(True)
-        if hasattr(self.plot_data_no_qt, '_row_ax_parameter_list') and hasattr(self.plot_data_no_qt, '_row_ax_parameter'):
+        if hasattr(self.no_qt, '_row_ax_parameter_list') and hasattr(self.no_qt, '_row_ax_parameter'):
             if self.row_ax_parameter_comboBox.count() == 0:
-                self.row_ax_parameter_comboBox.addItems(self.plot_data_no_qt.row_ax_parameter_list)  # currentIndexChanged is triggered, value is first item (e.g. sweeps)
-            self.row_ax_parameter_comboBox.setCurrentText(self.plot_data_no_qt.row_ax_parameter)
+                self.row_ax_parameter_comboBox.addItems(self.no_qt.row_ax_parameter_list)  # currentIndexChanged is triggered, value is first item (e.g. sweeps)
+            self.row_ax_parameter_comboBox.setCurrentText(self.no_qt.row_ax_parameter)
         self.row_ax_parameter_comboBox.blockSignals(False)
         # self.update_parameter_table_item_flags()
 
     def update_row_ax_parameter_from_comboBox(self):
-        self.plot_data_no_qt.row_ax_parameter = str(self.row_ax_parameter_comboBox.currentText())
+        self.no_qt.row_ax_parameter = str(self.row_ax_parameter_comboBox.currentText())
 
     def update_subtract_parameter_comboBox(self):
         self.update_subtract_parameter_comboBox_signal.emit()
 
     def update_subtract_parameter_comboBox_signal_emitted(self):
         self.subtract_parameter_comboBox.blockSignals(True)
-        if hasattr(self.plot_data_no_qt, '_subtract_parameter_list') and hasattr(self.plot_data_no_qt, '_subtract_parameter'):
+        if hasattr(self.no_qt, '_subtract_parameter_list') and hasattr(self.no_qt, '_subtract_parameter'):
             if self.subtract_parameter_comboBox.count() == 0:
-                self.subtract_parameter_comboBox.addItems(self.plot_data_no_qt.subtract_parameter_list)  # currentIndexChanged is triggered, value is first item (e.g. sweeps)
-            self.subtract_parameter_comboBox.setCurrentText(self.plot_data_no_qt.subtract_parameter)
+                self.subtract_parameter_comboBox.addItems(self.no_qt.subtract_parameter_list)  # currentIndexChanged is triggered, value is first item (e.g. sweeps)
+            self.subtract_parameter_comboBox.setCurrentText(self.no_qt.subtract_parameter)
         self.subtract_parameter_comboBox.blockSignals(False)
         # self.update_parameter_table_item_flags()
 
     def update_subtract_parameter_from_comboBox(self):
-        self.plot_data_no_qt.subtract_parameter = str(self.subtract_parameter_comboBox.currentText())
+        self.no_qt.subtract_parameter = str(self.subtract_parameter_comboBox.currentText())
 
     def update_parameter_table_data(self, parameter_table_data):
         self.update_parameter_table_data_signal.emit(parameter_table_data)
@@ -1294,10 +1277,10 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.get_QtGuiClass(qutip_enhanced.
 
     def update_parameter_table_item_flags(self):
         self.parameter_table.blockSignals(True)
-        if hasattr(self.plot_data_no_qt, '_x_axis_parameter'):
+        if hasattr(self.no_qt, '_x_axis_parameter'):
             for cidx in range(self.parameter_table.columnCount()):
                 cn = self.parameter_table.column_name(cidx)
-                if cn == self.plot_data_no_qt.x_axis_parameter:
+                if cn == self.no_qt.x_axis_parameter:
                     flag = Qt.NoItemFlags
                 else:
                     flag = Qt.ItemIsSelectable | Qt.ItemIsEnabled
@@ -1337,7 +1320,7 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.get_QtGuiClass(qutip_enhanced.
             if not cn in out:
                 out[cn] = []
             out[cn].append(item.row())
-        self.plot_data_no_qt.update_parameter_table_selected_indices(out)
+        self.no_qt.update_parameter_table_selected_indices(out)
 
     def update_observation_list_selected_indices(self, selected_indices):
         self.update_observation_list_selected_indices_signal.emit(selected_indices)
@@ -1349,7 +1332,7 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.get_QtGuiClass(qutip_enhanced.
         self.observation_widget.blockSignals(False)
 
     def update_observation_list_selected_indices_from_gui(self):
-        self.plot_data_no_qt.update_observation_list_selected_indices([i.row() for i in self.observation_widget.selectedIndexes()])
+        self.no_qt.update_observation_list_selected_indices([i.row() for i in self.observation_widget.selectedIndexes()])
 
     def update_fit_select_table_data(self, fit_select_table_data):
         self.update_fit_select_table_data_signal.emit(fit_select_table_data)
@@ -1363,7 +1346,7 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.get_QtGuiClass(qutip_enhanced.
         self.fit_select_table.blockSignals(False)
 
     def update_fit_select_table_selected_rows_from_gui(self):
-        self.plot_data_no_qt.update_fit_select_table_selected_rows(self.fit_select_table.selected_items_unique_row_indices())
+        self.no_qt.update_fit_select_table_selected_rows(self.fit_select_table.selected_items_unique_row_indices())
 
     def update_fit_select_table_selected_rows(self, selected_rows):
         self.update_fit_select_table_selected_rows_signal.emit(selected_rows)
@@ -1438,11 +1421,11 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.get_QtGuiClass(qutip_enhanced.
         self.plot_fit_layout.addWidget(self.canvas_fit, 1, 1, 20, 20)
         self.toolbar_fit_layout.addWidget(self.toolbar_fit, 21, 1, 1, 20)
 
-        self.update_plot_button.clicked.connect(self.plot_data_no_qt.update_plot)
-        self.update_fit_result_button.clicked.connect(lambda: self.plot_data_no_qt.update_plot_fit(None))
+        self.update_plot_button.clicked.connect(self.no_qt.update_plot)
+        self.update_fit_result_button.clicked.connect(lambda: self.no_qt.update_plot_fit(None))
         self.update_plot_button.setAcceptDrops(True)
 
-        self.parameter_table.hdf_file_dropped.connect(self.plot_data_no_qt.set_data_from_path)
+        self.parameter_table.hdf_file_dropped.connect(self.no_qt.set_data_from_path)
         self.parameter_table.itemSelectionChanged.connect(self.update_parameter_table_selected_indices_from_gui)
         self.fit_select_table.itemSelectionChanged.connect(self.update_fit_select_table_selected_rows_from_gui)
         self.observation_widget.itemSelectionChanged.connect(self.update_observation_list_selected_indices_from_gui)
@@ -1455,14 +1438,14 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.get_QtGuiClass(qutip_enhanced.
         self.subtract_parameter_comboBox.currentIndexChanged.connect(self.update_subtract_parameter_from_comboBox)
 
     def open_measurement_code(self):
-        if hasattr(self.plot_data_no_qt.data, 'filepath'):
-            subprocess.Popen(r"start {}/meas_code.py".format(os.path.dirname(self.plot_data_no_qt.data.filepath)), shell=True)
+        if hasattr(self.no_qt.data, 'filepath'):
+            subprocess.Popen(r"start {}/meas_code.py".format(os.path.dirname(self.no_qt.data.filepath)), shell=True)
         else:
             print('No filepath.')
 
     def open_explorer(self):
-        if hasattr(self.plot_data_no_qt.data, 'filepath'):
-            subprocess.Popen("explorer {}".format(os.path.abspath(os.path.dirname(self.plot_data_no_qt.data.filepath))), shell=True)
+        if hasattr(self.no_qt.data, 'filepath'):
+            subprocess.Popen("explorer {}".format(os.path.abspath(os.path.dirname(self.no_qt.data.filepath))), shell=True)
         else:
             print('No filepath.')
 

@@ -4,13 +4,24 @@ __metaclass__ = type
 
 import traceback
 import sys
+import os
 
 import PyQt5.QtWidgets
-import PyQt5.QtCore # pyqtSignal
+import PyQt5.QtCore
+import PyQt5.uic
+import PyQt5.uic
+
+def compile_ui_file(ui_filepath):
+    name = os.path.basename(ui_filepath).split('.')[0] + '.py'
+    py_filepath = os.path.join(os.path.dirname(ui_filepath), name)
+    with open(py_filepath, 'w') as f:
+        PyQt5.uic.compileUi(ui_filepath, f)
+
+
 
 class WithQt:
 
-    def __init__(self, title=None, parent=None, gui=True, QtGuiClass=None, **kwargs):
+    def __init__(self, parent=None, gui=None, QtGuiClass=None, **kwargs):
         super(WithQt, self).__init__()
         if gui:
             self.QtGuiClass = QtGuiClass
@@ -46,43 +57,40 @@ class WithQt:
             traceback.print_exception(exc_type, exc_value, exc_tb)
 
 
-def get_QtGuiClass(Ui_Window):
+class QtGuiClass(PyQt5.QtWidgets.QMainWindow):
+    clear_signal = PyQt5.QtCore.pyqtSignal()
+    show_signal = PyQt5.QtCore.pyqtSignal()
+    close_signal = PyQt5.QtCore.pyqtSignal()
+    update_window_title_signal = PyQt5.QtCore.pyqtSignal(str)
 
-    class QtGuiClass(PyQt5.QtWidgets.QMainWindow, Ui_Window):
-        clear_signal = PyQt5.QtCore.pyqtSignal()
-        show_signal = PyQt5.QtCore.pyqtSignal()
-        close_signal = PyQt5.QtCore.pyqtSignal()
-        update_window_title_signal = PyQt5.QtCore.pyqtSignal(str)
+    def __init__(self, parent=None, no_qt=None, ui_filepath=None):
+        super(QtGuiClass, self).__init__(parent=parent)
+        self.no_qt = no_qt
+        self.ui_filepath = ui_filepath
+        PyQt5.uic.loadUi(self.ui_filepath, self)
+        self.init_gui()
 
-        def __init__(self, parent=None, no_qt=None):
-            super(QtGuiClass, self).__init__(parent=parent)
-            self.plot_data_no_qt = no_qt
-            self.setupUi(self)
-            self.init_gui()
+    def init_gui(self):
+        for name in [
+            'clear',
+            'update_window_title',
+        ]:
+            getattr(getattr(self, "{}_signal".format(name)), 'connect')(getattr(self, "{}_signal_emitted".format(name)))
 
-        def init_gui(self):
-            for name in [
-                'clear',
-                'update_window_title',
-            ]:
-                getattr(getattr(self, "{}_signal".format(name)), 'connect')(getattr(self, "{}_signal_emitted".format(name)))
+        self.show_signal.connect(self.show)
+        self.close_signal.connect(self.close)
 
-            self.show_signal.connect(self.show)
-            self.close_signal.connect(self.close)
+    def clear(self):
+        self.clear_signal.emit()
 
-        def clear(self):
-            self.clear_signal.emit()
+    def show_gui(self):
+        self.show_signal.emit()
 
-        def show_gui(self):
-            self.show_signal.emit()
+    def close_gui(self):
+        self.close_signal.emit()
 
-        def close_gui(self):
-            self.close_signal.emit()
+    def update_window_title(self, val):
+        self.update_window_title_signal.emit(val)
 
-        def update_window_title(self, val):
-            self.update_window_title_signal.emit(val)
-
-        def update_window_title_signal_emitted(self, val):
-            self.setWindowTitle(val)
-
-    return QtGuiClass
+    def update_window_title_signal_emitted(self, val):
+        self.setWindowTitle(val)
