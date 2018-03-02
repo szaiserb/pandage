@@ -835,13 +835,14 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
     def update_fit_select_table_data(self):
         try:
             cpd = collections.OrderedDict()
-            for column_idx, column_name in enumerate(self.parameter_names_reduced()):
-                cpd[column_name] = []
-                for pi in self.selected_plot_items:
-                    if not pi[column_idx] in ['__average__', '__all__']:
-                        cpd[column_name].append(pi[column_idx])
-                if len(cpd[column_name]) == 0:
-                    del cpd[column_name]
+            for idx, spi in enumerate(self.line_plot_data()):
+                for column_idx, column_name in enumerate(self.parameter_names_reduced()):
+                    if column_name in spi['condition_dict_reduced']:
+                        if not column_name in cpd:
+                            cpd[column_name] = []
+                        cpd[column_name].append(spi['condition_dict_reduced'][column_name])
+                    elif column_name == self.subtract_parameter:
+                        cpd[column_name] = ['diff'.format(self.subtract_parameter)]
             self._fit_select_table_data = cpd
             if hasattr(self, '_gui'):
                 self.gui.update_fit_select_table_data(self.fit_select_table_data)
