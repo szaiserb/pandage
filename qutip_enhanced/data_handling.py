@@ -461,6 +461,8 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
 
     def new_data_arrived(self):
         try:
+            if hasattr(self.data, 'filepath') and matplotlib.rcParams["savefig.directory"] != os.path.dirname(self.data.filepath):
+                matplotlib.rcParams["savefig.directory"] = os.path.dirname(self.data.filepath)
             self.update_x_axis_parameter_list()
             self.update_col_ax_parameter_list()
             self.update_row_ax_parameter_list()
@@ -468,25 +470,12 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             self.update_parameter_table_data()
             self.update_observation_list_data()
             self.update_plot()
-            # if len(self.data.df) < 5000:
-            #
-            # df = self.data.df.copy()
-            # for col in df.columns:
-            #     drop = False
-            #     try:
-            #         if len(df[col].unique()) == 1:
-            #             drop = True
-            #     except:  # drops for example columns with numpy arrays
-            #         drop = True
-            #     if drop:
-            #         df.drop(col, inplace=True, axis=1)
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
 
     def delete_attributes(self):
         for attr_name in [
-            '_data_path',
             '_data',
             '_x_axis_parameter_list',
             '_col_ax_parameter_list',
@@ -1048,7 +1037,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
                     self.gui.axes.append(self.gui.fig.add_subplot(ny_tot, nx_tot, ni, **pd))
                 for idx, pdi in enumerate(self.line_plot_data()):
                     if len(ax_p_list) == 0 or self.row_ax_parameter == '__none__': #len(ax_p_list[0]) == 1:
-                        n = np.argwhere(ax_p_list == (pdi['condition_dict_reduced'][self.col_ax_parameter]))[0,0] if self.col_ax_parameter != '__none__' else 0
+                        n = np.argwhere(np.array(ax_p_list) == (pdi['condition_dict_reduced'][self.col_ax_parameter]))[0,0] if self.col_ax_parameter != '__none__' else 0
                     else:
                         for n, cr in enumerate(ax_p_list):
                             if cr[1] == pdi['condition_dict_reduced'][self.col_ax_parameter] and cr[0] == pdi['condition_dict_reduced'][self.row_ax_parameter]:
@@ -1056,7 +1045,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
                         else:
                             continue
                     abcdefg = collections.OrderedDict([(key, val) for key, val in pdi['condition_dict_reduced'].items() if key not in [self.subtract_parameter, self.col_ax_parameter, self.row_ax_parameter]])
-                    self.gui.axes[n].plot(pdi['x'], pdi['y'], '-', label=self.plot_label(abcdefg))#pdi['condition_dict_reduced']))
+                    self.gui.axes[n].plot(pdi['x'], pdi['y'], '-o', markersize=3, label=self.plot_label(abcdefg))#pdi['condition_dict_reduced']))
                     if len(ax_p_list) != 0:
                         # if len(ax_p_list.shape) == 1:
                         #     self.gui.axes[n].set_title("{}: {}".format(self.col_ax_parameter, pdi['condition_dict_reduced'][self.col_ax_parameter]))
@@ -1462,7 +1451,6 @@ def cpd():
     out = PlotData(data=data)
     out.gui.show_gui()
     return out
-
 
 def cpd_thread():
     import threading

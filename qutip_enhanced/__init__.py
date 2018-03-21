@@ -15,6 +15,7 @@ from . import data_handling
 from . import data_handling as dh
 from . import data_generation
 from . import data_generation as dg
+from . import qutrit_sensing
 
 import sys
 if sys.version_info[0] == 3:

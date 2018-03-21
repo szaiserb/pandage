@@ -90,9 +90,9 @@ class DataGeneration:
     def data(self):
         return self.pld.data
 
-    @data.setter
-    def data(self, val):
-        self.pld.data = val
+    # @data.setter
+    # def data(self, val):
+    #     self.pld.data = val
 
     @property
     def pld(self):
@@ -186,13 +186,6 @@ class DataGeneration:
             del self.current_iterator_df
         if hasattr(self, '_file_path') and hasattr(self, '_file_name'):
             self.pld.data_path = "{}/data.hdf".format(self.save_dir)
-
-    @property
-    def session_meas_count(self):
-        if len(self.data.df) == 0 or len(self.iterator_df_done) == 0:
-            return 0
-        else:
-            return len(self.iterator_df_done) - self.data.df[self.data.df.start_time > self.start_time].index[0]
 
     @property
     def save_dir(self):
