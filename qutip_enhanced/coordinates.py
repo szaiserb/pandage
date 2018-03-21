@@ -4,6 +4,7 @@ from imp import reload
 __metaclass__ = type
 
 import numpy as np
+import collections
 
 """
 Enter 2D or 3D vector v as dict. 
@@ -48,6 +49,8 @@ class Coord():
         return self.coord(vec=sph, coord_type=coord_type)
 
     def check_validity(self, vec):
+        if type(vec) not in [dict, collections.OrderedDict]:
+            raise Exception('Error!')
         if len(vec) > 3:
             raise Exception("No more than three coordinates are allowed!")
         if self.cart_coord[0] in vec or self.cart_coord[1] in vec or self.cart_coord[2] in vec:
