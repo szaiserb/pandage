@@ -52,13 +52,19 @@ def decay_matrix(t, t2):
         ]
     )
 
-def readout_fidelity_matrix(frp, fr0, frm):
+def readout_fidelity_matrix(frpp, frp0, frpm, fr0p, fr00, fr0m, frmp, frm0, frmm):
     return np.array(
         [
-            [frp,           (1-fr0)/2., (1-frm)/2.],
-            [(1-frp)/2.,    fr0,        (1-frm)/2.],
-            [(1-frp)/2.,    (1-fr0)/2., frm]
-        ])
+            [frpp, frp0, frpm],
+            [fr0p, fr00, fr0m],
+            [frmp, frm0, frmm],
+        ]
+    )
+        # [
+        #     [frp,           (1-fr0)/2., (1-frm)/2.],
+        #     [(1-frp)/2.,    fr0,        (1-frm)/2.],
+        #     [(1-frp)/2.,    (1-fr0)/2., frm]
+        # ])
 
 def gate_fidelity_matrix(fg):
     return np.array(
@@ -69,11 +75,13 @@ def gate_fidelity_matrix(fg):
         ])
 
 
-def f(x, Azz, x0, pnv0, fg, frp, fr0, frm, t2, mn):
+
+
+def f(x, Azz, x0, pnv0, fg, frpp, frp0, frpm, fr0p, fr00, fr0m, frmp, frm0, frm, t2, mn):
     """
     NOTE: ALL variables (including x) must be scalars, can probably rewritten to take vectors
     """
-    mfid_read = readout_fidelity_matrix(frp=frp, fr0=fr0, frm=frm)
+    mfid_read = readout_fidelity_matrix(frpp, frp0, frpm, fr0p, fr00, fr0m, frmp, frm0, frm)
     mt2 = decay_matrix(x, t2)
     mfid_gate = gate_fidelity_matrix(fg)
     p0 = np.array([fdd_t[i][mn](x, Azz, x0) for i in ['+', '0', '-']])
@@ -84,8 +92,8 @@ def f(x, Azz, x0, pnv0, fg, frp, fr0, frm, t2, mn):
 class QutritSensingModel(lmfit.Model):
     def __init__(self,  mn,  n14_state, *args, **kwargs):
         n14_sn = {'+1': 0, '0': 1, '-1': 2}[n14_state]
-        def the_fun(x, Azz, x0, pnv0, fg, frp, fr0, frm, t2):
-            return [f(xi, Azz, x0, pnv0, fg, frp, fr0, frm, t2, mn)[n14_sn] for xi in x]
+        def the_fun(x, Azz, x0, pnv0, fg, frpp, frp0, frpm, fr0p, fr00, fr0m, frmp, frm0, frm, t2):
+            return [f(xi, Azz, x0, pnv0, fg, frpp, frp0, frpm, fr0p, fr00, fr0m, frmp, frm0, frm, t2, mn)[n14_sn] for xi in x]
         super(QutritSensingModel, self).__init__(the_fun, *args, **kwargs)
 
 class QutritSensingModelAll(lmfit.Model):
