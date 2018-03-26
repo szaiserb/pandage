@@ -18,6 +18,15 @@ import zipfile
 
 np.set_printoptions(suppress=True, linewidth=100000)
 
+chrestenson_gate = Qobj(
+    np.array(
+        [
+            [1, 1,                           1                          ],
+            [1, np.exp(1.j * 2 * np.pi / 3), np.exp(1.j * 4 * np.pi / 3)],
+            [1, np.exp(1.j * 4 * np.pi / 3), np.exp(1.j * 2 * np.pi / 3)],
+        ]) / np.sqrt(3)
+)
+
 def save_qutip_enhanced(destination_dir):
     src = os.path.dirname(os.path.dirname(__file__))
     f = '{}/qutip_enhanced.zip'.format(destination_dir)
@@ -71,7 +80,6 @@ def sort_eigenvalues_standard_basis(dims, evec, evals):
     ev = Eigenvector(dims=dims)
     ev.sort(evec, evals)
     return np.real(ev.evals_sorted)
-
 
 class Arrow3D(FancyArrowPatch):
     def __init__(self, xs, ys, zs, *args, **kwargs):

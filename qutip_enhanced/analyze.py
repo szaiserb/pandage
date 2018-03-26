@@ -9,6 +9,7 @@ from .sequence_creator import unitary_propagator_list_mult
 from .qutip_enhanced import dim2spin, sort_eigenvalues_standard_basis
 import qutip_enhanced.nv_hamilton
 from collections import OrderedDict
+import collections
 from itertools import chain, combinations, product
 import numpy as np
 
@@ -131,7 +132,7 @@ def test_states(dims=None, pure=False, **kwargs):
             names_multi_list.append([i+j for i, j in zip(i[::2], i[1::2])])
     else:
         raise Exception('Error: {}'.format(kwargs))
-    out = {}
+    out = collections.OrderedDict()
     for idx, names_multi in enumerate(names_multi_list):
         name_multi = "".join(names_multi)
         out[name_multi] = tensor(*[__TEST_STATES_SINGLE_PURE__[dim][name] for name, dim in zip(names_multi, dims)]).unit()
