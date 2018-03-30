@@ -157,19 +157,18 @@ class DynPython(sequence_creator.Arbitrary):
             eng = matlab.engine.connect_matlab(use_engine)
             print('connected to {}'.format(use_engine))
             return eng
-        mdp = [float(i[3:]) for i in m if 'dpe' in i]
+        mdp = [int(i[3:]) for i in m if 'dpe' in i]
         il = itertools.count()
         while True:
             n = next(il)
             if not n in mdp:
                 break
         name = "dpe{}".format(n) if use_engine is None else use_engine
-        if desktop:
-            eng = matlab.engine.start_matlab("-desktop")
-        else:
-            eng = matlab.engine.start_matlab()
+        print('Starting matlab engine {}..'.format(name))
+        eng = matlab.engine.start_matlab("-desktop") if desktop else matlab.engine.start_matlab()
         eng.eval("matlab.engine.shareEngine('{}')".format(name), nargout=0)
-        print('started matlab engine {}'.format(name))
+        print('Done.')
+
         return eng
 
     @property

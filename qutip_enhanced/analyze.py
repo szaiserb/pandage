@@ -299,7 +299,18 @@ class Simulate(DataGeneration):
         self.pld = PlotData('analyze_pulse', gui=self.gui)
         self.pld.x_axis_parameter = 'to_bin'
         self.progress_bar = progress_bar
-        self.number_of_simultaneous_measurements = len(self.parameters['to_bin']) * len(self.parameters['initial_state']) * len(self.parameters['spin_num']) * len(self.parameters['axis'])
+        self.number_of_simultaneous_measurements = self.calc_number_of_simultaneous_measurements()
+
+    def calc_number_of_simultaneous_measurements(self):
+        if 'initial_state' in self.parameters:
+            f_initial_state = len(self.parameters['initial_state'])
+        else:
+            l = list()
+            for key, val in self.parameters.items():
+                if key.startswith('initial_state'):
+                    l.append(len(val))
+            f_initial_state = int(np.prod(l))
+        return len(self.parameters['to_bin'])  * len(self.parameters['spin_num']) * len(self.parameters['axis'])*f_initial_state
 
     @property
     def observation_names(self):
@@ -333,6 +344,18 @@ class Simulate(DataGeneration):
     def detunings(self, iterator_df_row):
         return dict([(key, val) for key, val in iterator_df_row.iteritems() if 'detuning' in key])
 
+    def initial_state(self, _I_):
+        if 'initial_state' in _I_:
+            return _I_['initial_state']
+        else:
+            d = collections.OrderedDict()
+            for key, val in _I_.items():
+                if key.startswith('initial_state'):
+                    d[int(key.replace('initial_state', ''))] = val
+            print(d)
+            print(sorted(d.items()))
+            return "".join(collections.OrderedDict(sorted(d.items())).values())
+
     def f(self, current_iterator_df, abort):
         observation_dict_list = []
         u_list_generated = False
@@ -346,7 +369,8 @@ class Simulate(DataGeneration):
                     L_Bc=[_I_['ps'] * i for i in self.L_Bc],
                 )
                 u_list_generated = True
-            ts = test_states(dims=self.dims, pure=False, names_multi_list_str=[_I_['initial_state']]).values()[0]
+            print(self.initial_state(_I_))
+            ts = test_states(dims=self.dims, pure=False, names_multi_list_str=[self.initial_state(_I_)]).values()[0]
             pts = propagate_test_states([u_list_mult[_I_['to_bin']]], ts)
             obse = OrderedDict(
                 [
