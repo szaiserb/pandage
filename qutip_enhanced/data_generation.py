@@ -70,7 +70,7 @@ class DataGeneration:
 
     @property
     def observation_names(self):
-        raise NotImplementedError
+        raise self._observation_names
 
     @property
     def number_of_simultaneous_measurements(self):
@@ -89,10 +89,6 @@ class DataGeneration:
     @property
     def data(self):
         return self.pld.data
-
-    # @data.setter
-    # def data(self, val):
-    #     self.pld.data = val
 
     @property
     def pld(self):
@@ -180,6 +176,35 @@ class DataGeneration:
             else:
                 break
 
+    def changes_from_previous(self, iterator_df):
+        if len(self.data.df) == 0:
+            out = iterator_df.iloc[0, :] == iterator_df.iloc[0, :]
+            out[:] = True
+        elif len(iterator_df) == 0: #required for last iteration, when current_iterator_df is empty
+            return iterator_df == iterator_df #should have zero rows (i.e. be empty)
+        else:
+            out = iterator_df.iloc[0, :] != self.data.df.iloc[-1, :len(self.iterator_df.columns)]
+        out = out.to_frame().transpose()
+        for idx in range(1, len(iterator_df)):
+            out = out.append(iterator_df.iloc[idx-1, :] != iterator_df.iloc[idx, :], ignore_index=True)
+        self.current_iterator_df_changes = out
+
+    def iterator_changed(self):
+        while True:
+            self.process_remeasure_items()
+            self.iterator_df_done = self.data.df.loc[:, self.data.parameter_names]  # self.iterator_df_done.append(self.current_iterator_df)
+            self.set_iterator_df()
+            self.iterator_df_drop_done()
+            self.update_progress()
+            self.iterator_df, self.current_iterator_df = df_pop(self.iterator_df, min(self.number_of_simultaneous_measurements, len(self.iterator_df)))
+            self.changes_from_previous(self.current_iterator_df)
+            self.data.append(self.current_iterator_df)
+            self.update_current_str()
+            if len(self.current_iterator_df) > 0:
+                yield self.current_iterator_df, self.current_iterator_df_changes
+            else:
+                break
+
     def reinit(self):
         self.start_time = datetime.datetime.now()
         if hasattr(self, 'current_iterator_df'):
@@ -217,26 +242,10 @@ class DataGeneration:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
 
-    # @property
-    # def file_name(self):
-    #     return self._file_name
-    #
-    # @file_name.setter
-    # def file_name(self, val):
-    #     self._file_name = val
-
-    # @property
-    # def file_path(self):
-    #     return self._file_path
-    #
-    # @file_path.setter
-    # def file_path(self, val):
-    #     self._file_path = val
-
     def make_save_location_params(self, script_path, **kwargs):
         script_path = os.path.abspath(script_path)
         self.file_name = str(os.path.splitext(os.path.basename(script_path))[0])
-        folder = kwargs['folder'] if 'folder' in kwargs else os.path.dirname(os.path.dirname(script_path))
+        folder = kwargs['folder'] if 'folder' in kwargs else os.path.dirname(os.path.dirname(script_path)) #os.path.dirname(os.path.dirname(script_path))
         if 'sub_folder_kw' in kwargs:
             fnl = script_path.split('\\')
             fnl = fnl[fnl.index(kwargs['sub_folder_kw']) + 1:]
@@ -263,7 +272,6 @@ class DataGeneration:
             if hasattr(self, '_meas_code'):
                 with open("{}/meas_code.py".format(self.save_dir), "w") as text_file:
                     text_file.write(self.meas_code)
-            # self.data.save("{}/data.csv".format(self.save_dir)) #this takes forever
             self.data.save("{}/data.hdf".format(self.save_dir))
             self.pld.save_plot("{}/plot.png".format(self.save_dir))
             if notify:

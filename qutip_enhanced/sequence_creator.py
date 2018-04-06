@@ -11,6 +11,7 @@ import more_itertools
 import lmfit.lineshapes
 import collections
 import traceback
+import operator
 from .qutip_enhanced import coordinates
 from qutip import Qobj
 
@@ -370,7 +371,7 @@ class Arbitrary:
         return sequence_steps
 
     def save_times_fields(self, path, name=None):
-        np.savetxt(path, np.around(self.times_fields(name), 9), fmt=str('%+1.9e'))
+        np.savetxt(path, np.around(self.times_fields(name), 9), fmt=str('%+1.14e'))
 
     def times_fields_aphi(self, name, sample_frequency=12e3):
         t = round2float(self.times(name), 1 / sample_frequency)
@@ -378,7 +379,7 @@ class Arbitrary:
 
     def save_times_fields_aphi(self, name, path=None, sample_frequency=12e3):
         np.savetxt(path, np.around(self.times_fields_aphi(name=name, sample_frequency=sample_frequency), 9),
-                   fmt=str('%+1.9e'))
+                   fmt=str('%+1.14e'))
 
     def save_dynamo_fields(self, directory):
         self.save_times_fields("{}\\fields.dat".format(directory))
@@ -1077,10 +1078,9 @@ class DDDegen(Arbitrary):
 def unitary_propagator(length_mus, h_mhz, fields, L_Bc):
     return (-1j*length_mus*(2*np.pi*h_mhz + sum(omega*Bc for omega, Bc in zip(fields, L_Bc)))).expm()
 
-def unitary_propagator_list(h_mhz, times_full, fields_full, L_Bc):
+def unitary_propagator_list(h_mhz, times, fields, L_Bc):
     u_list = []
-    L_Bc = [Qobj(i, dims=h_mhz.dims) for i in L_Bc]
-    for t, c_l in zip(times_full, fields_full):
+    for t, c_l in zip(times, fields):
         u_list.append(
             unitary_propagator(
                 length_mus=t,
@@ -1091,19 +1091,33 @@ def unitary_propagator_list(h_mhz, times_full, fields_full, L_Bc):
         )
     return u_list
 
-def unitary_propagator_list_mult(h_mhz, times_full, fields_full, L_Bc):
-    L_Bc = [Qobj(i, dims=h_mhz.dims) for i in L_Bc]
-    def u(i):
-        return unitary_propagator(
-            length_mus=times_full[i],
-            h_mhz=h_mhz,
-            fields=fields_full[i],
-            L_Bc=L_Bc,
-        )
+def insert_operators_from_dict(u_list, insert_operator_dict):
+    if insert_operator_dict is not None:
+        for idx, kv in enumerate(insert_operator_dict.items()):
+            u_list.insert(kv[0] + idx, kv[1])
 
-    u_list_mult = [u(len(times_full)-1)]
-    for i in range(len(times_full))[-2::-1]:
-        u_list_mult.append(
-            u_list_mult[-1]*u(i)
-        )
-    return u_list_mult
+def unitary_propagator_list_mult(u_list):
+    #HINT: replace argument u_list by "insert_operators_from_dict(unitary_propagator_list(h_mhz, times, fields, L_Bc), insert_operator_dict)", to generate a u_list
+    out = []
+    for idx in range(len(u_list)):
+        if idx > 0:
+            # u_list[idx] = u_list[idx] * u_list[idx-1]
+            out.append(u_list[idx] * out[idx-1])
+        else:
+            out.append(u_list[idx])
+    return out
+
+def unitary_propagator_list_sectioned(u_list, section_dict):
+    if type(section_dict) is not collections.OrderedDict:
+        raise Exception('Error: {}, {}'.format(section_dict, type(section_dict)))
+    u_list_reduced = []
+    sdv = section_dict.values()
+    for idx in range(len(sdv)):
+        if idx == 0:
+            ta = unitary_propagator_list_mult(u_list[:sdv[idx]+1])[-1]
+        else:
+            ta = unitary_propagator_list_mult(u_list[sdv[idx-1]+1:sdv[idx]+1])[-1]
+        u_list_reduced.append(ta)
+    return u_list_reduced
+
+

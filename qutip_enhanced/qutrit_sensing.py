@@ -69,8 +69,6 @@ def f(x, Azz, x0, pnv0, fg, frpp, frp0, frpm, fr0p, fr00, fr0m, frmp, frm0, frmm
 def fmn(x, Azz, x0, pnv0, fg, frpp, frp0, frpm, fr0p, fr00, fr0m, frmp, frm0, frmm, t2, pmnp):
     return pmnp*f(x, Azz, x0, pnv0, fg, frpp, frp0, frpm, fr0p, fr00, fr0m, frmp, frm0, frmm, t2, +1) + (1-pmnp)*f(x, Azz, x0, pnv0, fg, frpp, frp0, frpm, fr0p, fr00, fr0m, frmp, frm0, frmm, t2, -1)
 
-
-
 def fit_function_qutrit_sensing_concurrent(params, x=None, data_d=None):
     n14_sn = {'+': 0, '0': 1, '-': 2}
     eval_l = []

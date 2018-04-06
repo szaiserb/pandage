@@ -5,7 +5,7 @@ __metaclass__ = type
 from qutip import tensor, ket2dm, expect, jmat
 from .data_generation import DataGeneration
 from .data_handling import PlotData
-from .sequence_creator import unitary_propagator_list_mult
+from qutip_enhanced import sequence_creator
 from .qutip_enhanced import dim2spin, sort_eigenvalues_standard_basis
 import qutip_enhanced.nv_hamilton
 from collections import OrderedDict
@@ -98,10 +98,14 @@ def test_states_single(dim, pure=False):
     m = (dim - 1.)/2.
     out = dict()
     for axis in ['x', 'y', 'z']:
+        out["s{}".format(axis)] = []
         for idx, state in enumerate(jmat(m, axis).eigenstates()[1][::-1]):
             if not pure:
                 state = ket2dm(state)
             out["{}{}".format(axis, idx)] = state
+            out["s{}".format(axis)].append(state)
+        out["s{}".format(axis)] = sum(out["s{}".format(axis)])
+        out["s{}".format(axis)] = out["s{}".format(axis)]/out["s{}".format(axis)].norm()
     return out
 
 __TEST_STATES_SINGLE_PURE__ = dict([(dim, test_states_single(dim=dim, pure=True)) for dim in [2,3]])
@@ -288,18 +292,52 @@ def get_transition_frequency(**kwargs):
 class Simulate(DataGeneration):
 
     def __init__(self, gui=False, progress_bar=None, **kwargs):
-        DataGeneration.__init__(self)
         self.parameters = kwargs.pop('parameters')
         self.times = kwargs.pop('times')  # dp.times_full
         self.fields = kwargs.pop('fields')  # dp.fields_full
         self.ret_h_mhz = kwargs.pop('ret_h_mhz')
         self.L_Bc = kwargs.pop('L_Bc')
+        self.insert_operator_dict = kwargs.pop('insert_operator_dict', None)
+        self.section_dict = kwargs.pop('section_dict')
         self.dims = kwargs.pop('dims')
         self.gui = gui
         self.pld = PlotData('analyze_pulse', gui=self.gui)
         self.pld.x_axis_parameter = 'to_bin'
         self.progress_bar = progress_bar
         self.number_of_simultaneous_measurements = self.calc_number_of_simultaneous_measurements()
+
+    @property
+    def section_dict(self):
+        return self._section_dict
+
+    @section_dict.setter
+    def section_dict(self, val):
+        """
+
+        :param val: collections.OrderedDict([(sectionname1), ()])
+        :return:
+        """
+        if any([i not in val.values() for i in self.parameters['to_bin']]):
+            raise Exception("Some value in to_bin is not in section_dict")
+        if len(val.keys()) != len(set(val.keys())):
+            raise Exception('ERROR: {}'.format(val.keys()))
+        self._section_dict = val
+
+    @property
+    def insert_operator_dict(self):
+        return self._insert_operator_dict
+
+    @insert_operator_dict.setter
+    def insert_operator_dict(self, val):
+        if val is None:
+            self._insert_operator_dict = collections.OrderedDict()
+        else:
+            self._insert_operator_dict = collections.OrderedDict(sorted(val.items()))
+
+    def update_insert_operator_dict(self, idx, val):
+        self._insert_operator_dict[idx] = val
+        self._insert_operator_dict = collections.OrderedDict(sorted(self._insert_operator_dict.items()))
+
 
     def calc_number_of_simultaneous_measurements(self):
         if 'initial_state' in self.parameters:
@@ -310,7 +348,7 @@ class Simulate(DataGeneration):
                 if key.startswith('initial_state'):
                     l.append(len(val))
             f_initial_state = int(np.prod(l))
-        return len(self.parameters['to_bin'])  * len(self.parameters['spin_num']) * len(self.parameters['axis'])*f_initial_state
+        return len(self.parameters['to_bin']) * len(self.parameters['spin_num']) * len(self.parameters['axis'])*f_initial_state
 
     @property
     def observation_names(self):
@@ -326,7 +364,6 @@ class Simulate(DataGeneration):
                 if self.gui:
                     self.pld.new_data_arrived()
             self.pld.new_data_arrived()
-            # self.save()
         except Exception:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
@@ -352,8 +389,6 @@ class Simulate(DataGeneration):
             for key, val in _I_.items():
                 if key.startswith('initial_state'):
                     d[int(key.replace('initial_state', ''))] = val
-            print(d)
-            print(sorted(d.items()))
             return "".join(collections.OrderedDict(sorted(d.items())).values())
 
     def f(self, current_iterator_df, abort):
@@ -362,26 +397,17 @@ class Simulate(DataGeneration):
         for idx, _I_ in current_iterator_df.iterrows():
             if abort.is_set(): break
             if not u_list_generated:
-                u_list_mult = unitary_propagator_list_mult(
-                    h_mhz=self.ret_h_mhz(**self.detunings(_I_)),
-                    times_full=self.times,
-                    fields_full=self.fields,
-                    L_Bc=[_I_['ps'] * i for i in self.L_Bc],
+                u_list_mult = sequence_creator.unitary_propagator_list_mult(
+                    sequence_creator.unitary_propagator_list(
+                        h_mhz=self.ret_h_mhz(**self.detunings(_I_)),
+                        times_full=self.times,
+                        fields_full=self.fields,
+                        L_Bc=[_I_['ps'] * i for i in self.L_Bc],)
+
                 )
                 u_list_generated = True
-            print(self.initial_state(_I_))
             ts = test_states(dims=self.dims, pure=False, names_multi_list_str=[self.initial_state(_I_)]).values()[0]
             pts = propagate_test_states([u_list_mult[_I_['to_bin']]], ts)
-            obse = OrderedDict(
-                [
-                    ('expect',
-                     expect(
-                         jmat(
-                             dim2spin(self.dims[_I_['spin_num']]),
-                             _I_['axis']),
-                         pts[0].ptrace(_I_['spin_num']))
-                     )
-                ]
-            )
+            obse = OrderedDict([('expect', expect(jmat(dim2spin(self.dims[_I_['spin_num']]), _I_['axis']), pts[0].ptrace(_I_['spin_num'])))])
             observation_dict_list.append(obse)
         return observation_dict_list
