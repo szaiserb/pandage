@@ -36,6 +36,7 @@ import lmfit
 
 def ptrepack(file, folder, tempfile=None, lock=None):
     # C:\Users\yy3\AppData\Local\conda\conda\envs\py27\Scripts\ptrepack.exe -o --chunkshape=auto --propindexes --complevel=0 --complib=blosc data.hdf data_tmp.hdf
+
     if lock is not None and not lock.acquire(False):
         print('Trying to run ptrepack on {}'.format(os.path.join(folder, file)))
         print('Waiting for hdf_lock..')
@@ -45,13 +46,24 @@ def ptrepack(file, folder, tempfile=None, lock=None):
     ptrepack = r"{}\Scripts\ptrepack.exe".format(os.path.dirname(sys.executable))
     command = [ptrepack, "-o", "--chunkshape=auto", "--propindexes", "--complevel=9", "--complib=blosc", file, tempfile]
     _ = subprocess.call(command, cwd=folder)
-    os.remove(os.path.join(folder, file))
-    while True:
+    i = 0
+    t0 = time.time()
+    while i < 1000:
+        try:
+            os.remove(os.path.join(folder, file))
+            break
+        except:
+            print("Trying to remove {} again. (Try {}, {}s)".format(os.path.join(folder, file), i, time.time() - t0))
+            i += 1
+    i = 0
+    t0 = time.time()
+    while i < 1000:
         try:
             os.rename(os.path.join(folder, tempfile), os.path.join(folder, file))
             break
         except:
-            print("Trying to rename again.")
+            print("Trying to rename {} to {} again. (Try {}, {}s)".format(os.path.join(folder, tempfile), os.path.join(folder, file), i, time.time() - t0))
+            i += 1
     if lock is not None: lock.release()
 
 
@@ -756,6 +768,8 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
                 data_full = getattr(self.data.df, cn).unique()
                 if val == '__all__':
                     out[cn] = data_full
+                elif val == '__average__':
+                    out[cn] = []
                 else:
                     out[cn] = [data_full[i] for i in val]
             return out

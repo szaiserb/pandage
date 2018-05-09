@@ -9,6 +9,7 @@ import lmfit.lineshapes
 import itertools
 import scipy
 import collections
+import operator
 
 from .analyze import NVHamFit14nParams
 
@@ -89,8 +90,9 @@ class NVHam14NModel(lmfit.Model):
 
 
 class SincModel(lmfit.Model):
-    def __init__(self, rabi_frequency=None, negative=False, *args, **kwargs):
+    def __init__(self, rabi_frequency=None, vary_rabi_frequency=True, negative=False, *args, **kwargs):
         self.rabi_frequency = rabi_frequency
+        self.vary_rabi_frequency = vary_rabi_frequency
         self.negative = negative
         super(SincModel, self).__init__(sinc, *args, **kwargs)
 
@@ -100,8 +102,11 @@ class SincModel(lmfit.Model):
         center = result.params['center'].value
         y0 = result.params['intercept'].value
         amplitude = -(y0 - data.min())
+
         rabi_frequency = result.params['fwhm'].value if self.rabi_frequency is None else self.rabi_frequency
-        return lmfit.models.update_param_vals(self.make_params(center=center, y0=y0, amplitude=amplitude, rabi_frequency=rabi_frequency), self.prefix, **kwargs)
+        pars = lmfit.models.update_param_vals(self.make_params(center=center, y0=y0, amplitude=amplitude, rabi_frequency=rabi_frequency), self.prefix, **kwargs)
+        pars['rabi_frequency'].vary = self.vary_rabi_frequency
+        return pars
 
 
 class TripleSincHfModel(lmfit.Model):
@@ -150,6 +155,15 @@ class TripleSincHfModel(lmfit.Model):
 #     amp = amp*sig*ampscale
 #     sig = sig*sigscale
 #     return amp, cen, sig
+
+class LorentzianModel(lmfit.CompositeModel):
+
+    def __init__(self, left=lmfit.models.LorentzianModel(), right=lmfit.models.LinearModel(), negative=False):
+        super(LorentzianModel, self).__init__(left=left, right=right, op=operator.add)
+        self.negative = negative
+
+    def guess(self, data, x=None, **kwargs):
+        return lmfit.models.update_param_vals(guess_from_peak(model=self, y=data, x=x, negative=self.negative, **kwargs), self.prefix, **kwargs)
 
 class LorentzModel(lmfit.Model):
     def __init__(self, *args, **kwargs):
