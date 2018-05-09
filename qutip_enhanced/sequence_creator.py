@@ -1100,11 +1100,14 @@ def unitary_propagator_list_mult(u_list):
     #HINT: replace argument u_list by "insert_operators_from_dict(unitary_propagator_list(h_mhz, times, fields, L_Bc), insert_operator_dict)", to generate a u_list
     out = []
     for idx in range(len(u_list)):
-        if idx > 0:
-            # u_list[idx] = u_list[idx] * u_list[idx-1]
-            out.append(u_list[idx] * out[idx-1])
-        else:
-            out.append(u_list[idx])
+        try:
+            if idx > 0:
+                # u_list[idx] = u_list[idx] * u_list[idx-1]
+                out.append(u_list[idx] * out[idx-1])
+            else:
+                out.append(u_list[idx])
+        except:
+            pass
     return out
 
 def unitary_propagator_list_sectioned(u_list, section_dict):
@@ -1116,7 +1119,10 @@ def unitary_propagator_list_sectioned(u_list, section_dict):
         if idx == 0:
             ta = unitary_propagator_list_mult(u_list[:sdv[idx]+1])[-1]
         else:
-            ta = unitary_propagator_list_mult(u_list[sdv[idx-1]+1:sdv[idx]+1])[-1]
+            try:
+                ta = unitary_propagator_list_mult(u_list[sdv[idx-1]+1:sdv[idx]+1])[-1]
+            except:
+                pass
         u_list_reduced.append(ta)
     return u_list_reduced
 
