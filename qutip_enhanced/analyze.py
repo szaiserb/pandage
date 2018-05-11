@@ -2,7 +2,7 @@
 from __future__ import print_function, absolute_import, division
 
 __metaclass__ = type
-from qutip import tensor, ket2dm, expect, jmat
+from qutip import tensor, ket2dm, expect, jmat, Qobj
 from .data_generation import DataGeneration
 from .data_handling import PlotData
 from qutip_enhanced import sequence_creator
@@ -292,14 +292,16 @@ def get_transition_frequency(**kwargs):
 class Simulate(DataGeneration):
 
     def __init__(self, gui=False, progress_bar=None, **kwargs):
+        super(DataGeneration, self).__init__()
         self.parameters = kwargs.pop('parameters')
         self.times = kwargs.pop('times')  # dp.times_full
         self.fields = kwargs.pop('fields')  # dp.fields_full
         self.ret_h_mhz = kwargs.pop('ret_h_mhz')
-        self.L_Bc = kwargs.pop('L_Bc')
+        self.dims = kwargs.pop('dims')
+        self.L_Bc = [Qobj(i, dims=[self.dims, self.dims]) for i in kwargs.pop('L_Bc')]
         self.insert_operator_dict = kwargs.pop('insert_operator_dict', None)
         self.section_dict = kwargs.pop('section_dict')
-        self.dims = kwargs.pop('dims')
+
         self.gui = gui
         self.pld = PlotData('analyze_pulse', gui=self.gui)
         self.pld.x_axis_parameter = 'to_bin'
@@ -322,6 +324,10 @@ class Simulate(DataGeneration):
         if len(val.keys()) != len(set(val.keys())):
             raise Exception('ERROR: {}'.format(val.keys()))
         self._section_dict = val
+
+    @staticmethod
+    def get_section_dict(section_length_list, section_name_list):
+        return collections.OrderedDict([(key, val) for key, val in zip(section_name_list, np.cumsum(section_length_list)-1)])
 
     @property
     def insert_operator_dict(self):
@@ -354,23 +360,6 @@ class Simulate(DataGeneration):
     def observation_names(self):
         return ["expect"]
 
-    def run(self, abort=None):
-        self.init_run(init_from_file=None, iff=None)
-        try:
-            for idx, self.current_iterator_df in enumerate(self.iterator()):
-                if abort is not None and abort.is_set(): break
-                obs = self.f(current_iterator_df=self.current_iterator_df, abort=abort)
-                self.data.set_observations(obs)
-                if self.gui:
-                    self.pld.new_data_arrived()
-            self.pld.new_data_arrived()
-        except Exception:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
-        finally:
-            self.state = 'idle'
-            self.update_current_str()
-
     def update_progress(self):
         super(Simulate, self).update_progress()
         if self.progress_bar is None:
@@ -391,23 +380,78 @@ class Simulate(DataGeneration):
                     d[int(key.replace('initial_state', ''))] = val
             return "".join(collections.OrderedDict(sorted(d.items())).values())
 
-    def f(self, current_iterator_df, abort):
-        observation_dict_list = []
-        u_list_generated = False
-        for idx, _I_ in current_iterator_df.iterrows():
-            if abort.is_set(): break
-            if not u_list_generated:
-                u_list_mult = sequence_creator.unitary_propagator_list_mult(
-                    sequence_creator.unitary_propagator_list(
-                        h_mhz=self.ret_h_mhz(**self.detunings(_I_)),
-                        times_full=self.times,
-                        fields_full=self.fields,
-                        L_Bc=[_I_['ps'] * i for i in self.L_Bc],)
+    def run(self, abort=None):
+        self.init_run(init_from_file=None, iff=None)
+        try:
+            for idxo, _ in enumerate(self.iterator()):
+                if abort is not None and abort.is_set(): break
+                observation_dict_list = []
+                for idx, _I_ in self.current_iterator_df.iterrows():
+                    if sum(self.current_iterator_df_changes.iloc[idx, :][['electron_detuning', 'nuclear_detuning', 'ps']]) > 0:
+                        u_list = sequence_creator.unitary_propagator_list(
+                            h_mhz=self.ret_h_mhz(**self.detunings(self.current_iterator_df.iloc[0, :].to_dict())),
+                            times=self.times,
+                            fields=self.fields,
+                            L_Bc=self.L_Bc)
+                        sequence_creator.insert_operators_from_dict(u_list, self.insert_operator_dict)
+                        u_list_reduced = sequence_creator.unitary_propagator_list_sectioned(u_list, self.section_dict)
+                        u_list_mult = sequence_creator.unitary_propagator_list_mult(u_list_reduced)
+                    if abort is not None and abort.is_set(): break
+                    ts = test_states(dims=self.dims, pure=False, names_multi_list_str=[self.initial_state(_I_)]).values()[0]
+                    to_bin = self.section_dict.values().index(_I_['to_bin'])
+                    pts = propagate_test_states([u_list_mult[to_bin]], ts)
+                    op = jmat(dim2spin(self.dims[_I_['spin_num']]), _I_['axis'])
+                    state = pts[0].ptrace(_I_['spin_num'])
+                    obse = collections.OrderedDict([
+                        ('expect', expect(op, state))
+                    ])
+                    observation_dict_list.append(obse)
+                self.data.set_observations(observation_dict_list)
+                if self.gui:
+                    self.pld.new_data_arrived()
+            self.pld.new_data_arrived()
+        except Exception:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
+        finally:
+            self.state = 'idle'
+            self.update_current_str()
 
-                )
-                u_list_generated = True
-            ts = test_states(dims=self.dims, pure=False, names_multi_list_str=[self.initial_state(_I_)]).values()[0]
-            pts = propagate_test_states([u_list_mult[_I_['to_bin']]], ts)
-            obse = OrderedDict([('expect', expect(jmat(dim2spin(self.dims[_I_['spin_num']]), _I_['axis']), pts[0].ptrace(_I_['spin_num'])))])
-            observation_dict_list.append(obse)
-        return observation_dict_list
+
+    # def run(self, abort=None):
+    #     self.init_run(init_from_file=None, iff=None)
+    #     try:
+    #         for idx, self.current_iterator_df in enumerate(self.iterator()):
+    #             if abort is not None and abort.is_set(): break
+    #             obs = self.f(current_iterator_df=self.current_iterator_df, abort=abort)
+    #             self.data.set_observations(obs)
+    #             if self.gui:
+    #                 self.pld.new_data_arrived()
+    #         self.pld.new_data_arrived()
+    #     except Exception:
+    #         exc_type, exc_value, exc_tb = sys.exc_info()
+    #         traceback.print_exception(exc_type, exc_value, exc_tb)
+    #     finally:
+    #         self.state = 'idle'
+    #         self.update_current_str()
+
+    # def f(self, current_iterator_df, abort):
+    #     observation_dict_list = []
+    #     u_list_generated = False
+    #     for idx, _I_ in current_iterator_df.iterrows():
+    #         if abort.is_set(): break
+    #         if not u_list_generated:
+    #             u_list_mult = sequence_creator.unitary_propagator_list_mult(
+    #                 sequence_creator.unitary_propagator_list(
+    #                     h_mhz=self.ret_h_mhz(**self.detunings(_I_)),
+    #                     times_full=self.times,
+    #                     fields_full=self.fields,
+    #                     L_Bc=[_I_['ps'] * i for i in self.L_Bc],)
+    #
+    #             )
+    #             u_list_generated = True
+    #         ts = test_states(dims=self.dims, pure=False, names_multi_list_str=[self.initial_state(_I_)]).values()[0]
+    #         pts = propagate_test_states([u_list_mult[_I_['to_bin']]], ts)
+    #         obse = OrderedDict([('expect', expect(jmat(dim2spin(self.dims[_I_['spin_num']]), _I_['axis']), pts[0].ptrace(_I_['spin_num'])))])
+    #         observation_dict_list.append(obse)
+    #     return observation_dict_list

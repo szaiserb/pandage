@@ -21,7 +21,7 @@ import time
 
 class DataGeneration:
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         self.date_of_creation = datetime.datetime.now()
 
     current_idx_str = ret_property_typecheck('current_idx_str', str)
@@ -161,20 +161,20 @@ class DataGeneration:
     def update_progress(self):
         self._progress = len(self.iterator_df_done) / np.prod([len(i) for i in self.parameters.values()])
 
-    def iterator(self):
-        while True:
-            self.process_remeasure_items()
-            self.iterator_df_done = self.data.df.loc[:, self.data.parameter_names]  # self.iterator_df_done.append(self.current_iterator_df)
-            self.set_iterator_df()
-            self.iterator_df_drop_done()
-            self.update_progress()
-            self.iterator_df, self.current_iterator_df = df_pop(self.iterator_df, min(self.number_of_simultaneous_measurements, len(self.iterator_df)))
-            self.data.append(self.current_iterator_df)
-            self.update_current_str()
-            if len(self.current_iterator_df) > 0:
-                yield self.current_iterator_df
-            else:
-                break
+    # def iterator(self):
+    #     while True:
+    #         self.process_remeasure_items()
+    #         self.iterator_df_done = self.data.df.loc[:, self.data.parameter_names]  # self.iterator_df_done.append(self.current_iterator_df)
+    #         self.set_iterator_df()
+    #         self.iterator_df_drop_done()
+    #         self.update_progress()
+    #         self.iterator_df, self.current_iterator_df = df_pop(self.iterator_df, min(self.number_of_simultaneous_measurements, len(self.iterator_df)))
+    #         self.data.append(self.current_iterator_df)
+    #         self.update_current_str()
+    #         if len(self.current_iterator_df) > 0:
+    #             yield self.current_iterator_df
+    #         else:
+    #             break
 
     def changes_from_previous(self, iterator_df):
         if len(self.data.df) == 0:
@@ -189,7 +189,8 @@ class DataGeneration:
             out = out.append(iterator_df.iloc[idx-1, :] != iterator_df.iloc[idx, :], ignore_index=True)
         self.current_iterator_df_changes = out
 
-    def iterator_changed(self):
+    # def iterator_changed(self):
+    def iterator(self):
         while True:
             self.process_remeasure_items()
             self.iterator_df_done = self.data.df.loc[:, self.data.parameter_names]  # self.iterator_df_done.append(self.current_iterator_df)
