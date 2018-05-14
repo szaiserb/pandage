@@ -60,6 +60,8 @@ def ptrepack(file, folder, tempfile=None, lock=None):
     while i < 1000:
         try:
             os.rename(os.path.join(folder, tempfile), os.path.join(folder, file))
+            if i > 0:
+                print("Renaming {} to {} was successful after {} tries and a total of {}s)".format(os.path.join(folder, tempfile), os.path.join(folder, file), i, time.time() - t0))
             break
         except:
             print("Trying to rename {} to {} again. (Try {}, {}s)".format(os.path.join(folder, tempfile), os.path.join(folder, file), i, time.time() - t0))

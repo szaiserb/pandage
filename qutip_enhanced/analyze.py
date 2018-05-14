@@ -385,17 +385,11 @@ class Simulate(DataGeneration):
         try:
             for idxo, _ in enumerate(self.iterator()):
                 if abort is not None and abort.is_set(): break
+                if idxo == 0:
+                    u_list_reduced, u_list_mult = self.generate_u_list_mult()
                 observation_dict_list = []
                 for idx, _I_ in self.current_iterator_df.iterrows():
-                    if sum(self.current_iterator_df_changes.iloc[idx, :][['electron_detuning', 'nuclear_detuning', 'ps']]) > 0:
-                        u_list = sequence_creator.unitary_propagator_list(
-                            h_mhz=self.ret_h_mhz(**self.detunings(self.current_iterator_df.iloc[0, :].to_dict())),
-                            times=self.times,
-                            fields=self.fields,
-                            L_Bc=self.L_Bc)
-                        sequence_creator.insert_operators_from_dict(u_list, self.insert_operator_dict)
-                        u_list_reduced = sequence_creator.unitary_propagator_list_sectioned(u_list, self.section_dict)
-                        u_list_mult = sequence_creator.unitary_propagator_list_mult(u_list_reduced)
+                    u_list_reduced, u_list_mult = self.f(u_list_reduced=u_list_reduced, u_list_mult=u_list_mult, idxo=idxo, idx=idx, _I_=_I_, abort=abort)
                     if abort is not None and abort.is_set(): break
                     ts = test_states(dims=self.dims, pure=False, names_multi_list_str=[self.initial_state(_I_)]).values()[0]
                     to_bin = self.section_dict.values().index(_I_['to_bin'])
@@ -417,41 +411,18 @@ class Simulate(DataGeneration):
             self.state = 'idle'
             self.update_current_str()
 
+    def generate_u_list_mult(self):
+        u_list = sequence_creator.unitary_propagator_list(
+            h_mhz=self.ret_h_mhz(**self.detunings(self.current_iterator_df.iloc[0, :].to_dict())),
+            times=self.times,
+            fields=self.fields,
+            L_Bc=self.L_Bc)
+        sequence_creator.insert_operators_from_dict(u_list, self.insert_operator_dict)
+        u_list_reduced = sequence_creator.unitary_propagator_list_sectioned(u_list, self.section_dict)
+        return u_list_reduced, sequence_creator.unitary_propagator_list_mult(u_list_reduced)
 
-    # def run(self, abort=None):
-    #     self.init_run(init_from_file=None, iff=None)
-    #     try:
-    #         for idx, self.current_iterator_df in enumerate(self.iterator()):
-    #             if abort is not None and abort.is_set(): break
-    #             obs = self.f(current_iterator_df=self.current_iterator_df, abort=abort)
-    #             self.data.set_observations(obs)
-    #             if self.gui:
-    #                 self.pld.new_data_arrived()
-    #         self.pld.new_data_arrived()
-    #     except Exception:
-    #         exc_type, exc_value, exc_tb = sys.exc_info()
-    #         traceback.print_exception(exc_type, exc_value, exc_tb)
-    #     finally:
-    #         self.state = 'idle'
-    #         self.update_current_str()
-
-    # def f(self, current_iterator_df, abort):
-    #     observation_dict_list = []
-    #     u_list_generated = False
-    #     for idx, _I_ in current_iterator_df.iterrows():
-    #         if abort.is_set(): break
-    #         if not u_list_generated:
-    #             u_list_mult = sequence_creator.unitary_propagator_list_mult(
-    #                 sequence_creator.unitary_propagator_list(
-    #                     h_mhz=self.ret_h_mhz(**self.detunings(_I_)),
-    #                     times_full=self.times,
-    #                     fields_full=self.fields,
-    #                     L_Bc=[_I_['ps'] * i for i in self.L_Bc],)
-    #
-    #             )
-    #             u_list_generated = True
-    #         ts = test_states(dims=self.dims, pure=False, names_multi_list_str=[self.initial_state(_I_)]).values()[0]
-    #         pts = propagate_test_states([u_list_mult[_I_['to_bin']]], ts)
-    #         obse = OrderedDict([('expect', expect(jmat(dim2spin(self.dims[_I_['spin_num']]), _I_['axis']), pts[0].ptrace(_I_['spin_num'])))])
-    #         observation_dict_list.append(obse)
-    #     return observation_dict_list
+    def f(self, u_list_reduced, u_list_mult, idxo, idx, _I_, abort):
+        """
+        :return: updated versions of u_list_reduced, u_list_mult
+        """
+        raise NotImplementedError
