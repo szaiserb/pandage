@@ -294,14 +294,11 @@ class Simulate(DataGeneration):
     def __init__(self, gui=False, progress_bar=None, **kwargs):
         super(DataGeneration, self).__init__()
         self.parameters = kwargs.pop('parameters')
-        self.times = kwargs.pop('times')  # dp.times_full
-        self.fields = kwargs.pop('fields')  # dp.fields_full
+        self.times_fields_dict = kwargs.pop('times_fields_dict')  # dp.times_full
+        self.section_dict = self.get_section_dict(self.times_fields_dict)
         self.ret_h_mhz = kwargs.pop('ret_h_mhz')
         self.dims = kwargs.pop('dims')
         self.L_Bc = [Qobj(i, dims=[self.dims, self.dims]) for i in kwargs.pop('L_Bc')]
-        self.insert_operator_dict = kwargs.pop('insert_operator_dict', None)
-        self.section_dict = kwargs.pop('section_dict')
-
         self.gui = gui
         self.pld = PlotData('analyze_pulse', gui=self.gui)
         self.pld.x_axis_parameter = 'to_bin'
@@ -316,7 +313,8 @@ class Simulate(DataGeneration):
     def section_dict(self, val):
         """
 
-        :param val: collections.OrderedDict([(sectionname1), ()])
+        :param val: collections.OrderedDict([(sectionname1, section1), (sectionname2, section2), ...])
+            sectionname can be Qobj operator, integer (then it hast to be
         :return:
         """
         if any([i not in val.values() for i in self.parameters['to_bin']]):
@@ -325,25 +323,25 @@ class Simulate(DataGeneration):
             raise Exception('ERROR: {}'.format(val.keys()))
         self._section_dict = val
 
+
     @staticmethod
-    def get_section_dict(section_length_list, section_name_list):
-        return collections.OrderedDict([(key, val) for key, val in zip(section_name_list, np.cumsum(section_length_list)-1)])
+    def get_section_dict(times_fields_dict):
+        section_length_list = []
+        fields_list = []
+        insert_operator_dict = collections.OrderedDict()
+        for key, val in times_fields_dict.items():
+            iodidx = np.cumsum(section_length_list)[-1] if len(section_length_list) > 0 else 0
+            if isinstance(val, numbers.Number):
+                insert_operator_dict[iodidx] = 'tba'
+                section_length_list.append(val)
+            elif isinstance(val, Qobj):
+                insert_operator_dict[iodidx] = val
+                section_length_list.append(1)
+            else:
+                section_length_list.append(len(val))
+                fields_list.append(val)
 
-    @property
-    def insert_operator_dict(self):
-        return self._insert_operator_dict
-
-    @insert_operator_dict.setter
-    def insert_operator_dict(self, val):
-        if val is None:
-            self._insert_operator_dict = collections.OrderedDict()
-        else:
-            self._insert_operator_dict = collections.OrderedDict(sorted(val.items()))
-
-    def update_insert_operator_dict(self, idx, val):
-        self._insert_operator_dict[idx] = val
-        self._insert_operator_dict = collections.OrderedDict(sorted(self._insert_operator_dict.items()))
-
+        return collections.OrderedDict([(key, val) for key, val in zip(times_fields_dict.keys(), np.cumsum(section_length_list)-1)])
 
     def calc_number_of_simultaneous_measurements(self):
         if 'initial_state' in self.parameters:
@@ -412,14 +410,26 @@ class Simulate(DataGeneration):
             self.update_current_str()
 
     def generate_u_list_mult(self):
-        u_list = sequence_creator.unitary_propagator_list(
-            h_mhz=self.ret_h_mhz(**self.detunings(self.current_iterator_df.iloc[0, :].to_dict())),
-            times=self.times,
-            fields=self.fields,
-            L_Bc=self.L_Bc)
-        sequence_creator.insert_operators_from_dict(u_list, self.insert_operator_dict)
-        u_list_reduced = sequence_creator.unitary_propagator_list_sectioned(u_list, self.section_dict)
-        return u_list_reduced, sequence_creator.unitary_propagator_list_mult(u_list_reduced)
+        h_mhz = self.ret_h_mhz(**self.detunings(self.current_iterator_df.iloc[0, :].to_dict()))
+        u_list_reduced = []
+        for key, val in self.times_fields_dict.items():
+            if isinstance(val, numbers.Number):
+                u_list_reduced.append('tba')
+            elif isinstance(val, Qobj):
+                u_list_reduced.append(val)
+            else:
+                u_list_reduced.append(
+                    sequence_creator.unitary_propagator_list_mult(
+                        sequence_creator.unitary_propagator_list(
+                            h_mhz=h_mhz,
+                            times=val[:,0],
+                            fields=val[:, 1:],
+                            L_Bc=self.L_Bc
+                        )
+                    )[-1]
+                )
+        u_list_mult = sequence_creator.unitary_propagator_list_mult(u_list_reduced)
+        return u_list_reduced, u_list_mult
 
     def f(self, u_list_reduced, u_list_mult, idxo, idx, _I_, abort):
         """

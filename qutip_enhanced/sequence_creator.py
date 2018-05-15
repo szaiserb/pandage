@@ -1091,10 +1091,10 @@ def unitary_propagator_list(h_mhz, times, fields, L_Bc):
         )
     return u_list
 
-def insert_operators_from_dict(u_list, insert_operator_dict):
-    if insert_operator_dict is not None:
-        for idx, kv in enumerate(insert_operator_dict.items()):
-            u_list.insert(kv[0] + idx, kv[1])
+# def insert_operators_from_dict(u_list, insert_operator_dict):
+#     if insert_operator_dict is not None:
+#         for idx, kv in enumerate(insert_operator_dict.items()):
+#             u_list.insert(kv[0] + idx, kv[1])
 
 def unitary_propagator_list_mult(u_list):
     #HINT: replace argument u_list by "insert_operators_from_dict(unitary_propagator_list(h_mhz, times, fields, L_Bc), insert_operator_dict)", to generate a u_list
@@ -1110,20 +1110,20 @@ def unitary_propagator_list_mult(u_list):
             pass
     return out
 
-def unitary_propagator_list_sectioned(u_list, section_dict):
-    if type(section_dict) is not collections.OrderedDict:
-        raise Exception('Error: {}, {}'.format(section_dict, type(section_dict)))
-    u_list_reduced = []
-    sdv = section_dict.values()
-    for idx in range(len(sdv)):
-        if idx == 0:
-            ta = unitary_propagator_list_mult(u_list[:sdv[idx]+1])[-1]
-        else:
-            try:
-                ta = unitary_propagator_list_mult(u_list[sdv[idx-1]+1:sdv[idx]+1])[-1]
-            except:
-                pass
-        u_list_reduced.append(ta)
-    return u_list_reduced
+# def unitary_propagator_list_sectioned(u_list, section_dict):
+#     if type(section_dict) is not collections.OrderedDict:
+#         raise Exception('Error: {}, {}'.format(section_dict, type(section_dict)))
+#     u_list_reduced = []
+#     sdv = section_dict.values()
+#     for idx in range(len(sdv)):
+#         if idx == 0:
+#             ta = unitary_propagator_list_mult(u_list[:sdv[idx]+1])[-1]
+#         else:
+#             try:
+#                 ta = unitary_propagator_list_mult(u_list[sdv[idx-1]+1:sdv[idx]+1])[-1]
+#             except:
+#                 pass
+#         u_list_reduced.append(ta)
+#     return u_list_reduced
 
 
