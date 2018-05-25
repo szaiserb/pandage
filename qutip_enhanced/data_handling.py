@@ -165,56 +165,76 @@ class Data:
         else:
             return None
 
-    def get_last_parameter(self, df):
-        cn = list(df.columns)
-        bclp = self.backwards_compatibility_last_parameter(cn)
-        if bclp is not None:
-            last_parameter = bclp
-        else:
-            l_idx = [cni for cni in cn if cni.endswith('_idx')]
-            if len(l_idx) == 0:
-                raise Exception('Error: Could not figure out last_parameter, thus parameter_names and observation_names could not be determined: {}'.format(cn))
-            l = [i[:-4] for i in l_idx]
-            if all(np.array(cn[:2 * len(l_idx)]) == l + l_idx):
-                last_parameter = l_idx[-1]
+    def get_last_parameter(self, df, last_parameter=None):
+        if hasattr(self, '_parameter_names'):
+            if last_parameter is not None:
+                if last_parameter != self.parameter_names[-1]:
+                    raise Exception('Error: {}, {}'.format(self.parameter_names[-1], last_parameter))
             else:
-                raise Exception('Error: Could not figure out last_parameter, thus parameter_names and observation_names could not be determined: {}'.format(cn))
+                last_parameter = self.parameter_names[-1]
+        elif last_parameter is None:
+            cn = list(df.columns)
+            bclp = self.backwards_compatibility_last_parameter(cn)
+            if bclp is not None:
+                last_parameter = bclp
+            else:
+                l_idx = [cni for cni in cn if cni.endswith('_idx')]
+                if len(l_idx) == 0:
+                    raise Exception('Error: Could not figure out last_parameter, thus parameter_names and observation_names could not be determined: {}'.format(cn))
+                l = [i[:-4] for i in l_idx]
+                if all(np.array(cn[:2 * len(l_idx)]) == l + l_idx):
+                    last_parameter = l_idx[-1]
+                else:
+                    raise Exception('Error: Could not figure out last_parameter, thus parameter_names and observation_names could not be determined: {}'.format(cn))
+        elif last_parameter not in df.columns:
+                raise Exception("last_parameter {} ist not in dataframe columns {}".format(last_parameter, df.columns))
         return last_parameter
 
-    def init(self, init_from_file=None, iff=None, last_parameter=None, df=None):
-        init_from_file = iff if iff is not None else init_from_file
-        if init_from_file is not None or df is not None:
-            if init_from_file is not None:
-                if init_from_file.endswith('.hdf'):
-                    store = pd.HDFStore(init_from_file)
-                    if hasattr(store, 'df'):
-                        df = store['df']
-                        for key in ["parameter_names", 'observation_names', 'dtypes']:
-                            attr_name = "_{}".format(key)
-                            if hasattr(store.get_storer('df').attrs, key):
-                                setattr(self, attr_name, getattr(store.get_storer('df').attrs, key))
-                            else:
-                                if hasattr(self, attr_name):
-                                    delattr(self, attr_name)
-                    else:
-                        df = store.get('/a')
-                    store.close()
-                    self.filepath = init_from_file
-                elif init_from_file.endswith('.csv'):
-                    df = pd.read_csv(init_from_file, compression='gzip')
-            self._df = df[pd.notnull(df)]
-            if False in [hasattr(self, i) for i in ['_parameter_names', '_observation_names', '_dtypes']]:
-                if last_parameter is None:
-                    last_parameter = self.get_last_parameter(df)
-                lpi = list(self.df.columns.values).index(last_parameter) + 1
-                if not hasattr(self, '_parameter_names'):
-                    self.parameter_names = list(self.df.columns[:lpi])
-                if not hasattr(self, '_observation_names'):
-                    self.observation_names = list(self.df.columns[lpi:])
-                if not hasattr(self, '_dtypes'):
-                    self._dtypes = list(self.df.dtypes[lpi:])
+    def read_hdf(self, init_from_file):
+        store = pd.HDFStore(init_from_file)
+        if hasattr(store, 'df'):
+            df = store['df']
+            for key in ["parameter_names", 'observation_names', 'dtypes']:
+                attr_name = "_{}".format(key)
+                if hasattr(store.get_storer('df').attrs, key):
+                    setattr(self, attr_name, getattr(store.get_storer('df').attrs, key))
+                else:
+                    if hasattr(self, attr_name):
+                        delattr(self, attr_name)
         else:
+            df = store.get('/a')
+        store.close()
+        return df
+
+    def read_csv(self, init_from_file):
+        return pd.read_csv(init_from_file, compression='gzip')
+
+    def init_metadata(self, df, last_parameter):
+        if False in [hasattr(self, i) for i in ['_parameter_names', '_observation_names', '_dtypes']]:
+            if last_parameter is None:
+                last_parameter = self.get_last_parameter(df)
+            lpi = list(self.df.columns.values).index(last_parameter) + 1
+            if not hasattr(self, '_parameter_names'):
+                self.parameter_names = list(self.df.columns[:lpi])
+            if not hasattr(self, '_observation_names'):
+                self.observation_names = list(self.df.columns[lpi:])
+            if not hasattr(self, '_dtypes'):
+                self._dtypes = list(self.df.dtypes[lpi:])
+
+    def init(self, last_parameter=None, df=None, init_from_file=None, iff=None):
+        init_from_file = iff if iff is not None else init_from_file
+        if init_from_file is not None:
+            self.filepath = init_from_file
+            if init_from_file.endswith('.hdf'):
+                df = self.read_hdf(init_from_file)
+            elif init_from_file.endswith('.csv'):
+                df = self.read_csv(init_from_file)
+        if df is None:
             self._df = pd.DataFrame(columns=self.variables)
+        else:
+            self._df = df[pd.notnull(df)]
+        if init_from_file is not None:
+            self.init_metadata(df=df, last_parameter=last_parameter)
 
     def dropnan(self, max_expected_rows=None):
         ldf = len(self.df)
@@ -254,31 +274,26 @@ class Data:
             if notify:
                 print("hdf data saved in ({:.2f})".format(time.time() - t0))
 
-    def append(self, df_or_l):
-        if type(df_or_l) == pd.DataFrame:
-            df = df_or_l
-            if not (df.columns == self.parameter_names).all():
-                raise Exception('Error: Dataframe columns dont match: '.format(df.columns, self.parameter_names))
-            df_append = df_or_l
-        else:
-            l = df_or_l
-            if type(l) in [collections.OrderedDict, dict]:
-                l = [l]
-            for kwargs in l:
-                if len(kwargs) != len(self.parameter_names):
-                    raise Exception('Missing parameter for dataframe.')
-                if not all([i in kwargs for i in self.parameter_names]):
-                    raise Exception('Wrong parameter for dataframe.')
-            df_append = pd.DataFrame(columns=self.parameter_names, data=l)
+    def get_parameters_df(self, l):
+        df_append = l_to_df(l)
+        if not (df_append.columns == self.parameter_names).all():
+            raise Exception('Error: Dataframe columns dont match: '.format(df_append.columns, self.parameter_names))
+        return df_append.reset_index(drop=True)
+
+    def initialize_observations_df(self, n):
         l_obs = []
-        for idx in range(len(df_append)):
+        for idx in range(n):
             l_obs.append(collections.OrderedDict())
             for k, v in self.dtypes.items():
                 if v == 'datetime':
                     l_obs[idx][k] = datetime.datetime(1900, 1, 1)  # datetime.datetime.min is also an option, but leads to OutOfBoundsDatetime: Out of bounds nanosecond timestamp: 1-01-01 00:00:00, when calling data = self.df.iloc[index.row(), index.column()]
                 else:
                     l_obs[idx][k] = getattr(__builtin__, v)()
-        df_append = pd.concat([df_append.reset_index(drop=True), pd.DataFrame(columns=self.observation_names, data=l_obs)], axis=1)  # NECESSARY! Reason: sorting issues when appending df with missing columns
+        return pd.DataFrame(columns=self.observation_names, data=l_obs)
+
+    def append(self, l):
+        parameters_df = self.get_parameters_df(l)
+        df_append = pd.concat([parameters_df, self.initialize_observations_df(len(parameters_df))], axis=1)  # NECESSARY! Reason: sorting issues when appending df with missing columns
         if len(self.df) == 0:
             self._df = df_append
         else:
@@ -306,16 +321,20 @@ class Data:
     def column_product(self, column_names):
         return itertools.product(*[getattr(self.df, cn).unique() for cn in column_names])
 
+    def sub(self, l):
+        ldf = l_to_df(l)
+        new_parameter_names = [i for i in self.parameter_names if not (i in ldf.columns and len(ldf[i].unique()) == 1)]
+        sub = Data(parameter_names=new_parameter_names, observation_names=self.observation_names, dtypes=self.dtypes)
+        sub._df = self.dict_access(ldf)
+        return sub
+
     def iterator(self, column_names, output_data_instance=False):
         for idx, p in enumerate(self.column_product(column_names=column_names)):
-            d = collections.OrderedDict([i for i in zip(column_names, p)])
-            d_idx = collections.OrderedDict([(cn, np.argwhere(getattr(self.df, cn).unique() == p)[0, 0]) for cn, p in zip(column_names, p)])
-            if output_data_instance:
-                new_parameter_names = [i for i in self.parameter_names if not i in column_names]
-                sub = Data(parameter_names=new_parameter_names, observation_names=self.observation_names, dtypes=self.dtypes)
-                sub._df = self.dict_access(d)
-            else:
-                sub = self.dict_access(d)
+            d = collections.OrderedDict(zip(column_names, p))
+            d_idx = collections.OrderedDict([(cn, np.argwhere(getattr(self.df, cn).unique() == p)[0, 0]) for cn, p in d.items()])
+            sub = self.sub(l=d)
+            if not output_data_instance:
+                sub = sub.df
             yield d, d_idx, idx, sub
 
     @property

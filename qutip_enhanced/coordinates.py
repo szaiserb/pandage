@@ -9,7 +9,7 @@ import collections
 """
 Enter 2D or 3D vector v as dict. 
 - Cartesian coordinate: {'x': , 'y': , 'z'}
-- Spherical: {'rho':, 'azim': , 'elev': } where phi is the azimutal angle
+- Spherical: {'rho':, 'azim': , 'elev': }
 - Polar is [rho, azimuth], 
 """
 
@@ -89,7 +89,7 @@ def sph2cart(*args):
     if type(args[0]) == dict:
         return {'x': x, 'y': y, 'z': z}
     elif len(args) == 3:
-        return x,y,z
+        return x, y, z
 
 def cart2sph(*args):
     if type(args[0]) == dict:

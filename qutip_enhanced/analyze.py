@@ -12,6 +12,7 @@ from collections import OrderedDict
 import collections
 from itertools import chain, combinations, product
 import numpy as np
+import numbers
 
 import traceback
 import sys
@@ -94,6 +95,9 @@ def purity(dm):
     comb = list(chain.from_iterable(combinations(s, r) for r in range(len(s) + 1)))[1:]
     return dict((i, ((dm.ptrace(i)) ** 2).tr()) for i in comb)
 
+def measurement_result(dm, operator):
+    return np.abs((operator.dag()*operator*dm).tr())
+
 def test_states_single(dim, pure=False):
     m = (dim - 1.)/2.
     out = dict()
@@ -110,6 +114,9 @@ def test_states_single(dim, pure=False):
 
 __TEST_STATES_SINGLE_PURE__ = dict([(dim, test_states_single(dim=dim, pure=True)) for dim in [2,3]])
 __TEST_STATES_SINGLE__ = dict([(dim, test_states_single(dim=dim, pure=False)) for dim in [2,3]])
+
+def chunk(s, size=2):
+    return list(map(''.join, zip(*[iter(s)] * size)))
 
 def test_states(dims=None, pure=False, **kwargs):
     """
@@ -133,7 +140,7 @@ def test_states(dims=None, pure=False, **kwargs):
                 raise Exception('Error: each item of names_multi_list_str must be {} (is {})'. format(str, type(i)))
             if len(i) != 2 * len(dims):
                 raise Exception("Error: {}, {}, {}, {}".format(dims, 2 * len(dims), i, len(i)))
-            names_multi_list.append([i+j for i, j in zip(i[::2], i[1::2])])
+            names_multi_list.append(chunk(i))
     else:
         raise Exception('Error: {}'.format(kwargs))
     out = collections.OrderedDict()
@@ -294,7 +301,7 @@ class Simulate(DataGeneration):
     def __init__(self, gui=False, progress_bar=None, **kwargs):
         super(DataGeneration, self).__init__()
         self.parameters = kwargs.pop('parameters')
-        self.times_fields_dict = kwargs.pop('times_fields_dict')  # dp.times_full
+        self.times_fields_dict = self.get_times_fields_dict(kwargs.pop('times_fields_list'))
         self.section_dict = self.get_section_dict(self.times_fields_dict)
         self.ret_h_mhz = kwargs.pop('ret_h_mhz')
         self.dims = kwargs.pop('dims')
@@ -304,6 +311,14 @@ class Simulate(DataGeneration):
         self.pld.x_axis_parameter = 'to_bin'
         self.progress_bar = progress_bar
         self.number_of_simultaneous_measurements = self.calc_number_of_simultaneous_measurements()
+
+    @staticmethod
+    def get_times_fields_dict(times_fields_list):
+        l = [i[0] for i in times_fields_list]
+        if len(l) != len(set(l)):
+            raise Exception('Duplicate keys!')
+        else:
+            return collections.OrderedDict(times_fields_list)
 
     @property
     def section_dict(self):
@@ -352,11 +367,16 @@ class Simulate(DataGeneration):
                 if key.startswith('initial_state'):
                     l.append(len(val))
             f_initial_state = int(np.prod(l))
-        return len(self.parameters['to_bin']) * len(self.parameters['spin_num']) * len(self.parameters['axis'])*f_initial_state
+        if 'observation_type' in self.parameters:
+            return int(np.product([len(i) for i in self.parameters.values()[self.parameters.keys().index('observation_type'):]])*f_initial_state)
+        else:
+            return len(self.parameters['to_bin']) * len(self.parameters['spin_num']) * len(self.parameters['axis'])*f_initial_state
+
+
 
     @property
     def observation_names(self):
-        return ["expect"]
+        return ["value"]
 
     def update_progress(self):
         super(Simulate, self).update_progress()
@@ -378,6 +398,20 @@ class Simulate(DataGeneration):
                     d[int(key.replace('initial_state', ''))] = val
             return "".join(collections.OrderedDict(sorted(d.items())).values())
 
+    def expect(self, _I_, pts):
+        op = jmat(dim2spin(self.dims[_I_['spin_num']]), _I_['axis'])
+        state = pts[0].ptrace(_I_['spin_num'])
+        return expect(op, state)
+
+    def probability(self, _I_, pts):
+        id = [idx for idx, val in enumerate(chunk(_I_['measurement_operator'])) if val != 'nn']
+        dim_sub = [self.dims[i] for i in id]
+        mos_sub = [i for i in chunk(_I_['measurement_operator'])[id[0]:id[-1]+1]]
+        op = test_states(dims=dim_sub, pure=False, names_multi_list=[mos_sub]).values()[0]
+        dm = pts[0].ptrace(id)
+        return measurement_result(dm, op)
+
+
     def run(self, abort=None):
         self.init_run(init_from_file=None, iff=None)
         try:
@@ -392,12 +426,14 @@ class Simulate(DataGeneration):
                     ts = test_states(dims=self.dims, pure=False, names_multi_list_str=[self.initial_state(_I_)]).values()[0]
                     to_bin = self.section_dict.values().index(_I_['to_bin'])
                     pts = propagate_test_states([u_list_mult[to_bin]], ts)
-                    op = jmat(dim2spin(self.dims[_I_['spin_num']]), _I_['axis'])
-                    state = pts[0].ptrace(_I_['spin_num'])
-                    obse = collections.OrderedDict([
-                        ('expect', expect(op, state))
-                    ])
-                    observation_dict_list.append(obse)
+                    if _I_.get('observation_type', 'expect') == 'expect':
+                        value = self.expect(_I_, pts)
+                    elif _I_['observation_type'] == 'probability':
+                        value = self.probability(_I_, pts)
+                        # state = pts[0].ptrace([1,2,3])
+                        # op = tensor(jmat(1, 'z'), jmat(.5, 'z'), jmat(.5, 'z'))
+
+                    observation_dict_list.append(collections.OrderedDict([('value', value)]))
                 self.data.set_observations(observation_dict_list)
                 if self.gui:
                     self.pld.new_data_arrived()
