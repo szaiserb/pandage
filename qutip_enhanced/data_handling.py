@@ -1149,27 +1149,26 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             traceback.print_exception(exc_type, exc_value, exc_tb)
 
     def save_plot(self, filepath):
-        if hasattr(self, '_gui'):
-            try:
-                plt.ioff()
-                fig, ax = plt.subplots(1, 1)
-                if len(getattr(self.data.df, self.x_axis_parameter).unique()) == 1:
-                    self.x_axis_parameter = self.x_axis_parameter_with_largest_dim()
-                cn = self.parameter_names_reduced()
-                if cn[0] == 'sweeps' and self.x_axis_parameter != 'sweeps':
-                    del cn[0]
-                cn.remove(self.x_axis_parameter)
-                for d, d_idx, idx, df_sub in self.data.iterator(cn):
-                    for observation in self.observation_list_selected_data:
-                        dfagg = df_sub.groupby([self.x_axis_parameter]).agg({observation: np.mean}).reset_index()
-                        ax.plot(getattr(dfagg, self.x_axis_parameter), getattr(dfagg, observation))
-                fig.tight_layout()
-                fig.savefig(filepath)
-                plt.close(fig)
-                plt.ion()
-            except:
-                exc_type, exc_value, exc_tb = sys.exc_info()
-                traceback.print_exception(exc_type, exc_value, exc_tb)
+        try:
+            plt.ioff()
+            fig, ax = plt.subplots(1, 1)
+            if len(getattr(self.data.df, self.x_axis_parameter).unique()) == 1:
+                self.x_axis_parameter = self.x_axis_parameter_with_largest_dim()
+            cn = self.parameter_names_reduced()
+            if cn[0] == 'sweeps' and self.x_axis_parameter != 'sweeps':
+                del cn[0]
+            cn.remove(self.x_axis_parameter)
+            for d, d_idx, idx, df_sub in self.data.iterator(cn):
+                for observation in self.observation_list_selected_data:
+                    dfagg = df_sub.groupby([self.x_axis_parameter]).agg({observation: np.mean}).reset_index()
+                    ax.plot(getattr(dfagg, self.x_axis_parameter), getattr(dfagg, observation))
+            fig.tight_layout()
+            fig.savefig(filepath)
+            plt.close(fig)
+            plt.ion()
+        except:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
 
     @property
     def info_text(self):
@@ -1550,6 +1549,15 @@ def move_folder(folder_list_dict=None, destination_folder=None):
             failed += 1
             print("Folder {} could not be moved. Lets hope it has tbc in its name".format(i['root']))
     print("Successfully moved: {}. Failed: {}".format(len(folder_list_dict) - failed, failed))
+
+def replot_all_hdf(folder):
+    for root, dirs, files in os.walk(os.path.join(folder), topdown=False):
+        for name in files:
+            if name == 'data.hdf' and 'sim_code' in root:
+                pld = PlotData(gui=False, data=Data(iff=os.path.join(root, name)))
+                pld.save_plot(os.path.join(root, 'plot1.png'))
+                print(root)
+
 
 
 # if __name__ == '__main__':

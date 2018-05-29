@@ -38,7 +38,8 @@ def cosine_no_decay(x, amplitude, T, x0, c):
 
 
 def cosine(x, amplitude, T, x0, c, t2):
-    return cosine_no_decay_no_offset(x, amplitude, T, x0) * np.exp(-(x - x0) / t2) + c
+    out = cosine_no_decay_no_offset(x, amplitude, T, x0) * np.exp(-(x - x0) / t2) + c
+    return out
 
 
 def abs_cosine(x, amplitude, T, x0, c, t2):
@@ -360,7 +361,7 @@ class CosineModel(lmfit.Model):
         if p['amplitude'] < 0:
             p['amplitude'].value *= -1
             p['x0'].value = ((p['x0'] / p['T'] + 0.5) % 1) * p['T']
-        return lmfit.models.update_param_vals(self.make_params(amplitude=p['amplitude'].value, T=p['T'].value, x0=p['x0'].value, c=p['c'].value, t2=10 * max(x)), self.prefix, **kwargs)
+        return lmfit.models.update_param_vals(self.make_params(amplitude=p['amplitude'].value, T=p['T'].value, x0=p['x0'].value, c=p['c'].value, t2=10 * (max(np.abs(x)) - min(np.abs(x)))), self.prefix, **kwargs)
 
 
 class CosineMultiDetModel(lmfit.Model):
