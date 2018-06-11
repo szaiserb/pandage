@@ -1098,7 +1098,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             else:
                 if len(self.observation_list_selected_data) == 1:
                     axes[n].set_ylabel(self.observation_list_selected_data[0])
-        if 1 < len(axes[0].lines) <= 12:  # NOT PYTHON 3 SAFE
+        if 1 < len(axes[0].lines): # <= 12:  # NOT PYTHON 3 SAFE
             if len(ax_p_list) != 0:
                 axes.append(fig.add_subplot(ny_tot, nx_tot, ny_tot*nx_tot))
                 plt.setp(axes[-1].get_xticklabels(), visible=False)
@@ -1110,11 +1110,13 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
                     axes[0].lines,
                     [l.get_label() for l in axes[0].lines],
                     borderaxespad=0.1,  # Small spacing around legend box
-                    loc='upper left'
+                    loc='upper left',
+                    fontsize=20 / len(axes[0].lines) ** .25,
                 )
             else:
-                axes[0].legend()
+                axes[0].legend(fontsize=20/len(axes[0].lines)**.25,)
         fig.tight_layout()
+        plt.tight_layout()
         return axes
 
     def update_plot(self):

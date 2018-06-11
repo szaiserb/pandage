@@ -15,17 +15,9 @@ from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d import proj3d
 import itertools
 import zipfile
+import copy
 
 np.set_printoptions(suppress=True, linewidth=100000)
-
-chrestenson_gate = Qobj(
-    np.array(
-        [
-            [1, 1,                           1                          ],
-            [1, np.exp(1.j * 2 * np.pi / 3), np.exp(1.j * 4 * np.pi / 3)],
-            [1, np.exp(1.j * 4 * np.pi / 3), np.exp(1.j * 2 * np.pi / 3)],
-        ]) / np.sqrt(3)
-)
 
 def save_qutip_enhanced(destination_dir):
     src = os.path.dirname(os.path.dirname(__file__))
@@ -230,7 +222,7 @@ def extend_operator(dims, target_spin, operator, control_dict=None):
     example: given a system with three spins, spin 1, 1, 1/2.0, transition = [0,1], rotated spin = 1 and selective_to = {0:[1,2],2:[1]} will rotate the second spins transition 1 < - > 0,
     if spin 0 is in spin states 1 or 2 but not if it is in spin state 0 and if spin 2 is in spin state 1 but not if it is in spin state 0
     """
-    control_dict = {} if control_dict is None else control_dict
+    control_dict = {} if control_dict is None else copy.deepcopy(control_dict)
     for idx, dim in enumerate(dims):
         if idx not in control_dict and idx != target_spin:
             control_dict[idx] = range(dim)
@@ -325,6 +317,14 @@ def rotate(op, **kwargs):
     operator = U * op * U.dag()
     return operator
 
+def hadamard_walsh(d):
+    l = []
+    for n in range(d):
+        for m in range(d):
+            l.append(np.exp(1j*2*np.pi*m*n/float(d))*(basis(d, m) * basis(d, n).dag()))
+    return qsum(l)/np.sqrt(d)
+
+chrestenson_gate = hadamard_walsh(3)
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt

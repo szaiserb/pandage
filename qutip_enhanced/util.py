@@ -155,3 +155,25 @@ def ret_property_array_like_types(name, types):
         setattr(self, '_' + name, check_array_like_types(val, name, types))
 
     return property(ret_getter(name), setter)
+
+
+def move_to_dir(path, dir):
+    import os
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+    import shutil
+    shutil.move(path, dir)
+
+
+def f():
+    import os
+    os.chdir(r"D:\Dropbox\Dokumente\PI3\Projects\CSH_sensing_sequence")
+
+    with open("delete_this.txt", 'r') as f:
+        a = "".join(f.readlines())
+        for root, dirs, files in os.walk(os.getcwd()):
+            for d in dirs:
+                if d in a and 'sim_code' in d:
+                    move_to_dir(os.path.join(root, d), "TEMPORARY_DIRECTORY_FROM_ONENOTE_COMPARE")
+            break
+

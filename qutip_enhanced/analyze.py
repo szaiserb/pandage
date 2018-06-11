@@ -430,9 +430,9 @@ class Simulate(DataGeneration):
                         value = self.expect(_I_, pts)
                     elif _I_['observation_type'] == 'probability':
                         value = self.probability(_I_, pts)
-                        # state = pts[0].ptrace([1,2,3])
-                        # op = tensor(jmat(1, 'z'), jmat(.5, 'z'), jmat(.5, 'z'))
-
+                    elif _I_['observation_type'] == 'purity':
+                        value = purity(pts[0])[tuple([int(i) for i in _I_['spin_nums']])]
+                    observation_dict_list.append(collections.OrderedDict([('value', value)]))
                     observation_dict_list.append(collections.OrderedDict([('value', value)]))
                 self.data.set_observations(observation_dict_list)
                 if self.gui:
