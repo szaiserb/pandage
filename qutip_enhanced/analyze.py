@@ -433,7 +433,6 @@ class Simulate(DataGeneration):
                     elif _I_['observation_type'] == 'purity':
                         value = purity(pts[0])[tuple([int(i) for i in _I_['spin_nums']])]
                     observation_dict_list.append(collections.OrderedDict([('value', value)]))
-                    observation_dict_list.append(collections.OrderedDict([('value', value)]))
                 self.data.set_observations(observation_dict_list)
                 if self.gui:
                     self.pld.new_data_arrived()
