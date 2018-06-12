@@ -1116,7 +1116,6 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             else:
                 axes[0].legend(fontsize=20/len(axes[0].lines)**.25,)
         fig.tight_layout()
-        plt.tight_layout()
         return axes
 
     def update_plot(self):
