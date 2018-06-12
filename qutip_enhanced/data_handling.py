@@ -298,6 +298,7 @@ class Data:
             self._df = df_append
         else:
             self._df = self._df.append(df_append, ignore_index=True)
+        self.check_integrity()
 
     def set_observations(self, l, start_idx=None):
         start_idx = len(self._df) - 1 if start_idx is None else start_idx
@@ -305,18 +306,21 @@ class Data:
         for idx, row in l.iterrows():
             for obs, val in zip(l.columns, row):
                 self._df.at[start_idx - len(l) + idx + 1, obs] = val
+        self.check_integrity()
 
     def df_access(self, other):
         return df_access(self.df, other)
 
     def df_delete(self, other):
         self._df = df_delete(self.df, other)
+        self.check_integrity()
 
     def dict_access(self, l):
         return dict_access(df=self.df, l=l)
 
     def dict_delete(self, l):
         self._df = dict_delete(df=self.df, l=l)
+        self.check_integrity()
 
     def column_product(self, column_names):
         return itertools.product(*[getattr(self.df, cn).unique() for cn in column_names])
@@ -353,10 +357,11 @@ class Data:
 
     def check_integrity(self):
         if len(self.parameter_names) + len(self.observation_names) != len(self.df.columns):
-            raise Exception('Error!')
-        if not all([ i == j for i, j in zip(self.df.columns[:len(self.parameter_names)], self.parameter_names)]):
+            cnl = [(i, j) for i, j in zip(self.parameter_names + self.observation_names, self.df.columns)]
+            raise Exception('Error: Integrity corrupted: {}, {}, {}\n{}'.format(len(self.parameter_names), len(self.observation_names), len(self.df.columns)), cnl)
+        if not all([i == j for i, j in zip(self.df.columns[:len(self.parameter_names)], self.parameter_names)]):
             raise Exception('Error: Integrity corrupted: {}, {}'.format(self.df.columns, self.parameter_names))
-        if not all([ i == j for i, j in zip(self.df.columns[-len(self.observation_names):], self.observation_names)]):
+        if not all([i == j for i, j in zip(self.df.columns[-len(self.observation_names):], self.observation_names)]):
             raise Exception('Error: Integrity corrupted: {}, {}'.format(self.df.columns, self.observation_names))
         for cn in self.df.columns:
             if cn in self.parameter_names and cn in self.observation_names:
@@ -419,13 +424,13 @@ def extend_columns(df, other, columns=None):
         return pd.concat([df, pd.concat([other.loc[:, df_missing_columns].iloc[0:1, :]] * len(df)).reset_index(drop=True)], axis=1).reset_index(drop=True)
 
 def df_take_duplicate_rows(df, other):
-    df_columns = df.columns  # here for pure security reasons
-    df_dtypes = df.dtypes  # here for pure security reasons
+    df_columns = df.columns  # here for security reasons, leave it!
+    df_dtypes = df.dtypes  # here for security reasons, leave it!
     df_all = df.merge(other.drop_duplicates(), on=list(other.columns), how='left', indicator=True)
     out = df_all[df_all._merge == 'both'].iloc[:, :-1].reset_index(drop=True)
-    if not (out.columns == df_columns).all():  # here for pure security reasons
+    if not (out.columns == df_columns).all():  # here for security reasons, leave it!
         print(out.columns, df_columns)
-    if not (out.dtypes == df_dtypes).all():  # here for pure security reasons
+    if not (out.dtypes == df_dtypes).all():  # here for security reasons, leave it!
         print(out.columns, df.columns)
     return out
 
@@ -439,13 +444,13 @@ def df_drop_duplicate_rows(df, other):
         default: right.columns
     :return:
     """
-    df_columns = df.columns  # here for pure security reasons
-    df_dtypes = df.dtypes  # here for pure security reasons
+    df_columns = df.columns  # here for security reasons, leave it!
+    df_dtypes = df.dtypes  # here for security reasons, leave it!
     df_all = df.merge(other.drop_duplicates(), on=list(other.columns), how='left', indicator=True)
     out = df_all[df_all._merge == 'left_only'].iloc[:, :-1].reset_index(drop=True)
-    if not (out.columns == df_columns).all():  # here for pure security reasons
+    if not (out.columns == df_columns).all():  # here for security reasons, leave it!
         print(out.columns, df_columns)
-    if not (out.dtypes == df_dtypes).all():  # here for pure security reasons
+    if not (out.dtypes == df_dtypes).all():  # here for security reasons, leave it!
         print(out.columns, df.columns)
     return out
 

@@ -182,7 +182,8 @@ class DataGeneration:
             self.update_progress()
             self.iterator_df, self.current_iterator_df = df_pop(self.iterator_df, min(self.number_of_simultaneous_measurements, len(self.iterator_df)))
             self.changes_from_previous(self.current_iterator_df)
-            self.data.append(self.current_iterator_df)
+            if len(self.current_iterator_df) > 0:
+                self.data.append(self.current_iterator_df)
             self.update_current_str()
             if len(self.current_iterator_df) > 0:
                 yield self.current_iterator_df, self.current_iterator_df_changes
