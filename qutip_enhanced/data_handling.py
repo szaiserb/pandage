@@ -567,7 +567,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
 
     def update_x_axis_parameter_list(self):
         try:
-            self._x_axis_parameter_list = [cn for cn in self.parameter_names_reduced() if cn in self.data.df._get_numeric_data().columns]
+            self._x_axis_parameter_list = [cn for cn in self.parameter_names_reduced()]
             if not hasattr(self, '_x_axis_parameter') or (self.x_axis_parameter not in self.x_axis_parameter_list and len(self.x_axis_parameter_list) > 0):
                 self._x_axis_parameter = self.x_axis_parameter_with_largest_dim()
             if hasattr(self, '_gui'):
