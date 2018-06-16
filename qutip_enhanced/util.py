@@ -165,7 +165,7 @@ def move_to_dir(path, dir):
     shutil.move(path, dir)
 
 
-def f():
+def move_files_whose_filename_is_in_textfile_to_dir():
     import os
     os.chdir(r"D:\Dropbox\Dokumente\PI3\Projects\CSH_sensing_sequence")
 
