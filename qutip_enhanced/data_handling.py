@@ -146,6 +146,32 @@ class Data:
                     raise Exception("Error: {}, {}, {}, {}, {}".format(val, k, v, type(v), self.observation_names))
             self._dtypes = val
 
+    def change_column_dtype(self, column_name, new_dtype=None):
+        if new_dtype is not None:
+            self._df[[column_name]] = self.df[[column_name]].astype(new_dtype)
+        if column_name in self.observation_names:
+            self.dtypes[column_name] = new_dtype
+        self.reinstate_integrity()
+
+    def rename_column(self, column_name, column_name_new):
+        if column_name not in self.variables:
+            raise Exception('Error: column does not exist.')
+        self.parameter_names = [i if i != column_name else column_name_new for i in self.parameter_names]
+        self.observation_names = [i if i != column_name else column_name_new for i in self.observation_names]
+        self._df = self.df.rename(columns={column_name: column_name_new})
+        self.reinstate_integrity()
+
+    def delete_columns(self, column_names):
+        not_in = [cn for cn in column_names if not cn in self.variables]
+        if len(not_in) > 0:
+            raise Exception("Error: column_names {} can not be deleted because they do not exist.".format(not_in))
+        nupn = self.non_unary_parameter_names
+        non_unary_parameter_names_to_be_deleted = [cn for cn in column_names if cn in self.parameter_names and cn in nupn]
+        if len(non_unary_parameter_names_to_be_deleted) != 0:
+            raise Exception('Error: column_names {} are in parameter_names but are non_unary. Columns can not be deleted.'.format(non_unary_parameter_names_to_be_deleted))
+        self._df = self.df.drop(column_names, axis=1)
+        self.reinstate_integrity()
+
     @property
     def variables(self):
         return self.parameter_names + self.observation_names
@@ -221,8 +247,9 @@ class Data:
             if not hasattr(self, '_dtypes'):
                 self._dtypes = list(self.df.dtypes[lpi:])
 
-    def init(self, last_parameter=None, df=None, init_from_file=None, iff=None):
+    def init(self, last_parameter=None, df=None, init_from_file=None, iff=None, path=None):
         init_from_file = iff if iff is not None else init_from_file
+        init_from_file = path if path is not None else init_from_file
         if init_from_file is not None:
             self.filepath = init_from_file
             if init_from_file.endswith('.hdf'):
@@ -369,8 +396,10 @@ class Data:
 
     def reinstate_integrity(self):
         """
-        After columns of self.df have been removed, remove these from other variables as well.
+        After columns of self.df have been removed, remove these from other variables as well and vice versa
         """
+        cnl = [cn for cn in self.df.columns if cn not in self.parameter_names + self.observation_names]
+        self._df = self.df.drop(cnl, axis=1)
         self.parameter_names = [i for i in self.parameter_names if i in self.df.columns]
         self.observation_names = [i for i in self.observation_names if i in self.df.columns]
         for key in self.dtypes.keys():
@@ -378,9 +407,14 @@ class Data:
                 del self.dtypes[key]
         self.check_integrity()
 
-    def observations_to_parameters(self, observation_names, new_names, new_parameter_name, new_observation_name):
+    def observations_to_parameters(self, observation_names, new_names, new_parameter_name, new_observation_name='value', new_parameter_dtype=None):
         """
-        NOTE: If the dtype of the new column should be anything but str, you need to change this manually after calling this method.
+        :param observation_names: list of observation names to turn into one single parameter
+        :param new_names:  list of new names replacing the old observation_names
+        :param new_parameter_name: string, name for the new parameter, i.e. the new column in _df
+        :param new_observation_name: string, common name for all previous observation names
+        :param new_dtype: python dtype
+        :return: None
         """
         df = self.df.rename(dict([(old, new) for old, new in zip(observation_names, new_names)]), axis='columns')
         df = df.melt(id_vars=[cn for cn in df.columns if cn not in new_names])
@@ -391,6 +425,38 @@ class Data:
         self.observation_names.insert(previous_observation_location, new_observation_name)
         new_column_names = self.parameter_names + self.observation_names
         self._df = self._df[new_column_names]
+        self.change_column_dtype(new_parameter_name, new_parameter_dtype)
+        self.check_integrity()
+
+    def subtract_parameter(self, parameter_name, observation_name=None, observation_name_new=None):
+        """
+        Subtracts the values of one observation with respect to one binary parameter (a parameter with two unique values).
+        An example could be
+            observation_name = 'location'
+            parameter_name = 'time' with values 'start', 'end'
+            new_parameter_name = 'distance'
+        Parameter values, for which only one observation was made (e.g. only 'start' was measured) are dropped completely.
+        :param parameter_name: string
+        :param new_parameter_name: string
+        :param observation_name: string
+        :return:
+        """
+
+        lnp = len(getattr(self.df, parameter_name).unique())
+        if lnp != 2:
+            raise Exception('Error: Only parameters with 2 unique items can be subtracted. Parameter {} has {}'.format(parameter_name, lnp))
+        if len(self.observation_names) == 1:
+            observation_name = self.observation_names[0]
+        else:
+            if observation_name is None:
+                raise Exception('Error: observation_name to be subtracted could not be determined and must be given.')
+            else:
+                self.delete_columns([i for i in self.observation_names if i not in observation_name])
+        self._df.dropna()
+        self.parameter_names = [key for key in self.parameter_names if key != parameter_name]
+        self._df = self.df.groupby(self.parameter_names).filter(lambda x: len(x) == 2).groupby(self.parameter_names).agg({observation_name: lambda x: -1 * np.diff(x)}).reset_index()
+        if observation_name_new is not None:
+            self.rename_column(observation_name, observation_name_new)
         self.check_integrity()
 
 def extend_columns(df, other, columns=None):
@@ -455,8 +521,17 @@ def df_drop_duplicate_rows(df, other):
     return out
 
 class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
-
     def __init__(self, title=None, parent=None, gui=True, **kwargs):
+        """
+
+        :param title:
+        :param parent:
+        :param gui:
+        :param kwargs:
+            path: path to hdf file
+            data: Data instance or
+        """
+
         super(PlotData, self).__init__(parent=parent, gui=gui, QtGuiClass=PlotDataQt)
         self.set_data(**kwargs)
         if title is not None:
@@ -776,7 +851,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             elif not isinstance(parameter_table_selected_indices, collections.OrderedDict):
                 raise Exception(type(parameter_table_selected_indices), parameter_table_selected_indices)
             else:
-                out = collections.OrderedDict([(key, []) if key in ['sweeps', self.x_axis_parameter] else (key, []) for key, val in self.parameter_table_data.items()])
+                out = collections.OrderedDict([(key, []) if key in ['sweeps', self.x_axis_parameter] else (key, val) for key, val in self.parameter_table_selected_indices.items()])
                 for cn, val in parameter_table_selected_indices.items():
                     out[cn] = val
                 self._parameter_table_selected_indices = out
