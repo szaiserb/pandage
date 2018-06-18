@@ -738,7 +738,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             if getattr(self, '_x_axis_parameter', None) != val:
                 self._x_axis_parameter = val
                 if hasattr(self, '_gui'):
-                    self.gui.update_x_axis_parameter_comboBox()
+                    self.gui.x_axis_parameter.update_comboBox()
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
@@ -753,7 +753,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             if not hasattr(self, '_x_axis_parameter') or (self.x_axis_parameter not in self.x_axis_parameter_list and len(self.x_axis_parameter_list) > 0):
                 self._x_axis_parameter = self.x_axis_parameter_with_largest_dim()
             if hasattr(self, '_gui'):
-                self.gui.update_x_axis_parameter_comboBox()
+                self.gui.x_axis_parameter.update_comboBox()
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
@@ -1364,13 +1364,46 @@ class SelectableListQt(PyQt5.QtWidgets.QWidget):
         ]:
             getattr(getattr(self, "update_{}_signal".format(name)), 'connect')(getattr(self, "update_{}_signal_emitted".format(name)))
 
+class ParameterCombobox(PyQt5.QtWidgets.QWidget):
+
+    def __init__(self, name, widget_name, parent, *args, **kwargs):
+        super(ParameterCombobox, self).__init__(*args, **kwargs)
+        self.name = name # x_axis_parameter
+        self.widget_name = widget_name#widget_name = x_axis_parameter_comboBox
+        self.parent = parent
+
+    update_comboBox_signal = pyqtSignal()
+
+    def update_comboBox(self):
+        self.update_comboBox_signal.emit()
+
+    def update_comboBox_signal_emitted(self):
+        widget = getattr(self.parent, self.widget_name)
+        widget.blockSignals(True)
+        if hasattr(self.parent.no_qt, '_{}_list'.format(self.name)) and hasattr(self.parent.no_qt, '_{}'.format(self.name)):
+            if widget.count() == 0:
+                widget.addItems(getattr(self.parent.no_qt, '{}_list'.format(self.name)))  # currentIndexChanged is triggered, value is first item (e.g. sweeps)
+            widget.setCurrentText(getattr(self.parent.no_qt, self.name))
+        widget.blockSignals(False)
+        getattr(self.parent, 'update_parameter_table_item_flags')()
+
+    def update_from_comboBox(self):
+        setattr(self.parent.no_qt, self.name, str(getattr(self.parent, self.widget_name).currentText()))
+
+    def connect_signals(self):
+        for name in [
+            'comboBox'.format(self.name),
+        ]:
+            getattr(getattr(self, "update_{}_signal".format(name)), 'connect')(getattr(self, "update_{}_signal_emitted".format(name)))
+
 class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
     def __init__(self, parent=None, no_qt=None):
         self.observation_list = SelectableListQt(name='observation_list', widget_name='observation_widget', parent=self)
         self.average_parameter_list = SelectableListQt(name='average_parameter_list', widget_name='average_parameter_widget', parent=self)
+        self.x_axis_parameter = ParameterCombobox(name='x_axis_parameter', widget_name='x_axis_parameter_comboBox', parent=self)
         super(PlotDataQt, self).__init__(parent=parent, no_qt=no_qt, ui_filepath=os.path.join(os.path.dirname(__file__), 'qtgui/plot_data.ui'))
 
-    update_x_axis_parameter_comboBox_signal = pyqtSignal()
+    # update_x_axis_parameter_comboBox_signal = pyqtSignal()
     update_col_ax_parameter_comboBox_signal = pyqtSignal()
     update_row_ax_parameter_comboBox_signal = pyqtSignal()
     update_subtract_parameter_comboBox_signal = pyqtSignal()
@@ -1411,20 +1444,20 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
         except:
             pass
 
-    def update_x_axis_parameter_comboBox(self):
-        self.update_x_axis_parameter_comboBox_signal.emit()
-
-    def update_x_axis_parameter_comboBox_signal_emitted(self):
-        self.x_axis_parameter_comboBox.blockSignals(True)
-        if hasattr(self.no_qt, '_x_axis_parameter_list') and hasattr(self.no_qt, '_x_axis_parameter'):
-            if self.x_axis_parameter_comboBox.count() == 0:
-                self.x_axis_parameter_comboBox.addItems(self.no_qt.x_axis_parameter_list)  # currentIndexChanged is triggered, value is first item (e.g. sweeps)
-            self.x_axis_parameter_comboBox.setCurrentText(self.no_qt.x_axis_parameter)
-        self.x_axis_parameter_comboBox.blockSignals(False)
-        self.update_parameter_table_item_flags()
-
-    def update_x_axis_parameter_from_comboBox(self):
-        self.no_qt.x_axis_parameter = str(self.x_axis_parameter_comboBox.currentText())
+    # def update_x_axis_parameter_comboBox(self):
+    #     self.update_x_axis_parameter_comboBox_signal.emit()
+    #
+    # def update_x_axis_parameter_comboBox_signal_emitted(self):
+    #     self.x_axis_parameter_comboBox.blockSignals(True)
+    #     if hasattr(self.no_qt, '_x_axis_parameter_list') and hasattr(self.no_qt, '_x_axis_parameter'):
+    #         if self.x_axis_parameter_comboBox.count() == 0:
+    #             self.x_axis_parameter_comboBox.addItems(self.no_qt.x_axis_parameter_list)  # currentIndexChanged is triggered, value is first item (e.g. sweeps)
+    #         self.x_axis_parameter_comboBox.setCurrentText(self.no_qt.x_axis_parameter)
+    #     self.x_axis_parameter_comboBox.blockSignals(False)
+    #     self.update_parameter_table_item_flags()
+    #
+    # def update_x_axis_parameter_from_comboBox(self):
+    #     self.no_qt.x_axis_parameter = str(self.x_axis_parameter_comboBox.currentText())
 
     def update_col_ax_parameter_comboBox(self):
         self.update_col_ax_parameter_comboBox_signal.emit()
@@ -1569,7 +1602,6 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
     def init_gui(self):
         super(PlotDataQt, self).init_gui()
         for name in [
-            'update_x_axis_parameter_comboBox',
             'update_col_ax_parameter_comboBox',
             'update_row_ax_parameter_comboBox',
             'update_subtract_parameter_comboBox',
@@ -1583,7 +1615,8 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
             getattr(getattr(self, "{}_signal".format(name)), 'connect')(getattr(self, "{}_signal_emitted".format(name)))
         for name in [
             'observation_list',
-            'average_parameter_list'
+            'average_parameter_list',
+            'x_axis_parameter'
         ]:
             getattr(self, name).connect_signals()
 
@@ -1619,7 +1652,7 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
         self.open_code_button.clicked.connect(self.open_measurement_code)
         self.open_explorer_button.clicked.connect(self.open_explorer)
 
-        self.x_axis_parameter_comboBox.currentIndexChanged.connect(self.update_x_axis_parameter_from_comboBox)
+        self.x_axis_parameter_comboBox.currentIndexChanged.connect(self.x_axis_parameter.update_from_comboBox)
         self.col_ax_parameter_comboBox.currentIndexChanged.connect(self.update_col_ax_parameter_from_comboBox)
         self.row_ax_parameter_comboBox.currentIndexChanged.connect(self.update_row_ax_parameter_from_comboBox)
         self.subtract_parameter_comboBox.currentIndexChanged.connect(self.update_subtract_parameter_from_comboBox)
