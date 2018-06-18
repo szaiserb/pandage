@@ -607,7 +607,7 @@ class AverageParameterList(SelectableList):
 
     def get_data(self):
         try:
-            return [i for i in self.parent.data.parameter_names if not i in
+            return [i for i in self.parent.data.non_unary_parameter_names if not i in
                                                                        [
                                                                            self.parent.x_axis_parameter,
                                                                            self.parent.col_ax_parameter,
@@ -633,7 +633,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
 
         super(PlotData, self).__init__(parent=parent, gui=gui, QtGuiClass=PlotDataQt)
         self.observation_list = ObservationList(parent=self)
-        # self.average_parameter_list = AverageParameterList(parent=self)
+        self.average_parameter_list = AverageParameterList(parent=self)
         self.set_data(**kwargs)
         if title is not None:
             self.update_window_title(title)
@@ -683,14 +683,13 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         try:
             if hasattr(self.data, 'filepath') and matplotlib.rcParams["savefig.directory"] != os.path.dirname(self.data.filepath):
                 matplotlib.rcParams["savefig.directory"] = os.path.dirname(self.data.filepath)
-            # self.update_average_parameter_list()
             self.update_x_axis_parameter_list()
             self.update_col_ax_parameter_list()
             self.update_row_ax_parameter_list()
             self.update_subtract_parameter_list()
             self.update_parameter_table_data()
             self.observation_list.update_data()
-            # self.average_parameter_list.update_data()
+            self.average_parameter_list.update_data()
             self.update_plot()
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
@@ -720,7 +719,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
                     traceback.print_exception(exc_type, exc_value, exc_tb)
         for attr_name in [
             'observation_list',
-            # 'average_parameter_list',
+            'average_parameter_list',
         ]:
             try:
                 getattr(self, attr_name).delete_attributes()
@@ -1345,14 +1344,14 @@ class SelectableListQt(PyQt5.QtWidgets.QWidget):
         getattr(self, "update_data_signal".format(self.name)).emit(data)
 
     def update_data_signal_emitted(self, data):
-        if self.parent.observation_widget.count() == 0:
+        if getattr(self.parent, self.widget_name).count() == 0:
             for val in data:
                 getattr(self.parent, self.widget_name).addItem(QListWidgetItem(val))
         elif len(self.data) != getattr(self.parent, self.widget_name).count():
             raise Exception('Error: ', getattr(self.parent, self.widget_name).count(), data)
 
     def update_selected_indices(self, selected_indices):
-        getattr(self, "update_selected_indices_signal".format("observation_list")).emit(selected_indices)
+        getattr(self, "update_selected_indices_signal").emit(selected_indices)
 
     def update_selected_indices_signal_emitted(self, update_selected_indices):
         getattr(self.parent, self.widget_name).blockSignals(True)
@@ -1373,6 +1372,7 @@ class SelectableListQt(PyQt5.QtWidgets.QWidget):
 class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
     def __init__(self, parent=None, no_qt=None):
         self.observation_list = SelectableListQt(name='observation_list', widget_name='observation_widget', parent=self)
+        self.average_parameter_list = SelectableListQt(name='average_parameter_list', widget_name='average_parameter_widget', parent=self)
         super(PlotDataQt, self).__init__(parent=parent, no_qt=no_qt, ui_filepath=os.path.join(os.path.dirname(__file__), 'qtgui/plot_data.ui'))
 
     update_x_axis_parameter_comboBox_signal = pyqtSignal()
@@ -1394,6 +1394,7 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
             ['subtract_parameter_comboBox', 'clear'],
             ['parameter_table', 'clear_table_contents'],
             ['observation_widget', 'clear'],
+            ['average_parameter_widget', 'clear'],
             ['fit_select_table', 'clear_table_contents'],
             ['fit_result_table', 'clear_table_contents'],
         ]:
@@ -1496,28 +1497,6 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
                     self.parameter_table.set_cell(ridx, cidx, flag=flag)
         self.parameter_table.blockSignals(False)
 
-    # def update_observation_list_data(self, observation_list_data):
-    #     self.update_observation_list_data_signal.emit(observation_list_data)
-    #
-    # def update_observation_list_data_signal_emitted(self, observation_list_data):
-    #     if self.observation_widget.count() == 0:
-    #         for obs in observation_list_data:
-    #             self.observation_widget.addItem(QListWidgetItem(obs))
-    #     elif len(self.observation_list_data) != self.observation_widget.count():
-    #         raise Exception('Error: ', self.observation_widget.count(), observation_list_data)
-    #
-    # def update_observation_list_selected_indices(self, selected_indices):
-    #     self.update_observation_list_selected_indices_signal.emit(selected_indices)
-    #
-    # def update_observation_list_selected_indices_signal_emitted(self, update_observation_list_selected_indices):
-    #     self.observation_widget.blockSignals(True)
-    #     for i in update_observation_list_selected_indices:
-    #         self.observation_widget.item(i).setSelected(True)
-    #     self.observation_widget.blockSignals(False)
-    #
-    # def update_observation_list_selected_indices_from_gui(self):
-    #     self.no_qt.observation_list.update_selected_indices([i.row() for i in self.observation_widget.selectedIndexes()])
-
     def update_parameter_table_selected_indices(self, selected_indices):
         self.update_parameter_table_selected_indices_signal.emit(selected_indices)
 
@@ -1607,7 +1586,8 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
         ]:
             getattr(getattr(self, "{}_signal".format(name)), 'connect')(getattr(self, "{}_signal_emitted".format(name)))
         for name in [
-            'observation_list'
+            'observation_list',
+            'average_parameter_list'
         ]:
             getattr(self, name).connect_signals()
 
@@ -1639,6 +1619,7 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
         self.parameter_table.itemSelectionChanged.connect(self.update_parameter_table_selected_indices_from_gui)
         self.fit_select_table.itemSelectionChanged.connect(self.update_fit_select_table_selected_rows_from_gui)
         self.observation_widget.itemSelectionChanged.connect(self.observation_list.update_selected_indices_from_gui)
+        self.average_parameter_widget.itemSelectionChanged.connect(self.average_parameter_list.update_selected_indices_from_gui)
         self.open_code_button.clicked.connect(self.open_measurement_code)
         self.open_explorer_button.clicked.connect(self.open_explorer)
 

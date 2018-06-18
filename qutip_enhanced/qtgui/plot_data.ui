@@ -44,9 +44,9 @@
     <widget class="QListWidget" name="observation_widget">
      <property name="geometry">
       <rect>
-       <x>1020</x>
+       <x>960</x>
        <y>0</y>
-       <width>231</width>
+       <width>141</width>
        <height>261</height>
       </rect>
      </property>
@@ -59,7 +59,7 @@
       <rect>
        <x>0</x>
        <y>0</y>
-       <width>1011</width>
+       <width>951</width>
        <height>261</height>
       </rect>
      </property>
@@ -329,6 +329,19 @@
       <bool>true</bool>
      </property>
     </widget>
+    <widget class="QListWidget" name="average_parameter_widget">
+     <property name="geometry">
+      <rect>
+       <x>1110</x>
+       <y>0</y>
+       <width>141</width>
+       <height>261</height>
+      </rect>
+     </property>
+     <property name="selectionMode">
+      <enum>QAbstractItemView::ExtendedSelection</enum>
+     </property>
+    </widget>
     <zorder>parameter_table</zorder>
     <zorder>observation_widget</zorder>
     <zorder>gridLayoutWidget</zorder>
@@ -345,6 +358,7 @@
     <zorder>subtract_parameter_comboBox</zorder>
     <zorder>label_4</zorder>
     <zorder>row_ax_parameter_comboBox</zorder>
+    <zorder>average_parameter_widget</zorder>
    </widget>
    <widget class="QWidget" name="fit_tab">
     <attribute name="title">
