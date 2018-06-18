@@ -16,6 +16,7 @@ import collections
 import subprocess
 import threading
 from PyQt5.QtWidgets import QListWidgetItem
+import PyQt5.QtWidgets
 from PyQt5.QtCore import Qt, pyqtSignal
 
 from .util import ret_property_array_like_types
@@ -1329,15 +1330,19 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             traceback.print_exception(exc_type, exc_value, exc_tb)
 
 
-class SelectableListQt():
+class SelectableListQt(PyQt5.QtWidgets.QWidget):
 
-    def __init__(self, name, widget_name, parent):
+    def __init__(self, name, widget_name, parent, *args, **kwargs):
+        super(SelectableListQt, self).__init__(*args, **kwargs)
         self.name = name
         self.widget_name = widget_name
         self.parent = parent
 
+    update_data_signal = pyqtSignal(list)
+    update_selected_indices_signal = pyqtSignal(list)
+
     def update_data(self, data):
-        getattr(self.parent, "update_{}_data_signal".format(self.name)).emit(data)
+        getattr(self, "update_data_signal".format(self.name)).emit(data)
 
     def update_data_signal_emitted(self, data):
         if self.parent.observation_widget.count() == 0:
@@ -1347,7 +1352,7 @@ class SelectableListQt():
             raise Exception('Error: ', getattr(self.parent, self.widget_name).count(), data)
 
     def update_selected_indices(self, selected_indices):
-        getattr(self.parent, "update_{}_selected_indices_signal".format("observation_list")).emit(selected_indices)
+        getattr(self, "update_selected_indices_signal".format("observation_list")).emit(selected_indices)
 
     def update_selected_indices_signal_emitted(self, update_selected_indices):
         getattr(self.parent, self.widget_name).blockSignals(True)
@@ -1363,7 +1368,7 @@ class SelectableListQt():
             'data'.format(self.name),
             'selected_indices'.format(self.name),
         ]:
-            getattr(getattr(self.parent, "update_{}_{}_signal".format(self.name, name)), 'connect')(getattr(self, "update_{}_signal_emitted".format(name)))
+            getattr(getattr(self, "update_{}_signal".format(name)), 'connect')(getattr(self, "update_{}_signal_emitted".format(name)))
 
 class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
     def __init__(self, parent=None, no_qt=None):
@@ -1376,8 +1381,6 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
     update_subtract_parameter_comboBox_signal = pyqtSignal()
     update_parameter_table_data_signal = pyqtSignal(collections.OrderedDict)
     update_parameter_table_selected_indices_signal = pyqtSignal(collections.OrderedDict)
-    update_observation_list_data_signal = pyqtSignal(list)
-    update_observation_list_selected_indices_signal = pyqtSignal(list)
     update_fit_select_table_data_signal = pyqtSignal(collections.OrderedDict)
     update_fit_select_table_selected_rows_signal = pyqtSignal(list)
     update_fit_result_table_data_signal = pyqtSignal(collections.OrderedDict)
