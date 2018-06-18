@@ -551,12 +551,12 @@ class SelectableList(Base):
 
     def update_data(self):
         try:
-            if not hasattr(self, '_data'):
-                self._data = self.get_data()
-                if hasattr(self.parent, '_gui'):
-                    getattr(getattr(self.parent.gui, self.name), "update_data".format(self.name))(self.data)
-            elif self.data != self.get_data():
-                raise Exception('Error: Data of {} must not be changed after data was given to PlotData.'.format(self.name), self.list_data, self.names_reduced())
+            # if not hasattr(self, '_data'):
+            self._data = self.get_data()
+            if hasattr(self.parent, '_gui'):
+                getattr(getattr(self.parent.gui, self.name), "update_data")(self.data)
+            # elif self.data != self.get_data():
+            #     raise Exception('Error: Data of {} must not be changed after data was given to PlotData.'.format(self.name), self.list_data, self.names_reduced())
             self.update_selected_indices()
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
@@ -570,12 +570,12 @@ class SelectableList(Base):
         try:
             if val is not None:
                 self._selected_indices = val
-            elif not hasattr(self, '_selected_indices') or  any([i not in self.data for i in self.selected_data]):
+            elif not hasattr(self, '_selected_indices') or any([i not in self.data for i in self.selected_data]):
                 self._selected_indices = [0]
             else:
                 return
             if hasattr(self.parent, '_gui'):
-                getattr(getattr(self.parent.gui, self.name), "update_selected_indices".format(self.name))(self.selected_indices)
+                getattr(getattr(self.parent.gui, self.name), "update_selected_indices")(self.selected_indices)
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
@@ -609,10 +609,10 @@ class AverageParameterList(SelectableList):
         try:
             return [i for i in self.parent.data.non_unary_parameter_names if not i in
                                                                        [
-                                                                           self.parent.x_axis_parameter,
-                                                                           self.parent.col_ax_parameter,
-                                                                           self.parent.row_ax_parameter,
-                                                                           self.parent.subtract_parameter
+                                                                           # self.parent.x_axis_parameter,
+                                                                           # self.parent.col_ax_parameter,
+                                                                           # self.parent.row_ax_parameter,
+                                                                           # self.parent.subtract_parameter
                                                                        ]
                     ]
         except:
@@ -1082,6 +1082,11 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
 
+    # def line_plot_data(self):
+    #     plot_data = {}
+    #     for obs in self.observation_list.selected_data:
+
+
     def ret_line_plot_data_single(self, condition_dict, observation_name):
         try:
             cl = [self.data.df[key] == val for key, val in condition_dict.items() if val not in ['__all__', '__average__']]
@@ -1339,11 +1344,11 @@ class SelectableListQt(PyQt5.QtWidgets.QWidget):
         getattr(self, "update_data_signal".format(self.name)).emit(data)
 
     def update_data_signal_emitted(self, data):
-        if getattr(self.parent, self.widget_name).count() == 0:
-            for val in data:
-                getattr(self.parent, self.widget_name).addItem(QListWidgetItem(val))
-        elif len(self.data) != getattr(self.parent, self.widget_name).count():
-            raise Exception('Error: ', getattr(self.parent, self.widget_name).count(), data)
+        widget = getattr(self.parent, self.widget_name)
+        if widget.count() != 0:
+            self.parent.clear_widget(self.widget_name, 'clear')
+        for val in data:
+            widget.addItem(QListWidgetItem(val))
 
     def update_selected_indices(self, selected_indices):
         getattr(self, "update_selected_indices_signal").emit(selected_indices)
@@ -1381,6 +1386,12 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
     update_fit_result_table_data_signal = pyqtSignal(collections.OrderedDict)
     update_info_text_signal = pyqtSignal(str)
 
+    def clear_widget(self, name, clear_method_name):
+        getattr(self, name).blockSignals(True)
+        getattr(getattr(self, name), clear_method_name)()
+        getattr(self, name).blockSignals(False)
+
+
     def clear_signal_emitted(self):
         for item in [
             ['x_axis_parameter_comboBox', 'clear'],
@@ -1393,9 +1404,7 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
             ['fit_select_table', 'clear_table_contents'],
             ['fit_result_table', 'clear_table_contents'],
         ]:
-            getattr(self, item[0]).blockSignals(True)
-            getattr(getattr(self, item[0]), item[1])()
-            getattr(self, item[0]).blockSignals(False)
+            self.clear_widget(item[0], item[1])
         try:
             self.fig.clf()
             self.canvas.draw()
