@@ -1357,7 +1357,7 @@ class SelectableListQt(PyQt5.QtWidgets.QWidget):
         getattr(self.parent, self.widget_name).blockSignals(True)
         for i in update_selected_indices:
             getattr(self.parent, self.widget_name).item(i).setSelected(True)
-            getattr(self.parent, self.widget_name).blockSignals(False)
+        getattr(self.parent, self.widget_name).blockSignals(False)
 
     def update_selected_indices_from_gui(self):
         getattr(self.parent.no_qt, self.name).update_selected_indices([i.row() for i in getattr(self.parent, self.widget_name).selectedIndexes()])
