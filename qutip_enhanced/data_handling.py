@@ -551,12 +551,9 @@ class SelectableList(Base):
 
     def update_data(self):
         try:
-            # if not hasattr(self, '_data'):
             self._data = self.get_data()
             if hasattr(self.parent, '_gui'):
                 getattr(getattr(self.parent.gui, self.name), "update_data")(self.data)
-            # elif self.data != self.get_data():
-            #     raise Exception('Error: Data of {} must not be changed after data was given to PlotData.'.format(self.name), self.list_data, self.names_reduced())
             self.update_selected_indices()
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
@@ -571,7 +568,7 @@ class SelectableList(Base):
             if val is not None:
                 self._selected_indices = val
             elif not hasattr(self, '_selected_indices') or any([i not in self.data for i in self.selected_data]):
-                self._selected_indices = [0]
+                self._selected_indices = [self.data.index('sweeps')] if 'sweeps' in self.data else []
             else:
                 return
             if hasattr(self.parent, '_gui'):
@@ -937,9 +934,6 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         try:
             out = collections.OrderedDict()
             for cn, val in parameter_table_selected_data.items():
-                # if isinstance(val, basestring) and val in ['__all__', '__average__']:
-                #     out[cn] = val
-                # else:
                 indices = []
                 for i in val:
                     indices.append(np.where(self.parameter_table_data[cn] == i)[0][0])
@@ -965,10 +959,16 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             if all([len(i) == 0 for i in out.values()]):
                 self._selected_plot_items = []
                 return
+            spl = [self.x_axis_parameter, self.col_ax_parameter, self.row_ax_parameter, self.subtract_parameter] + self.average_parameter_list.selected_data
+            spl = [i for i in spl if i != '__none__']
+            if len(spl) != len(set(spl)):
+                self._selected_plot_items = []
+                print('Selected plot options are invalid, parameters have been selected multiple times. {}'.format(spl))
+                return
             for key, val in out.items():
                 if key == self.x_axis_parameter or key == self.subtract_parameter:
                     out[key] = ['__all__']
-                elif len(val) == 0:
+                if key in self.average_parameter_list.selected_data:
                     out[key] = ['__average__']
             self._selected_plot_items = list(itertools.product(*out.values()))
         except:
@@ -1082,11 +1082,6 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
 
-    # def line_plot_data(self):
-    #     plot_data = {}
-    #     for obs in self.observation_list.selected_data:
-
-
     def ret_line_plot_data_single(self, condition_dict, observation_name):
         try:
             cl = [self.data.df[key] == val for key, val in condition_dict.items() if val not in ['__all__', '__average__']]
@@ -1119,10 +1114,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
                             keys = [key for key, val in condition_dict.items() if val not in ['__average__', '__all__']] + [self.x_axis_parameter]
                             dfxys = self.ret_line_plot_data_single(condition_dict, observation_name).dropna(subset=[observation_name])
                             dfxy = dfxys.groupby(keys).filter(lambda x: len(x) ==2).groupby(keys).agg({observation_name: lambda x: -1 * np.diff(x)}).reset_index()
-                            if len(dfxy) > 1: #exclude also single points
-                                # # if len(dfxy) == 1: #exclude also single points
-                                # #     print('Warning: Could not get plot_data for {}.\nPossible reason: data points have not been measured for both values of subtract_parameter.'.format(condition_dict))
-                                # continue
+                            if len(dfxy) > 1:
                                 condition_dict_reduced = collections.OrderedDict([(key, val) for key, val in condition_dict.items() if val not in ['__average__', '__all__']])
                                 plot_data.append(
                                     dict(
@@ -1173,7 +1165,6 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             n = kwargs['n']
             nx = n%nx_tot
             ny = int(np.floor(n/float(nx_tot)))
-            # nx = n - nx_tot*ny
         elif 'nx' in kwargs and 'ny' in kwargs:
             nx = kwargs['nx']
             ny = kwargs['ny']
@@ -1184,11 +1175,15 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             raise Exception('Error: given n (or (nx, ny)) does not index an axis within the grid')
         most_bottom_axis = True if n + nx_tot > n_tot - 1 else False
         most_left_axis = True if nx == 0 else False
-        # return collections.OrderedDict([('n', n), ('nx', nx), ('ny', ny), ('most_bottom_axis', most_bottom_axis), ('most_left_axis', most_left_axis)])
         return n, nx, ny, most_bottom_axis, most_left_axis
 
     def update_plot_new(self, fig):
+        if len(self.observation_list.selected_data) == 0:
+            print('Please select the items from observation_list that you want to plot.')
+            return
         self.update_selected_plot_items()
+        if len(self.selected_plot_items) == 0:
+            return
         self.update_fit_select_table_data()
         fig.clear()
         if self.col_ax_parameter != '__none__' and self.row_ax_parameter == '__none__':
@@ -1441,7 +1436,6 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
                 self.col_ax_parameter_comboBox.addItems(self.no_qt.col_ax_parameter_list)  # currentIndexChanged is triggered, value is first item (e.g. sweeps)
             self.col_ax_parameter_comboBox.setCurrentText(self.no_qt.col_ax_parameter)
         self.col_ax_parameter_comboBox.blockSignals(False)
-        # self.update_parameter_table_item_flags()
 
     def update_col_ax_parameter_from_comboBox(self):
         self.no_qt.col_ax_parameter = str(self.col_ax_parameter_comboBox.currentText())
@@ -1456,7 +1450,6 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
                 self.row_ax_parameter_comboBox.addItems(self.no_qt.row_ax_parameter_list)  # currentIndexChanged is triggered, value is first item (e.g. sweeps)
             self.row_ax_parameter_comboBox.setCurrentText(self.no_qt.row_ax_parameter)
         self.row_ax_parameter_comboBox.blockSignals(False)
-        # self.update_parameter_table_item_flags()
 
     def update_row_ax_parameter_from_comboBox(self):
         self.no_qt.row_ax_parameter = str(self.row_ax_parameter_comboBox.currentText())
@@ -1471,7 +1464,6 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
                 self.subtract_parameter_comboBox.addItems(self.no_qt.subtract_parameter_list)  # currentIndexChanged is triggered, value is first item (e.g. sweeps)
             self.subtract_parameter_comboBox.setCurrentText(self.no_qt.subtract_parameter)
         self.subtract_parameter_comboBox.blockSignals(False)
-        # self.update_parameter_table_item_flags()
 
     def update_subtract_parameter_from_comboBox(self):
         self.no_qt.subtract_parameter = str(self.subtract_parameter_comboBox.currentText())
