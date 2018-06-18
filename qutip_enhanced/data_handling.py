@@ -907,11 +907,11 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
     def update_parameter_table_selected_indices(self, parameter_table_selected_indices=None):
         try:
             if parameter_table_selected_indices is None:
-                self._parameter_table_selected_indices = collections.OrderedDict([(key, []) if key in ['sweeps', self.x_axis_parameter] else (key, '__all__') for key, val in self.parameter_table_data.items()])
+                self._parameter_table_selected_indices = collections.OrderedDict([(key, range(len(val))) for key, val in self.parameter_table_data.items()])
             elif not isinstance(parameter_table_selected_indices, collections.OrderedDict):
                 raise Exception(type(parameter_table_selected_indices), parameter_table_selected_indices)
             else:
-                out = collections.OrderedDict([(key, []) if key in ['sweeps', self.x_axis_parameter] else (key, val) for key, val in self.parameter_table_selected_indices.items()])
+                out = self._parameter_table_selected_indices = collections.OrderedDict([(key, range(len(val))) for key, val in self.parameter_table_data.items()])
                 for cn, val in parameter_table_selected_indices.items():
                     out[cn] = val
                 self._parameter_table_selected_indices = out
@@ -927,12 +927,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             out = collections.OrderedDict()
             for cn, val in self.parameter_table_selected_indices.items():
                 data_full = getattr(self.data.df, cn).unique()
-                if val == '__all__':
-                    out[cn] = data_full
-                elif val == '__average__':
-                    out[cn] = []
-                else:
-                    out[cn] = [data_full[i] for i in val]
+                out[cn] = [data_full[i] for i in val]
             return out
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
@@ -942,13 +937,13 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         try:
             out = collections.OrderedDict()
             for cn, val in parameter_table_selected_data.items():
-                if isinstance(val, basestring) and val in ['__all__', '__average__']:
-                    out[cn] = val
-                else:
-                    indices = []
-                    for i in val:
-                        indices.append(np.where(self.parameter_table_data[cn] == i)[0][0])
-                    out[cn] = indices
+                # if isinstance(val, basestring) and val in ['__all__', '__average__']:
+                #     out[cn] = val
+                # else:
+                indices = []
+                for i in val:
+                    indices.append(np.where(self.parameter_table_data[cn] == i)[0][0])
+                out[cn] = indices
             self.update_parameter_table_selected_indices(out)
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
@@ -1360,7 +1355,7 @@ class SelectableListQt(PyQt5.QtWidgets.QWidget):
             getattr(self.parent, self.widget_name).blockSignals(False)
 
     def update_selected_indices_from_gui(self):
-        self.parent.no_qt.observation_list.update_selected_indices([i.row() for i in getattr(self.parent, self.widget_name).selectedIndexes()])
+        getattr(self.parent.no_qt, self.name).update_selected_indices([i.row() for i in getattr(self.parent, self.widget_name).selectedIndexes()])
 
     def connect_signals(self):
         for name in [
