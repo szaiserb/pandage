@@ -520,6 +520,86 @@ def df_drop_duplicate_rows(df, other):
         print(out.columns, df.columns)
     return out
 
+class Base:
+
+    def __init__(self, delete_names=None):
+        self.delete_names = [] if delete_names is None else delete_names
+
+
+
+    def delete_attributes(self):
+        for attr_name in self.delete_names:
+            if hasattr(self, attr_name):
+                try:
+                    delattr(self, attr_name)
+                except:
+                    print("Attribute ", attr_name, " could not be deleted.")
+                    exc_type, exc_value, exc_tb = sys.exc_info()
+                    traceback.print_exception(exc_type, exc_value, exc_tb)
+
+
+class SelectableList(Base):
+    def __init__(self, name='noname', parent=None, **kwargs): # kwargs =dict(delete_names=['_data','_selected_indices',])
+        super(SelectableList, self).__init__(**kwargs)
+        self.parent = parent
+        self.name = name
+
+    @property
+    def data(self):
+        return getattr(self, '_data')
+
+    def update_data(self):
+        try:
+            if not hasattr(self, '_data'):
+                self._data = self.get_data()
+                if hasattr(self.parent, '_gui'):
+                    getattr(self.parent.gui, "update_{}_data".format(self.name))(self.data)
+            elif self.data != self.get_data():
+                raise Exception('Error: Data of {} must not be changed after data was given to PlotData.'.format(self.name), self.list_data, self.names_reduced())
+            self.update_selected_indices()
+        except:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
+
+    @property
+    def selected_indices(self):
+        return self._selected_indices
+
+    def update_selected_indices(self, val=None):
+        try:
+            if val is not None:
+                self._selected_indices = val
+            elif not hasattr(self, '_selected_indices') or  any([i not in self.data for i in self.selected_data]):
+                self._selected_indices = [0]
+            else:
+                return
+            if hasattr(self.parent, '_gui'):
+                getattr(self.parent.gui, "update_{}_selected_indices".format(self.name))(self.selected_indices)
+        except:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
+
+    @property
+    def selected_data(self):
+        try:
+            return [self.data[i] for i in self.selected_indices]
+        except:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
+
+class ObservationList(SelectableList):
+
+    def __init__(self, **kwargs):
+        super(ObservationList, self).__init__(name='observation_list', delete_names=['_data', '_selected_indices'], **kwargs)
+        self.exclude_names = ['trace', 'start_time', 'end_time', 'thresholds']
+
+    def get_data(self):
+        try:
+            return [i for i in self.parent.data.observation_names if not i in self.exclude_names]
+        except:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
+
 class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
     def __init__(self, title=None, parent=None, gui=True, **kwargs):
         """
@@ -533,12 +613,14 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         """
 
         super(PlotData, self).__init__(parent=parent, gui=gui, QtGuiClass=PlotDataQt)
+        self.observation_list = ObservationList(parent=self)
         self.set_data(**kwargs)
         if title is not None:
             self.update_window_title(title)
 
     fit_function = 'cosine'
     show_legend = False
+
 
     def set_data(self, **kwargs):
         try:
@@ -581,12 +663,13 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         try:
             if hasattr(self.data, 'filepath') and matplotlib.rcParams["savefig.directory"] != os.path.dirname(self.data.filepath):
                 matplotlib.rcParams["savefig.directory"] = os.path.dirname(self.data.filepath)
+            # self.update_average_parameter_list()
             self.update_x_axis_parameter_list()
             self.update_col_ax_parameter_list()
             self.update_row_ax_parameter_list()
             self.update_subtract_parameter_list()
             self.update_parameter_table_data()
-            self.update_observation_list_data()
+            self.observation_list.update_data()
             self.update_plot()
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
@@ -601,8 +684,6 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             '_subtract_parameter_list',
             '_parameter_table_data',
             '_parameter_table_selected_data',
-            '_observation_list_data',
-            '_observation_list_selected_indices',
             '_selected_plot_items',
             '_fit_select_table_data',
             '_fit_select_table_selected_rows',
@@ -616,7 +697,15 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
                     print("Attribute ", attr_name, " could not be deleted.")
                     exc_type, exc_value, exc_tb = sys.exc_info()
                     traceback.print_exception(exc_type, exc_value, exc_tb)
-
+        for attr_name in [
+            'observation_list',
+        ]:
+            try:
+                getattr(self, attr_name).delete_attributes()
+            except:
+                print("Attributes of {} could not be deleted.".format(attr_name))
+                exc_type, exc_value, exc_tb = sys.exc_info()
+                traceback.print_exception(exc_type, exc_value, exc_tb)
     @property
     def x_axis_parameter(self):
         try:
@@ -786,55 +875,56 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
 
-    @property
-    def observation_list_data(self):
-        return getattr(self, '_observation_list_data')
-
-    def update_observation_list_data(self):
-        try:
-            if not hasattr(self, '_observation_list_data'):
-                self._observation_list_data = self.observation_names_reduced()
-                if hasattr(self, '_gui'):
-                    self.gui.update_observation_list_data(self.observation_list_data)
-            elif self.observation_list_data != self.observation_names_reduced():
-                raise Exception('Error: Data of observation list must not be changed after data was given to PlotData.', self.observation_list_data, self.observation_names_reduced())
-            self.update_observation_list_selected_indices()
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
-
-    @property
-    def observation_list_selected_indices(self):
-        return self._observation_list_selected_indices
-
-    def update_observation_list_selected_indices(self, val=None):
-        try:
-            if val is not None:
-                self._observation_list_selected_indices = val
-            elif not hasattr(self, '_observation_list_selected_indices') or  any([i not in self.observation_list_data for i in self.observation_list_selected_data]):
-                self._observation_list_selected_indices = [0]
-            else:
-                return
-            if hasattr(self, '_gui'):
-                self.gui.update_observation_list_selected_indices(self.observation_list_selected_indices)
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
-
-    @property
-    def observation_list_selected_data(self):
-        try:
-            return [self.observation_list_data[i] for i in self.observation_list_selected_indices]
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
-
-    def observation_names_reduced(self):
-        try:
-            return [i for i in self.data.observation_names if not i in ['trace', 'start_time', 'end_time', 'thresholds']]
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+    # update_average_parameter_list
+    # @property
+    # def observation_list_data(self):
+    #     return getattr(self, '_observation_list_data')
+    #
+    # def update_observation_list_data(self):
+    #     try:
+    #         if not hasattr(self, '_observation_list_data'):
+    #             self._observation_list_data = self.observation_names_reduced()
+    #             if hasattr(self, '_gui'):
+    #                 self.gui.update_observation_list_data(self.observation_list_data)
+    #         elif self.observation_list_data != self.observation_names_reduced():
+    #             raise Exception('Error: Data of observation list must not be changed after data was given to PlotData.', self.observation_list_data, self.observation_names_reduced())
+    #         self.update_observation_list_selected_indices()
+    #     except:
+    #         exc_type, exc_value, exc_tb = sys.exc_info()
+    #         traceback.print_exception(exc_type, exc_value, exc_tb)
+    #
+    # @property
+    # def observation_list_selected_indices(self):
+    #     return self._observation_list_selected_indices
+    #
+    # def update_observation_list_selected_indices(self, val=None):
+    #     try:
+    #         if val is not None:
+    #             self._observation_list_selected_indices = val
+    #         elif not hasattr(self, '_observation_list_selected_indices') or  any([i not in self.observation_list_data for i in self.observation_list_selected_data]):
+    #             self._observation_list_selected_indices = [0]
+    #         else:
+    #             return
+    #         if hasattr(self, '_gui'):
+    #             self.gui.update_observation_list_selected_indices(self.observation_list_selected_indices)
+    #     except:
+    #         exc_type, exc_value, exc_tb = sys.exc_info()
+    #         traceback.print_exception(exc_type, exc_value, exc_tb)
+    #
+    # @property
+    # def observation_list_selected_data(self):
+    #     try:
+    #         return [self.observation_list_data[i] for i in self.observation_list_selected_indices]
+    #     except:
+    #         exc_type, exc_value, exc_tb = sys.exc_info()
+    #         traceback.print_exception(exc_type, exc_value, exc_tb)
+    #
+    # def observation_names_reduced(self):
+    #     try:
+    #         return [i for i in self.data.observation_names if not i in ['trace', 'start_time', 'end_time', 'thresholds']]
+    #     except:
+    #         exc_type, exc_value, exc_tb = sys.exc_info()
+    #         traceback.print_exception(exc_type, exc_value, exc_tb)
 
     @property
     def parameter_table_selected_indices(self):
@@ -1043,7 +1133,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             if len(self.data.df) > 0:
                 for p in self.selected_plot_items:
                     condition_dict = collections.OrderedDict([(ni, pi) for ni, pi in zip(self.parameter_names_reduced(), p)])
-                    for observation_name in self.observation_list_selected_data:
+                    for observation_name in self.observation_list.selected_data:
                         if self.subtract_parameter == '__none__':
                             dfxy = self.ret_line_plot_data_single(condition_dict, observation_name).dropna(subset=[observation_name])
                             condition_dict_reduced = collections.OrderedDict([(key, val) for key, val in condition_dict.items() if val not in ['__average__', '__all__']])
@@ -1176,8 +1266,8 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             if not most_left_axis:
                 plt.setp(axes[n].get_yticklabels(), visible=False)
             else:
-                if len(self.observation_list_selected_data) == 1:
-                    axes[n].set_ylabel(self.observation_list_selected_data[0])
+                if len(self.observation_list.selected_data) == 1:
+                    axes[n].set_ylabel(self.observation_list.selected_data[0])
         if 1 < len(axes[0].lines): # <= 12:  # NOT PYTHON 3 SAFE
             if len(ax_p_list) != 0:
                 axes.append(fig.add_subplot(ny_tot, nx_tot, ny_tot*nx_tot))
@@ -1240,7 +1330,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
                 del cn[0]
             cn.remove(self.x_axis_parameter)
             for d, d_idx, idx, df_sub in self.data.iterator(cn):
-                for observation in self.observation_list_selected_data:
+                for observation in self.observation_list.selected_data:
                     dfagg = df_sub.groupby([self.x_axis_parameter]).agg({observation: np.mean}).reset_index()
                     ax.plot(getattr(dfagg, self.x_axis_parameter), getattr(dfagg, observation))
             fig.tight_layout()
@@ -1440,7 +1530,7 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
         self.observation_widget.blockSignals(False)
 
     def update_observation_list_selected_indices_from_gui(self):
-        self.no_qt.update_observation_list_selected_indices([i.row() for i in self.observation_widget.selectedIndexes()])
+        self.no_qt.observation_list.update_selected_indices([i.row() for i in self.observation_widget.selectedIndexes()])
 
     def update_fit_select_table_data(self, fit_select_table_data):
         self.update_fit_select_table_data_signal.emit(fit_select_table_data)
