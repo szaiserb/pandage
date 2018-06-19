@@ -35,6 +35,17 @@ else:
     import builtins as __builtin__
 import lmfit
 
+def printexception(func):
+    @functools.wraps(func)
+    def wrapper(*a, **kw):
+        try:
+            return func(*a, **kw)
+        except:
+            print('THROWN_FROM_PRINTEXCEPTIONWRAPPER')
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
+    return wrapper
+
 def ptrepack(file, folder, tempfile=None, lock=None):
     # C:\Users\yy3\AppData\Local\conda\conda\envs\py27\Scripts\ptrepack.exe -o --chunkshape=auto --propindexes --complevel=0 --complib=blosc data.hdf data_tmp.hdf
 
@@ -526,17 +537,11 @@ class Base:
     def __init__(self, delete_names=None):
         self.delete_names = [] if delete_names is None else delete_names
 
-
-
+    @printexception
     def delete_attributes(self):
         for attr_name in self.delete_names:
             if hasattr(self, attr_name):
-                try:
-                    delattr(self, attr_name)
-                except:
-                    print("Attribute ", attr_name, " could not be deleted.")
-                    exc_type, exc_value, exc_tb = sys.exc_info()
-                    traceback.print_exception(exc_type, exc_value, exc_tb)
+                delattr(self, attr_name)
 
 
 class SelectableList(Base):
@@ -546,75 +551,56 @@ class SelectableList(Base):
         self.name = name
 
     @property
+    @printexception
     def data(self):
         return getattr(self, '_data')
 
+    @printexception
     def update_data(self):
-        try:
-            self._data = self.get_data()
-            if hasattr(self.parent, '_gui'):
-                getattr(getattr(self.parent.gui, self.name), "update_data")(self.data)
-            self.update_selected_indices()
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        self._data = self.get_data()
+        if hasattr(self.parent, '_gui'):
+            getattr(getattr(self.parent.gui, self.name), "update_data")(self.data)
+        self.update_selected_indices()
 
     @property
     def selected_indices(self):
         return self._selected_indices
 
+    @printexception
     def update_selected_indices(self, val=None):
-        try:
-            if val is not None:
-                self._selected_indices = val
-            elif not hasattr(self, '_selected_indices') or any([i not in self.data for i in self.selected_data]):
-                self._selected_indices = [self.data.index('sweeps')] if 'sweeps' in self.data else []
-            else:
-                return
-            if hasattr(self.parent, '_gui'):
-                getattr(getattr(self.parent.gui, self.name), "update_selected_indices")(self.selected_indices)
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        if val is not None:
+            self._selected_indices = val
+        elif not hasattr(self, '_selected_indices') or any([i not in self.data for i in self.selected_data]):
+            self._selected_indices = [self.data.index('sweeps')] if 'sweeps' in self.data else []
+        else:
+            return
+        if hasattr(self.parent, '_gui'):
+            getattr(getattr(self.parent.gui, self.name), "update_selected_indices")(self.selected_indices)
 
     @property
+    @printexception
     def selected_data(self):
-        try:
-            return [self.data[i] for i in self.selected_indices]
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        return [self.data[i] for i in self.selected_indices]
+
 
 class ObservationList(SelectableList):
 
     def __init__(self, **kwargs):
         super(ObservationList, self).__init__(name='observation_list', delete_names=['_data', '_selected_indices'], **kwargs)
 
+    @printexception
     def get_data(self):
-        try:
-            return [i for i in self.parent.data.observation_names if not i in ['trace', 'start_time', 'end_time', 'thresholds']]
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        return [i for i in self.parent.data.observation_names if not i in ['trace', 'start_time', 'end_time', 'thresholds']]
 
 class AverageParameterList(SelectableList):
 
     def __init__(self, **kwargs):
         super(AverageParameterList, self).__init__(name='average_parameter_list', delete_names=['_data', '_selected_indices'], **kwargs)
 
+    @printexception
     def get_data(self):
-        try:
-            return [i for i in self.parent.data.non_unary_parameter_names if not i in
-                                                                       [
-                                                                           # self.parent.x_axis_parameter,
-                                                                           # self.parent.col_ax_parameter,
-                                                                           # self.parent.row_ax_parameter,
-                                                                           # self.parent.subtract_parameter
-                                                                       ]
-                    ]
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        return [i for i in self.parent.data.non_unary_parameter_names if not i in []]
+
 
 class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
     def __init__(self, title=None, parent=None, gui=True, **kwargs):
@@ -639,59 +625,48 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
     show_legend = False
 
 
+    @printexception
     def set_data(self, **kwargs):
-        try:
-            if 'path' in kwargs:
-                self.data = Data(iff=kwargs['path'])
-            elif 'data' in kwargs:
-                self.data = kwargs['data']
-            if hasattr(self.data, 'filepath'):
-                self.update_window_title(self.data.filepath)
-                matplotlib.rcParams["savefig.directory"] = os.path.dirname(self.data.filepath)
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        if 'path' in kwargs:
+            self.data = Data(iff=kwargs['path'])
+        elif 'data' in kwargs:
+            self.data = kwargs['data']
+        if hasattr(self.data, 'filepath'):
+            self.update_window_title(self.data.filepath)
+            matplotlib.rcParams["savefig.directory"] = os.path.dirname(self.data.filepath)
 
     def set_data_from_path(self, path):
         self.set_data(path=path)
 
     @property
+    @printexception
     def data(self):
-        try:
-            if hasattr(self, '_data'):
-                return self._data
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        if hasattr(self, '_data'):
+            return self._data
 
     @data.setter
+    @printexception
     def data(self, val):
-        try:
-            self.delete_attributes()
-            if hasattr(self, '_gui'):
-                self.gui.clear()
-            self._data = val
-            self.new_data_arrived()
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        self.delete_attributes()
+        if hasattr(self, '_gui'):
+            self.gui.clear()
+        self._data = val
+        self.new_data_arrived()
 
+    @printexception
     def new_data_arrived(self):
-        try:
-            if hasattr(self.data, 'filepath') and matplotlib.rcParams["savefig.directory"] != os.path.dirname(self.data.filepath):
-                matplotlib.rcParams["savefig.directory"] = os.path.dirname(self.data.filepath)
-            self.update_x_axis_parameter_list()
-            self.update_col_ax_parameter_list()
-            self.update_row_ax_parameter_list()
-            self.update_subtract_parameter_list()
-            self.update_parameter_table_data()
-            self.observation_list.update_data()
-            self.average_parameter_list.update_data()
-            self.update_plot()
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        if hasattr(self.data, 'filepath') and matplotlib.rcParams["savefig.directory"] != os.path.dirname(self.data.filepath):
+            matplotlib.rcParams["savefig.directory"] = os.path.dirname(self.data.filepath)
+        self.update_x_axis_parameter_list()
+        self.update_col_ax_parameter_list()
+        self.update_row_ax_parameter_list()
+        self.update_subtract_parameter_list()
+        self.update_parameter_table_data()
+        self.observation_list.update_data()
+        self.average_parameter_list.update_data()
+        self.update_plot()
 
+    @printexception
     def delete_attributes(self):
         for attr_name in [
             '_data',
@@ -708,325 +683,241 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             '_fit_result_table_data'
         ]:
             if hasattr(self, attr_name):
-                try:
-                    delattr(self, attr_name)
-                except:
-                    print("Attribute ", attr_name, " could not be deleted.")
-                    exc_type, exc_value, exc_tb = sys.exc_info()
-                    traceback.print_exception(exc_type, exc_value, exc_tb)
+                delattr(self, attr_name)
         for attr_name in [
             'observation_list',
             'average_parameter_list',
         ]:
-            try:
-                getattr(self, attr_name).delete_attributes()
-            except:
-                print("Attributes of {} could not be deleted.".format(attr_name))
-                exc_type, exc_value, exc_tb = sys.exc_info()
-                traceback.print_exception(exc_type, exc_value, exc_tb)
+            getattr(self, attr_name).delete_attributes()
     @property
+    @printexception
     def x_axis_parameter(self):
-        try:
-            return self._x_axis_parameter
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        return self._x_axis_parameter
 
     @x_axis_parameter.setter
+    @printexception
     def x_axis_parameter(self, val):
-        try:
-            if getattr(self, '_x_axis_parameter', None) != val:
-                self._x_axis_parameter = val
-                if hasattr(self, '_gui'):
-                    self.gui.x_axis_parameter.update_comboBox()
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        if getattr(self, '_x_axis_parameter', None) != val:
+            self._x_axis_parameter = val
+            if hasattr(self, '_gui'):
+                self.gui.x_axis_parameter.update_comboBox()
 
     @property
     def x_axis_parameter_list(self):
         return self._x_axis_parameter_list
 
+    @printexception
     def update_x_axis_parameter_list(self):
-        try:
-            self._x_axis_parameter_list = [cn for cn in self.parameter_names_reduced()]
-            if not hasattr(self, '_x_axis_parameter') or (self.x_axis_parameter not in self.x_axis_parameter_list and len(self.x_axis_parameter_list) > 0):
-                self._x_axis_parameter = self.x_axis_parameter_with_largest_dim()
-            if hasattr(self, '_gui'):
-                self.gui.x_axis_parameter.update_comboBox()
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        self._x_axis_parameter_list = [cn for cn in self.parameter_names_reduced()]
+        if not hasattr(self, '_x_axis_parameter') or (self.x_axis_parameter not in self.x_axis_parameter_list and len(self.x_axis_parameter_list) > 0):
+            self._x_axis_parameter = self.x_axis_parameter_with_largest_dim()
+        if hasattr(self, '_gui'):
+            self.gui.x_axis_parameter.update_comboBox()
 
     def x_axis_parameter_with_largest_dim(self):
         return self.x_axis_parameter_list[np.argmax([len(getattr(self.data.df, p).unique()) for p in self.x_axis_parameter_list])]
 
     @property
+    @printexception
     def col_ax_parameter(self):
-        try:
-            return self._col_ax_parameter
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        return self._col_ax_parameter
+
 
     @col_ax_parameter.setter
+    @printexception
     def col_ax_parameter(self, val):
-        try:
-            if getattr(self, '_col_ax_parameter', None) != val:
-                self._col_ax_parameter = val
-                if hasattr(self, '_gui'):
-                    self.gui.col_ax_parameter.update_comboBox()
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        if getattr(self, '_col_ax_parameter', None) != val:
+            self._col_ax_parameter = val
+            if hasattr(self, '_gui'):
+                self.gui.col_ax_parameter.update_comboBox()
+
 
     @property
     def col_ax_parameter_list(self):
         return self._col_ax_parameter_list
 
+    @printexception
     def update_col_ax_parameter_list(self):
-        try:
-            self._col_ax_parameter_list = ['__none__'] + [cn for cn in self.parameter_names_reduced()]
-            if not hasattr(self, '_col_ax_parameter') or (self._col_ax_parameter not in self.col_ax_parameter_list and len(self.col_ax_parameter_list) > 0):
-                self._col_ax_parameter = '__none__'
-            if hasattr(self, '_gui'):
-                self.gui.col_ax_parameter.update_comboBox()
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        self._col_ax_parameter_list = ['__none__'] + [cn for cn in self.parameter_names_reduced()]
+        if not hasattr(self, '_col_ax_parameter') or (self._col_ax_parameter not in self.col_ax_parameter_list and len(self.col_ax_parameter_list) > 0):
+            self._col_ax_parameter = '__none__'
+        if hasattr(self, '_gui'):
+            self.gui.col_ax_parameter.update_comboBox()
 
     @property
+    @printexception
     def row_ax_parameter(self):
-        try:
-            return self._row_ax_parameter
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        return self._row_ax_parameter
 
     @row_ax_parameter.setter
+    @printexception
     def row_ax_parameter(self, val):
-        try:
-            if getattr(self, '_row_ax_parameter', None) != val:
-                self._row_ax_parameter = val
-                if hasattr(self, '_gui'):
-                    self.gui.row_ax_parameter.update_comboBox()
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        if getattr(self, '_row_ax_parameter', None) != val:
+            self._row_ax_parameter = val
+            if hasattr(self, '_gui'):
+                self.gui.row_ax_parameter.update_comboBox()
 
     @property
     def row_ax_parameter_list(self):
         return self._row_ax_parameter_list
 
+    @printexception
     def update_row_ax_parameter_list(self):
-        try:
-            self._row_ax_parameter_list = ['__none__'] + [cn for cn in self.parameter_names_reduced()]
-            if not hasattr(self, '_row_ax_parameter') or (self._row_ax_parameter not in self.row_ax_parameter_list and len(self.row_ax_parameter_list) > 0):
-                self._row_ax_parameter = '__none__'
-            if hasattr(self, '_gui'):
-                self.gui.row_ax_parameter.update_comboBox()
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        self._row_ax_parameter_list = ['__none__'] + [cn for cn in self.parameter_names_reduced()]
+        if not hasattr(self, '_row_ax_parameter') or (self._row_ax_parameter not in self.row_ax_parameter_list and len(self.row_ax_parameter_list) > 0):
+            self._row_ax_parameter = '__none__'
+        if hasattr(self, '_gui'):
+            self.gui.row_ax_parameter.update_comboBox()
 
     @property
+    @printexception
     def subtract_parameter(self):
-        try:
-            return self._subtract_parameter
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        return self._subtract_parameter
 
     @subtract_parameter.setter
+    @printexception
     def subtract_parameter(self, val):
-        try:
-            if getattr(self, '_subtract_parameter', None) != val:
-                self._subtract_parameter = val
-                if hasattr(self, '_gui'):
-                    self.gui.subtract_parameter.update_comboBox()
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        if getattr(self, '_subtract_parameter', None) != val:
+            self._subtract_parameter = val
+            if hasattr(self, '_gui'):
+                self.gui.subtract_parameter.update_comboBox()
 
     @property
     def subtract_parameter_list(self):
         return self._subtract_parameter_list
 
+    @printexception
     def update_subtract_parameter_list(self):
-        try:
-            self._subtract_parameter_list = ['__none__'] + [cn for cn in self.parameter_names_reduced()]
-            if not hasattr(self, '_subtract_parameter') or (self._subtract_parameter not in self.subtract_parameter_list and len(self.subtract_parameter_list) > 0):
-                self._subtract_parameter = '__none__'
-            if hasattr(self, '_gui'):
-                self.gui.subtract_parameter.update_comboBox()
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        self._subtract_parameter_list = ['__none__'] + [cn for cn in self.parameter_names_reduced()]
+        if not hasattr(self, '_subtract_parameter') or (self._subtract_parameter not in self.subtract_parameter_list and len(self.subtract_parameter_list) > 0):
+            self._subtract_parameter = '__none__'
+        if hasattr(self, '_gui'):
+            self.gui.subtract_parameter.update_comboBox()
 
+    @printexception
     def parameter_names_reduced(self, data=None):
-        try:
-            data = self.data if data is None else data
-            return [i for i in data.parameter_names if not '_idx' in i]
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        data = self.data if data is None else data
+        return [i for i in data.parameter_names if not '_idx' in i]
 
     @property
+    @printexception
     def parameter_table_data(self):
-        try:
-            val_none = collections.OrderedDict([(cn, []) for cn in self.parameter_names_reduced()])
-            return getattr(self, '_parameter_table_data', val_none)
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        val_none = collections.OrderedDict([(cn, []) for cn in self.parameter_names_reduced()])
+        return getattr(self, '_parameter_table_data', val_none)
 
+    @printexception
     def update_parameter_table_data(self):
-        try:
-            ptd = collections.OrderedDict()
-            for cn in self.parameter_names_reduced():
-                ptd[cn] = getattr(self.data.df, cn).unique()
-            self._parameter_table_data = ptd
-            if hasattr(self, '_gui'):
-                self.gui.update_parameter_table_data(parameter_table_data=self.parameter_table_data)
-            self.update_parameter_table_selected_indices()
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        ptd = collections.OrderedDict()
+        for cn in self.parameter_names_reduced():
+            ptd[cn] = getattr(self.data.df, cn).unique()
+        self._parameter_table_data = ptd
+        if hasattr(self, '_gui'):
+            self.gui.update_parameter_table_data(parameter_table_data=self.parameter_table_data)
+        self.update_parameter_table_selected_indices()
 
     @property
+    @printexception
     def parameter_table_selected_indices(self):
-        try:
-            return self._parameter_table_selected_indices
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        return self._parameter_table_selected_indices
 
+    @printexception
     def update_parameter_table_selected_indices(self, parameter_table_selected_indices=None):
-        try:
-            if parameter_table_selected_indices is None:
-                self._parameter_table_selected_indices = collections.OrderedDict([(key, range(len(val))) for key, val in self.parameter_table_data.items()])
-            elif not isinstance(parameter_table_selected_indices, collections.OrderedDict):
-                raise Exception(type(parameter_table_selected_indices), parameter_table_selected_indices)
-            else:
-                out = self._parameter_table_selected_indices = collections.OrderedDict([(key, range(len(val))) for key, val in self.parameter_table_data.items()])
-                for cn, val in parameter_table_selected_indices.items():
-                    out[cn] = val
-                self._parameter_table_selected_indices = out
-            if hasattr(self, '_gui'):
-                self.gui.update_parameter_table_selected_indices(self.parameter_table_selected_indices)
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        if parameter_table_selected_indices is None:
+            self._parameter_table_selected_indices = collections.OrderedDict([(key, range(len(val))) for key, val in self.parameter_table_data.items()])
+        elif not isinstance(parameter_table_selected_indices, collections.OrderedDict):
+            raise Exception(type(parameter_table_selected_indices), parameter_table_selected_indices)
+        else:
+            out = self._parameter_table_selected_indices = collections.OrderedDict([(key, range(len(val))) for key, val in self.parameter_table_data.items()])
+            for cn, val in parameter_table_selected_indices.items():
+                out[cn] = val
+            self._parameter_table_selected_indices = out
+        if hasattr(self, '_gui'):
+            self.gui.update_parameter_table_selected_indices(self.parameter_table_selected_indices)
 
     @property
+    @printexception
     def parameter_table_selected_data(self):
-        try:
-            out = collections.OrderedDict()
-            for cn, val in self.parameter_table_selected_indices.items():
-                data_full = getattr(self.data.df, cn).unique()
-                out[cn] = [data_full[i] for i in val]
-            return out
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        out = collections.OrderedDict()
+        for cn, val in self.parameter_table_selected_indices.items():
+            data_full = getattr(self.data.df, cn).unique()
+            out[cn] = [data_full[i] for i in val]
+        return out
 
+    @printexception
     def update_parameter_table_selected_data(self, parameter_table_selected_data):
-        try:
-            out = collections.OrderedDict()
-            for cn, val in parameter_table_selected_data.items():
-                indices = []
-                for i in val:
-                    indices.append(np.where(self.parameter_table_data[cn] == i)[0][0])
-                out[cn] = indices
-            self.update_parameter_table_selected_indices(out)
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        out = collections.OrderedDict()
+        for cn, val in parameter_table_selected_data.items():
+            indices = []
+            for i in val:
+                indices.append(np.where(self.parameter_table_data[cn] == i)[0][0])
+            out[cn] = indices
+        self.update_parameter_table_selected_indices(out)
 
     @property
+    @printexception
     def selected_plot_items(self):
-        try:
-            return self._selected_plot_items
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        return self._selected_plot_items
 
+    @printexception
     def update_selected_plot_items(self):
-        try:
-            if len(getattr(self.data.df, self.x_axis_parameter).unique()) == 1:
-                self.x_axis_parameter = self.x_axis_parameter_with_largest_dim()
-            out = self.parameter_table_selected_data
-            if all([len(i) == 0 for i in out.values()]):
-                self._selected_plot_items = []
-                return
-            spl = [self.x_axis_parameter, self.col_ax_parameter, self.row_ax_parameter, self.subtract_parameter] + self.average_parameter_list.selected_data
-            spl = [i for i in spl if i != '__none__']
-            if len(spl) != len(set(spl)):
-                self._selected_plot_items = []
-                print('Selected plot options are invalid, parameters have been selected multiple times. {}'.format(spl))
-                return
-            for key, val in out.items():
-                if key == self.x_axis_parameter or key == self.subtract_parameter:
-                    out[key] = ['__all__']
-                if key in self.average_parameter_list.selected_data:
-                    out[key] = ['__average__']
-            self._selected_plot_items = list(itertools.product(*out.values()))
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        if len(getattr(self.data.df, self.x_axis_parameter).unique()) == 1:
+            self.x_axis_parameter = self.x_axis_parameter_with_largest_dim()
+        out = self.parameter_table_selected_data
+        if all([len(i) == 0 for i in out.values()]):
+            self._selected_plot_items = []
+            return
+        spl = [self.x_axis_parameter, self.col_ax_parameter, self.row_ax_parameter, self.subtract_parameter] + self.average_parameter_list.selected_data
+        spl = [i for i in spl if i != '__none__']
+        if len(spl) != len(set(spl)):
+            self._selected_plot_items = []
+            print('Selected plot options are invalid, parameters have been selected multiple times. {}'.format(spl))
+            return
+        for key, val in out.items():
+            if key == self.x_axis_parameter or key == self.subtract_parameter:
+                out[key] = ['__all__']
+            if key in self.average_parameter_list.selected_data:
+                out[key] = ['__average__']
+        self._selected_plot_items = list(itertools.product(*out.values()))
 
     @property
+    @printexception
     def fit_select_table_data(self):
-        try:
-            return self._fit_select_table_data
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        return self._fit_select_table_data
 
+    @printexception
     def update_fit_select_table_data(self):
-        try:
-            cpd = collections.OrderedDict()
-            for idx, spi in enumerate(self.line_plot_data()):
-                for column_idx, column_name in enumerate(self.parameter_names_reduced()):
-                    if column_name in spi['condition_dict_reduced']:
-                        if not column_name in cpd:
-                            cpd[column_name] = []
-                        cpd[column_name].append(spi['condition_dict_reduced'][column_name])
-                    elif column_name == self.subtract_parameter:
-                        cpd[column_name] = ['diff'.format(self.subtract_parameter)]
-            self._fit_select_table_data = cpd
-            if hasattr(self, '_gui'):
-                self.gui.update_fit_select_table_data(self.fit_select_table_data)
-            self.update_fit_select_table_selected_rows(range(len(self.fit_select_table_data.values()[0])))
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        cpd = collections.OrderedDict()
+        for idx, spi in enumerate(self.line_plot_data()):
+            for column_idx, column_name in enumerate(self.parameter_names_reduced()):
+                if column_name in spi['condition_dict_reduced']:
+                    if not column_name in cpd:
+                        cpd[column_name] = []
+                    cpd[column_name].append(spi['condition_dict_reduced'][column_name])
+                elif column_name == self.subtract_parameter:
+                    cpd[column_name] = ['diff'.format(self.subtract_parameter)]
+        self._fit_select_table_data = cpd
+        if hasattr(self, '_gui'):
+            self.gui.update_fit_select_table_data(self.fit_select_table_data)
+        self.update_fit_select_table_selected_rows(range(len(self.fit_select_table_data.values()[0])))
+
 
     @property
+    @printexception
     def fit_select_table_selected_rows(self):
-        try:
-            return self._fit_select_table_selected_rows
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        return self._fit_select_table_selected_rows
 
+    @printexception
     def update_fit_select_table_selected_rows(self, fit_select_table_selected_rows=None):
-        try:
-            self._fit_select_table_selected_rows = [] if fit_select_table_selected_rows is None else fit_select_table_selected_rows  # self.fit_select_table.selected_items_unique_column_indices()
-            if hasattr(self, '_gui'):
-                self.gui.update_fit_select_table_selected_rows(self.fit_select_table_selected_rows)
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        self._fit_select_table_selected_rows = [] if fit_select_table_selected_rows is None else fit_select_table_selected_rows  # self.fit_select_table.selected_items_unique_column_indices()
+        if hasattr(self, '_gui'):
+            self.gui.update_fit_select_table_selected_rows(self.fit_select_table_selected_rows)
 
     @property
+    @printexception
     def fit_results(self):
-        try:
-            return self._fit_results
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        return self._fit_results
 
+    @printexception
     def update_fit_results(self):
         try:
             spi = self.line_plot_data()
@@ -1058,49 +949,54 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             traceback.print_exception(exc_type, exc_value, exc_tb)
 
     @property
+    @printexception
     def fit_result_table_data(self):
-        try:
-            return self._fit_result_table_data
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        return self._fit_result_table_data
 
+    @printexception
     def update_fit_result_table_data(self):
-        try:
-            if len(self.fit_results) == 0:
-                out = collections.OrderedDict()
-            else:
-                header = self.fit_results[0][0]['condition_dict_reduced'].keys() + ['observation_name'] + self.fit_results[0][1].params.keys()
-                out = collections.OrderedDict([(key, []) for key in header])
-                for fri in self.fit_results:
-                    for key, val in fri[0]['condition_dict_reduced'].items() + [('observation_name', fri[0]['observation_name'])] + [(key, val.value) for key, val in fri[1].params.items()]:
-                        out[key].append(val)
-            self._fit_result_table_data = out
-            if hasattr(self, '_gui'):
-                self.gui.update_fit_result_table_data(self.fit_result_table_data)
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        if len(self.fit_results) == 0:
+            out = collections.OrderedDict()
+        else:
+            header = self.fit_results[0][0]['condition_dict_reduced'].keys() + ['observation_name'] + self.fit_results[0][1].params.keys()
+            out = collections.OrderedDict([(key, []) for key in header])
+            for fri in self.fit_results:
+                for key, val in fri[0]['condition_dict_reduced'].items() + [('observation_name', fri[0]['observation_name'])] + [(key, val.value) for key, val in fri[1].params.items()]:
+                    out[key].append(val)
+        self._fit_result_table_data = out
+        if hasattr(self, '_gui'):
+            self.gui.update_fit_result_table_data(self.fit_result_table_data)
 
+    @printexception
     def ret_line_plot_data_single(self, condition_dict, observation_name):
-        try:
-            cl = [self.data.df[key] == val for key, val in condition_dict.items() if val not in ['__all__', '__average__']]
-            out = self.data.df[functools.reduce(np.logical_and, cl)] if len(cl) != 0 else self.data.df
-            # TODO: wont work for dates as can not be averaged
-            return out.groupby([key for key, val in condition_dict.items() if val != '__average__']).agg({observation_name: np.mean}).reset_index()
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        cl = [self.data.df[key] == val for key, val in condition_dict.items() if val not in ['__all__', '__average__']]
+        out = self.data.df[functools.reduce(np.logical_and, cl)] if len(cl) != 0 else self.data.df
+        # TODO: wont work for dates as can not be averaged
+        return out.groupby([key for key, val in condition_dict.items() if val != '__average__']).agg({observation_name: np.mean}).reset_index()
 
+    @printexception
     def line_plot_data(self):
-        try:
-            plot_data = []
-            if len(self.data.df) > 0:
-                for p in self.selected_plot_items:
-                    condition_dict = collections.OrderedDict([(ni, pi) for ni, pi in zip(self.parameter_names_reduced(), p)])
-                    for observation_name in self.observation_list.selected_data:
-                        if self.subtract_parameter == '__none__':
-                            dfxy = self.ret_line_plot_data_single(condition_dict, observation_name).dropna(subset=[observation_name])
+        plot_data = []
+        if len(self.data.df) > 0:
+            for p in self.selected_plot_items:
+                condition_dict = collections.OrderedDict([(ni, pi) for ni, pi in zip(self.parameter_names_reduced(), p)])
+                for observation_name in self.observation_list.selected_data:
+                    if self.subtract_parameter == '__none__':
+                        dfxy = self.ret_line_plot_data_single(condition_dict, observation_name).dropna(subset=[observation_name])
+                        condition_dict_reduced = collections.OrderedDict([(key, val) for key, val in condition_dict.items() if val not in ['__average__', '__all__']])
+                        plot_data.append(
+                            dict(
+                                condition_dict_reduced=condition_dict_reduced,
+                                observation_name=observation_name,
+                                x=getattr(dfxy, self.x_axis_parameter),
+                                y=getattr(dfxy, observation_name)
+                            )
+                        )
+                    else:
+                        keys = [key for key, val in condition_dict.items() if val not in ['__average__', '__all__']] + [self.x_axis_parameter]
+                        dfxys = self.ret_line_plot_data_single(condition_dict, observation_name).dropna(subset=[observation_name])
+                        dfxy = dfxys.groupby(keys).filter(lambda x: len(x) ==2).groupby(keys).agg({observation_name: lambda x: -1 * np.diff(x)}).reset_index()
+                        if len(dfxy) > 1:
                             condition_dict_reduced = collections.OrderedDict([(key, val) for key, val in condition_dict.items() if val not in ['__average__', '__all__']])
                             plot_data.append(
                                 dict(
@@ -1110,24 +1006,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
                                     y=getattr(dfxy, observation_name)
                                 )
                             )
-                        else:
-                            keys = [key for key, val in condition_dict.items() if val not in ['__average__', '__all__']] + [self.x_axis_parameter]
-                            dfxys = self.ret_line_plot_data_single(condition_dict, observation_name).dropna(subset=[observation_name])
-                            dfxy = dfxys.groupby(keys).filter(lambda x: len(x) ==2).groupby(keys).agg({observation_name: lambda x: -1 * np.diff(x)}).reset_index()
-                            if len(dfxy) > 1:
-                                condition_dict_reduced = collections.OrderedDict([(key, val) for key, val in condition_dict.items() if val not in ['__average__', '__all__']])
-                                plot_data.append(
-                                    dict(
-                                        condition_dict_reduced=condition_dict_reduced,
-                                        observation_name=observation_name,
-                                        x=getattr(dfxy, self.x_axis_parameter),
-                                        y=getattr(dfxy, observation_name)
-                                    )
-                                )
-            return plot_data
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        return plot_data
 
     def plot_label(self, condition_dict_reduced):
         label = ""
@@ -1253,75 +1132,59 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         fig.tight_layout()
         return axes
 
-    def update_plot(self):
-        try:
-            if hasattr(self, '_data') and hasattr(self, '_gui'):
-                self.gui.axes = self.update_plot_new(fig=self.gui.fig)
-                self.gui.canvas.draw()
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+    @printexception
+    def update_plot(self, *args, **kwargs):
+        if hasattr(self, '_data') and hasattr(self, '_gui'):
+            self.gui.axes = self.update_plot_new(fig=self.gui.fig)
+            self.gui.canvas.draw()
 
+    @printexception
     def update_plot_fit(self, fit_results=None):
-        try:
-            if fit_results is None:
-                self.update_fit_results()
-            else:
-                self._fit_results = fit_results
-            if hasattr(self, '_gui'):
-                self.gui.fig_fit.clear()
-                self.gui.ax_fit = self.gui.fig_fit.add_subplot(111)
-                for idx, fi in enumerate(self.fit_results):
-                    color = self.gui.ax_fit._get_lines.get_next_color()
-                    r = fi[1]
-                    x = r.userkws['x']
-                    y = r.eval(params=r.params, x=x)
-                    self.gui.ax_fit.plot(x, y, '-', color=color)
-                    self.gui.ax_fit.plot(x, r.data, 'o', color=color, markersize=3.5)
-                    self.gui.fig_fit.tight_layout()
-                    self.gui.canvas_fit.draw()
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        if fit_results is None:
+            self.update_fit_results()
+        else:
+            self._fit_results = fit_results
+        if hasattr(self, '_gui'):
+            self.gui.fig_fit.clear()
+            self.gui.ax_fit = self.gui.fig_fit.add_subplot(111)
+            for idx, fi in enumerate(self.fit_results):
+                color = self.gui.ax_fit._get_lines.get_next_color()
+                r = fi[1]
+                x = r.userkws['x']
+                y = r.eval(params=r.params, x=x)
+                self.gui.ax_fit.plot(x, y, '-', color=color)
+                self.gui.ax_fit.plot(x, r.data, 'o', color=color, markersize=3.5)
+                self.gui.fig_fit.tight_layout()
+                self.gui.canvas_fit.draw()
 
+    @printexception
     def save_plot(self, filepath):
-        try:
-            plt.ioff()
-            fig, ax = plt.subplots(1, 1)
-            if len(getattr(self.data.df, self.x_axis_parameter).unique()) == 1:
-                self.x_axis_parameter = self.x_axis_parameter_with_largest_dim()
-            cn = self.parameter_names_reduced()
-            if cn[0] == 'sweeps' and self.x_axis_parameter != 'sweeps':
-                del cn[0]
-            cn.remove(self.x_axis_parameter)
-            for d, d_idx, idx, df_sub in self.data.iterator(cn):
-                for observation in self.observation_list.selected_data:
-                    dfagg = df_sub.groupby([self.x_axis_parameter]).agg({observation: np.mean}).reset_index()
-                    ax.plot(getattr(dfagg, self.x_axis_parameter), getattr(dfagg, observation))
-            fig.tight_layout()
-            fig.savefig(filepath)
-            plt.close(fig)
-            plt.ion()
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        plt.ioff()
+        fig, ax = plt.subplots(1, 1)
+        if len(getattr(self.data.df, self.x_axis_parameter).unique()) == 1:
+            self.x_axis_parameter = self.x_axis_parameter_with_largest_dim()
+        cn = self.parameter_names_reduced()
+        if cn[0] == 'sweeps' and self.x_axis_parameter != 'sweeps':
+            del cn[0]
+        cn.remove(self.x_axis_parameter)
+        for d, d_idx, idx, df_sub in self.data.iterator(cn):
+            for observation in self.observation_list.selected_data:
+                dfagg = df_sub.groupby([self.x_axis_parameter]).agg({observation: np.mean}).reset_index()
+                ax.plot(getattr(dfagg, self.x_axis_parameter), getattr(dfagg, observation))
+        fig.tight_layout()
+        fig.savefig(filepath)
+        plt.close(fig)
+        plt.ion()
 
     @property
+    @printexception
     def info_text(self):
-        try:
-            return self._info_text
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        return self._info_text
 
     def update_info_text(self, info_text):
-        try:
-            self._info_text = info_text
-            if hasattr(self, '_gui'):
-                self.gui.update_info_text(info_text)
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        self._info_text = info_text
+        if hasattr(self, '_gui'):
+            self.gui.update_info_text(info_text)
 
 
 class SelectableListQt(PyQt5.QtWidgets.QWidget):
@@ -1354,6 +1217,7 @@ class SelectableListQt(PyQt5.QtWidgets.QWidget):
             getattr(self.parent, self.widget_name).item(i).setSelected(True)
         getattr(self.parent, self.widget_name).blockSignals(False)
 
+    @printexception
     def update_selected_indices_from_gui(self):
         getattr(self.parent.no_qt, self.name).update_selected_indices([i.row() for i in getattr(self.parent, self.widget_name).selectedIndexes()])
 
@@ -1387,7 +1251,8 @@ class ParameterCombobox(PyQt5.QtWidgets.QWidget):
         widget.blockSignals(False)
         getattr(self.parent, 'update_parameter_table_item_flags')()
 
-    def update_from_comboBox(self):
+    @printexception
+    def update_from_comboBox(self, item):
         setattr(self.parent.no_qt, self.name, str(getattr(self.parent, self.widget_name).currentText()))
 
     def connect_signals(self):
@@ -1503,7 +1368,7 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
         for column_name, val in fit_select_table_data.items():
             self.fit_select_table.set_column(column_name, val, [Qt.ItemIsSelectable | Qt.ItemIsEnabled for _ in range(len(val))])
         self.fit_select_table.blockSignals(False)
-
+    @printexception
     def update_fit_select_table_selected_rows_from_gui(self):
         self.no_qt.update_fit_select_table_selected_rows(self.fit_select_table.selected_items_unique_row_indices())
 
@@ -1707,3 +1572,4 @@ def replot_all_hdf(folder):
 #     data.append(collections.OrderedDict([('a', 1), ('b', 20.5)]))
 #     data.set_observations(l=collections.OrderedDict([('c', 'ggggg')]))
 #     data.dict_delete(l=collections.OrderedDict([('a', 1), ('b', 20.5)]))
+
