@@ -775,7 +775,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             if getattr(self, '_col_ax_parameter', None) != val:
                 self._col_ax_parameter = val
                 if hasattr(self, '_gui'):
-                    self.gui.update_col_ax_parameter_comboBox()
+                    self.gui.col_ax_parameter.update_comboBox()
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
@@ -790,7 +790,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             if not hasattr(self, '_col_ax_parameter') or (self._col_ax_parameter not in self.col_ax_parameter_list and len(self.col_ax_parameter_list) > 0):
                 self._col_ax_parameter = '__none__'
             if hasattr(self, '_gui'):
-                self.gui.update_col_ax_parameter_comboBox()
+                self.gui.col_ax_parameter.update_comboBox()
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
@@ -809,7 +809,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             if getattr(self, '_row_ax_parameter', None) != val:
                 self._row_ax_parameter = val
                 if hasattr(self, '_gui'):
-                    self.gui.update_row_ax_parameter_comboBox()
+                    self.gui.row_ax_parameter.update_comboBox()
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
@@ -824,7 +824,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             if not hasattr(self, '_row_ax_parameter') or (self._row_ax_parameter not in self.row_ax_parameter_list and len(self.row_ax_parameter_list) > 0):
                 self._row_ax_parameter = '__none__'
             if hasattr(self, '_gui'):
-                self.gui.update_row_ax_parameter_comboBox()
+                self.gui.row_ax_parameter.update_comboBox()
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
@@ -843,7 +843,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             if getattr(self, '_subtract_parameter', None) != val:
                 self._subtract_parameter = val
                 if hasattr(self, '_gui'):
-                    self.gui.update_subtract_parameter_comboBox()
+                    self.gui.subtract_parameter.update_comboBox()
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
@@ -858,7 +858,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             if not hasattr(self, '_subtract_parameter') or (self._subtract_parameter not in self.subtract_parameter_list and len(self.subtract_parameter_list) > 0):
                 self._subtract_parameter = '__none__'
             if hasattr(self, '_gui'):
-                self.gui.update_subtract_parameter_comboBox()
+                self.gui.subtract_parameter.update_comboBox()
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
@@ -1401,12 +1401,12 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
         self.observation_list = SelectableListQt(name='observation_list', widget_name='observation_widget', parent=self)
         self.average_parameter_list = SelectableListQt(name='average_parameter_list', widget_name='average_parameter_widget', parent=self)
         self.x_axis_parameter = ParameterCombobox(name='x_axis_parameter', widget_name='x_axis_parameter_comboBox', parent=self)
+        self.col_ax_parameter = ParameterCombobox(name='col_ax_parameter', widget_name='col_ax_parameter_comboBox', parent=self)
+        self.row_ax_parameter = ParameterCombobox(name='row_ax_parameter', widget_name='row_ax_parameter_comboBox', parent=self)
+        self.subtract_parameter = ParameterCombobox(name='subtract_parameter', widget_name='subtract_parameter_comboBox', parent=self)
+
         super(PlotDataQt, self).__init__(parent=parent, no_qt=no_qt, ui_filepath=os.path.join(os.path.dirname(__file__), 'qtgui/plot_data.ui'))
 
-    # update_x_axis_parameter_comboBox_signal = pyqtSignal()
-    update_col_ax_parameter_comboBox_signal = pyqtSignal()
-    update_row_ax_parameter_comboBox_signal = pyqtSignal()
-    update_subtract_parameter_comboBox_signal = pyqtSignal()
     update_parameter_table_data_signal = pyqtSignal(collections.OrderedDict)
     update_parameter_table_selected_indices_signal = pyqtSignal(collections.OrderedDict)
     update_fit_select_table_data_signal = pyqtSignal(collections.OrderedDict)
@@ -1443,63 +1443,6 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
             self.canvas_fit.draw()
         except:
             pass
-
-    # def update_x_axis_parameter_comboBox(self):
-    #     self.update_x_axis_parameter_comboBox_signal.emit()
-    #
-    # def update_x_axis_parameter_comboBox_signal_emitted(self):
-    #     self.x_axis_parameter_comboBox.blockSignals(True)
-    #     if hasattr(self.no_qt, '_x_axis_parameter_list') and hasattr(self.no_qt, '_x_axis_parameter'):
-    #         if self.x_axis_parameter_comboBox.count() == 0:
-    #             self.x_axis_parameter_comboBox.addItems(self.no_qt.x_axis_parameter_list)  # currentIndexChanged is triggered, value is first item (e.g. sweeps)
-    #         self.x_axis_parameter_comboBox.setCurrentText(self.no_qt.x_axis_parameter)
-    #     self.x_axis_parameter_comboBox.blockSignals(False)
-    #     self.update_parameter_table_item_flags()
-    #
-    # def update_x_axis_parameter_from_comboBox(self):
-    #     self.no_qt.x_axis_parameter = str(self.x_axis_parameter_comboBox.currentText())
-
-    def update_col_ax_parameter_comboBox(self):
-        self.update_col_ax_parameter_comboBox_signal.emit()
-
-    def update_col_ax_parameter_comboBox_signal_emitted(self):
-        self.col_ax_parameter_comboBox.blockSignals(True)
-        if hasattr(self.no_qt, '_col_ax_parameter_list') and hasattr(self.no_qt, '_col_ax_parameter'):
-            if self.col_ax_parameter_comboBox.count() == 0:
-                self.col_ax_parameter_comboBox.addItems(self.no_qt.col_ax_parameter_list)  # currentIndexChanged is triggered, value is first item (e.g. sweeps)
-            self.col_ax_parameter_comboBox.setCurrentText(self.no_qt.col_ax_parameter)
-        self.col_ax_parameter_comboBox.blockSignals(False)
-
-    def update_col_ax_parameter_from_comboBox(self):
-        self.no_qt.col_ax_parameter = str(self.col_ax_parameter_comboBox.currentText())
-
-    def update_row_ax_parameter_comboBox(self):
-        self.update_row_ax_parameter_comboBox_signal.emit()
-
-    def update_row_ax_parameter_comboBox_signal_emitted(self):
-        self.row_ax_parameter_comboBox.blockSignals(True)
-        if hasattr(self.no_qt, '_row_ax_parameter_list') and hasattr(self.no_qt, '_row_ax_parameter'):
-            if self.row_ax_parameter_comboBox.count() == 0:
-                self.row_ax_parameter_comboBox.addItems(self.no_qt.row_ax_parameter_list)  # currentIndexChanged is triggered, value is first item (e.g. sweeps)
-            self.row_ax_parameter_comboBox.setCurrentText(self.no_qt.row_ax_parameter)
-        self.row_ax_parameter_comboBox.blockSignals(False)
-
-    def update_row_ax_parameter_from_comboBox(self):
-        self.no_qt.row_ax_parameter = str(self.row_ax_parameter_comboBox.currentText())
-
-    def update_subtract_parameter_comboBox(self):
-        self.update_subtract_parameter_comboBox_signal.emit()
-
-    def update_subtract_parameter_comboBox_signal_emitted(self):
-        self.subtract_parameter_comboBox.blockSignals(True)
-        if hasattr(self.no_qt, '_subtract_parameter_list') and hasattr(self.no_qt, '_subtract_parameter'):
-            if self.subtract_parameter_comboBox.count() == 0:
-                self.subtract_parameter_comboBox.addItems(self.no_qt.subtract_parameter_list)  # currentIndexChanged is triggered, value is first item (e.g. sweeps)
-            self.subtract_parameter_comboBox.setCurrentText(self.no_qt.subtract_parameter)
-        self.subtract_parameter_comboBox.blockSignals(False)
-
-    def update_subtract_parameter_from_comboBox(self):
-        self.no_qt.subtract_parameter = str(self.subtract_parameter_comboBox.currentText())
 
     def update_parameter_table_data(self, parameter_table_data):
         self.update_parameter_table_data_signal.emit(parameter_table_data)
@@ -1602,9 +1545,6 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
     def init_gui(self):
         super(PlotDataQt, self).init_gui()
         for name in [
-            'update_col_ax_parameter_comboBox',
-            'update_row_ax_parameter_comboBox',
-            'update_subtract_parameter_comboBox',
             'update_parameter_table_data',
             'update_parameter_table_selected_indices',
             'update_fit_select_table_data',
@@ -1616,7 +1556,10 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
         for name in [
             'observation_list',
             'average_parameter_list',
-            'x_axis_parameter'
+            'x_axis_parameter',
+            'row_ax_parameter',
+            'col_ax_parameter',
+            'subtract_parameter'
         ]:
             getattr(self, name).connect_signals()
 
@@ -1653,9 +1596,9 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
         self.open_explorer_button.clicked.connect(self.open_explorer)
 
         self.x_axis_parameter_comboBox.currentIndexChanged.connect(self.x_axis_parameter.update_from_comboBox)
-        self.col_ax_parameter_comboBox.currentIndexChanged.connect(self.update_col_ax_parameter_from_comboBox)
-        self.row_ax_parameter_comboBox.currentIndexChanged.connect(self.update_row_ax_parameter_from_comboBox)
-        self.subtract_parameter_comboBox.currentIndexChanged.connect(self.update_subtract_parameter_from_comboBox)
+        self.col_ax_parameter_comboBox.currentIndexChanged.connect(self.col_ax_parameter.update_from_comboBox)
+        self.row_ax_parameter_comboBox.currentIndexChanged.connect(self.row_ax_parameter.update_from_comboBox)
+        self.subtract_parameter_comboBox.currentIndexChanged.connect(self.subtract_parameter.update_from_comboBox)
 
     def open_measurement_code(self):
         if hasattr(self.no_qt.data, 'filepath'):
