@@ -454,7 +454,7 @@ class Data:
     def average_parameter(self, parameter_name, observation_names):
         self.check_pn_on_helper(parameter_name, observation_names)
         self.delete_columns([i for i in self.observation_names if i not in observation_names])
-        self._df.dropna(inplace=True)
+        # self._df.dropna(inplace=True)
         self.parameter_names = [key for key in self.parameter_names if key != parameter_name]
         self._df = self.df.groupby(self.parameter_names).agg(dict([(obs, np.mean) for obs in observation_names])).reset_index()
         self.check_integrity()
@@ -827,158 +827,158 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             data.average_parameter(pn, observation_names=self.observation_list.selected_data)
         return data
 
-    @property
-    @printexception
-    def selected_plot_items(self):
-        return self._selected_plot_items
+    # @property
+    # @printexception
+    # def selected_plot_items(self):
+    #     return self._selected_plot_items
+    #
+    # @printexception
+    # def update_selected_plot_items(self):
+    #     out = self.parameter_table.selected_data
+    #     if all([len(i) == 0 for i in out.values()]):
+    #         self._selected_plot_items = []
+    #         return
+    #     spl = [self.x_axis_parameter_list.selected_value, self.col_ax_parameter_list.selected_value, self.row_ax_parameter_list.selected_value, self.subtract_parameter_list.selected_value] + self.average_parameter_list.selected_data
+    #     spl = [i for i in spl if i != '__none__']
+    #     if len(spl) != len(set(spl)):
+    #         self._selected_plot_items = []
+    #         print('Selected plot options are invalid, parameters have been selected multiple times. {}'.format(spl))
+    #         return
+    #     for key, val in out.items():
+    #         if key == self.x_axis_parameter_list.selected_value or key == self.subtract_parameter_list.selected_value:
+    #             out[key] = ['__all__']
+    #         if key in self.average_parameter_list.selected_data:
+    #             out[key] = ['__average__']
+    #     self._selected_plot_items = list(itertools.product(*out.values()))
 
-    @printexception
-    def update_selected_plot_items(self):
-        out = self.parameter_table.selected_data
-        if all([len(i) == 0 for i in out.values()]):
-            self._selected_plot_items = []
-            return
-        spl = [self.x_axis_parameter_list.selected_value, self.col_ax_parameter_list.selected_value, self.row_ax_parameter_list.selected_value, self.subtract_parameter_list.selected_value] + self.average_parameter_list.selected_data
-        spl = [i for i in spl if i != '__none__']
-        if len(spl) != len(set(spl)):
-            self._selected_plot_items = []
-            print('Selected plot options are invalid, parameters have been selected multiple times. {}'.format(spl))
-            return
-        for key, val in out.items():
-            if key == self.x_axis_parameter_list.selected_value or key == self.subtract_parameter_list.selected_value:
-                out[key] = ['__all__']
-            if key in self.average_parameter_list.selected_data:
-                out[key] = ['__average__']
-        self._selected_plot_items = list(itertools.product(*out.values()))
-
-    @property
-    @printexception
-    def fit_select_table_data(self):
-        return self._fit_select_table_data
-
-    @printexception
-    def update_fit_select_table_data(self):
-        cpd = collections.OrderedDict()
-        for idx, spi in enumerate(self.line_plot_data()):
-            for column_idx, column_name in enumerate(self.parameter_names_reduced()):
-                if column_name in spi['condition_dict_reduced']:
-                    if not column_name in cpd:
-                        cpd[column_name] = []
-                    cpd[column_name].append(spi['condition_dict_reduced'][column_name])
-                elif column_name == self.subtract_parameter_list.selected_value:
-                    cpd[column_name] = ['diff'.format(self.subtract_parameter_list.selected_value)]
-        self._fit_select_table_data = cpd
-        if hasattr(self, '_gui'):
-            self.gui.update_fit_select_table_data(self.fit_select_table_data)
-        self.update_fit_select_table_selected_rows(range(len(self.fit_select_table_data.values()[0])))
-
-
-    @property
-    @printexception
-    def fit_select_table_selected_rows(self):
-        return self._fit_select_table_selected_rows
-
-    @printexception
-    def update_fit_select_table_selected_rows(self, fit_select_table_selected_rows=None):
-        self._fit_select_table_selected_rows = [] if fit_select_table_selected_rows is None else fit_select_table_selected_rows  # self.fit_select_table_widget.selected_items_unique_column_indices()
-        if hasattr(self, '_gui'):
-            self.gui.update_fit_select_table_selected_rows(self.fit_select_table_selected_rows)
-
-    @property
-    @printexception
-    def fit_results(self):
-        return self._fit_results
-
-    @printexception
-    def update_fit_results(self):
-        try:
-            spi = self.line_plot_data()
-            if hasattr(self, 'custom_model'):
-                mod = self.custom_model
-            elif self.fit_function == 'cosine':
-                from . import lmfit_models
-                mod = lmfit_models.CosineModel()
-            elif self.fit_function == 'exp':
-                pass
-            elif self.fit_function == 'lorentz':
-                from . import lmfit_models
-                mod = lmfit.models.LorentzianModel()
-            self._fit_results = []
-            for idx in self.fit_select_table_selected_rows:
-                i = spi[idx]
-                params = mod.guess(data=np.array(i['y']), x=np.array(i['x']))
-                fp = getattr(self, 'fix_params', {})
-                if all(key in params for key in fp.keys()):
-                    for key, val in fp.items():
-                        params[key].vary = False
-                        params[key].value = val
-                self._fit_results.append([i, mod.fit(np.array(i['y']), params, x=np.array(i['x']))])
-            self.update_fit_result_table_data()
-        except ValueError:
-            print("Can not fit, input contains nan values")
-        except:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
-
-    @property
-    @printexception
-    def fit_result_table_data(self):
-        return self._fit_result_table_data
-
-    @printexception
-    def update_fit_result_table_data(self):
-        if len(self.fit_results) == 0:
-            out = collections.OrderedDict()
-        else:
-            header = self.fit_results[0][0]['condition_dict_reduced'].keys() + ['observation_name'] + self.fit_results[0][1].params.keys()
-            out = collections.OrderedDict([(key, []) for key in header])
-            for fri in self.fit_results:
-                for key, val in fri[0]['condition_dict_reduced'].items() + [('observation_name', fri[0]['observation_name'])] + [(key, val.value) for key, val in fri[1].params.items()]:
-                    out[key].append(val)
-        self._fit_result_table_data = out
-        if hasattr(self, '_gui'):
-            self.gui.update_fit_result_table_data(self.fit_result_table_data)
-
-    @printexception
-    def ret_line_plot_data_single(self, condition_dict, observation_name):
-        cl = [self.data.df[key] == val for key, val in condition_dict.items() if val not in ['__all__', '__average__']]
-        out = self.data.df[functools.reduce(np.logical_and, cl)] if len(cl) != 0 else self.data.df
-        # TODO: wont work for dates as can not be averaged
-        return out.groupby([key for key, val in condition_dict.items() if val != '__average__']).agg({observation_name: np.mean}).reset_index()
-
-    @printexception
-    def line_plot_data(self):
-        plot_data = []
-        if len(self.data.df) > 0:
-            for p in self.selected_plot_items:
-                condition_dict = collections.OrderedDict([(ni, pi) for ni, pi in zip(self.parameter_names_reduced(), p)])
-                for observation_name in self.observation_list.selected_data:
-                    if self.subtract_parameter_list.selected_value == '__none__':
-                        dfxy = self.ret_line_plot_data_single(condition_dict, observation_name).dropna(subset=[observation_name])
-                        condition_dict_reduced = collections.OrderedDict([(key, val) for key, val in condition_dict.items() if val not in ['__average__', '__all__']])
-                        plot_data.append(
-                            dict(
-                                condition_dict_reduced=condition_dict_reduced,
-                                observation_name=observation_name,
-                                x=getattr(dfxy, self.x_axis_parameter_list.selected_value),
-                                y=getattr(dfxy, observation_name)
-                            )
-                        )
-                    else:
-                        keys = [key for key, val in condition_dict.items() if val not in ['__average__', '__all__']] + [self.x_axis_parameter_list.selected_value]
-                        dfxys = self.ret_line_plot_data_single(condition_dict, observation_name).dropna(subset=[observation_name])
-                        dfxy = dfxys.groupby(keys).filter(lambda x: len(x) ==2).groupby(keys).agg({observation_name: lambda x: -1 * np.diff(x)}).reset_index()
-                        if len(dfxy) > 1:
-                            condition_dict_reduced = collections.OrderedDict([(key, val) for key, val in condition_dict.items() if val not in ['__average__', '__all__']])
-                            plot_data.append(
-                                dict(
-                                    condition_dict_reduced=condition_dict_reduced,
-                                    observation_name=observation_name,
-                                    x=getattr(dfxy, self.x_axis_parameter_list.selected_value),
-                                    y=getattr(dfxy, observation_name)
-                                )
-                            )
-        return plot_data
+    # @property
+    # @printexception
+    # def fit_select_table_data(self):
+    #     return self._fit_select_table_data
+    #
+    # @printexception
+    # def update_fit_select_table_data(self):
+    #     cpd = collections.OrderedDict()
+    #     for idx, spi in enumerate(self.line_plot_data()):
+    #         for column_idx, column_name in enumerate(self.parameter_names_reduced()):
+    #             if column_name in spi['condition_dict_reduced']:
+    #                 if not column_name in cpd:
+    #                     cpd[column_name] = []
+    #                 cpd[column_name].append(spi['condition_dict_reduced'][column_name])
+    #             elif column_name == self.subtract_parameter_list.selected_value:
+    #                 cpd[column_name] = ['diff'.format(self.subtract_parameter_list.selected_value)]
+    #     self._fit_select_table_data = cpd
+    #     if hasattr(self, '_gui'):
+    #         self.gui.update_fit_select_table_data(self.fit_select_table_data)
+    #     self.update_fit_select_table_selected_rows(range(len(self.fit_select_table_data.values()[0])))
+    #
+    #
+    # @property
+    # @printexception
+    # def fit_select_table_selected_rows(self):
+    #     return self._fit_select_table_selected_rows
+    #
+    # @printexception
+    # def update_fit_select_table_selected_rows(self, fit_select_table_selected_rows=None):
+    #     self._fit_select_table_selected_rows = [] if fit_select_table_selected_rows is None else fit_select_table_selected_rows  # self.fit_select_table_widget.selected_items_unique_column_indices()
+    #     if hasattr(self, '_gui'):
+    #         self.gui.update_fit_select_table_selected_rows(self.fit_select_table_selected_rows)
+    #
+    # @property
+    # @printexception
+    # def fit_results(self):
+    #     return self._fit_results
+    #
+    # @printexception
+    # def update_fit_results(self):
+    #     try:
+    #         spi = self.line_plot_data()
+    #         if hasattr(self, 'custom_model'):
+    #             mod = self.custom_model
+    #         elif self.fit_function == 'cosine':
+    #             from . import lmfit_models
+    #             mod = lmfit_models.CosineModel()
+    #         elif self.fit_function == 'exp':
+    #             pass
+    #         elif self.fit_function == 'lorentz':
+    #             from . import lmfit_models
+    #             mod = lmfit.models.LorentzianModel()
+    #         self._fit_results = []
+    #         for idx in self.fit_select_table_selected_rows:
+    #             i = spi[idx]
+    #             params = mod.guess(data=np.array(i['y']), x=np.array(i['x']))
+    #             fp = getattr(self, 'fix_params', {})
+    #             if all(key in params for key in fp.keys()):
+    #                 for key, val in fp.items():
+    #                     params[key].vary = False
+    #                     params[key].value = val
+    #             self._fit_results.append([i, mod.fit(np.array(i['y']), params, x=np.array(i['x']))])
+    #         self.update_fit_result_table_data()
+    #     except ValueError:
+    #         print("Can not fit, input contains nan values")
+    #     except:
+    #         exc_type, exc_value, exc_tb = sys.exc_info()
+    #         traceback.print_exception(exc_type, exc_value, exc_tb)
+    #
+    # @property
+    # @printexception
+    # def fit_result_table_data(self):
+    #     return self._fit_result_table_data
+    #
+    # @printexception
+    # def update_fit_result_table_data(self):
+    #     if len(self.fit_results) == 0:
+    #         out = collections.OrderedDict()
+    #     else:
+    #         header = self.fit_results[0][0]['condition_dict_reduced'].keys() + ['observation_name'] + self.fit_results[0][1].params.keys()
+    #         out = collections.OrderedDict([(key, []) for key in header])
+    #         for fri in self.fit_results:
+    #             for key, val in fri[0]['condition_dict_reduced'].items() + [('observation_name', fri[0]['observation_name'])] + [(key, val.value) for key, val in fri[1].params.items()]:
+    #                 out[key].append(val)
+    #     self._fit_result_table_data = out
+    #     if hasattr(self, '_gui'):
+    #         self.gui.update_fit_result_table_data(self.fit_result_table_data)
+    #
+    # @printexception
+    # def ret_line_plot_data_single(self, condition_dict, observation_name):
+    #     cl = [self.data.df[key] == val for key, val in condition_dict.items() if val not in ['__all__', '__average__']]
+    #     out = self.data.df[functools.reduce(np.logical_and, cl)] if len(cl) != 0 else self.data.df
+    #     # TODO: wont work for dates as can not be averaged
+    #     return out.groupby([key for key, val in condition_dict.items() if val != '__average__']).agg({observation_name: np.mean}).reset_index()
+    #
+    # @printexception
+    # def line_plot_data(self):
+    #     plot_data = []
+    #     if len(self.data.df) > 0:
+    #         for p in self.selected_plot_items:
+    #             condition_dict = collections.OrderedDict([(ni, pi) for ni, pi in zip(self.parameter_names_reduced(), p)])
+    #             for observation_name in self.observation_list.selected_data:
+    #                 if self.subtract_parameter_list.selected_value == '__none__':
+    #                     dfxy = self.ret_line_plot_data_single(condition_dict, observation_name).dropna(subset=[observation_name])
+    #                     condition_dict_reduced = collections.OrderedDict([(key, val) for key, val in condition_dict.items() if val not in ['__average__', '__all__']])
+    #                     plot_data.append(
+    #                         dict(
+    #                             condition_dict_reduced=condition_dict_reduced,
+    #                             observation_name=observation_name,
+    #                             x=getattr(dfxy, self.x_axis_parameter_list.selected_value),
+    #                             y=getattr(dfxy, observation_name)
+    #                         )
+    #                     )
+    #                 else:
+    #                     keys = [key for key, val in condition_dict.items() if val not in ['__average__', '__all__']] + [self.x_axis_parameter_list.selected_value]
+    #                     dfxys = self.ret_line_plot_data_single(condition_dict, observation_name).dropna(subset=[observation_name])
+    #                     dfxy = dfxys.groupby(keys).filter(lambda x: len(x) ==2).groupby(keys).agg({observation_name: lambda x: -1 * np.diff(x)}).reset_index()
+    #                     if len(dfxy) > 1:
+    #                         condition_dict_reduced = collections.OrderedDict([(key, val) for key, val in condition_dict.items() if val not in ['__average__', '__all__']])
+    #                         plot_data.append(
+    #                             dict(
+    #                                 condition_dict_reduced=condition_dict_reduced,
+    #                                 observation_name=observation_name,
+    #                                 x=getattr(dfxy, self.x_axis_parameter_list.selected_value),
+    #                                 y=getattr(dfxy, observation_name)
+    #                             )
+    #                         )
+    #     return plot_data
 
     def plot_label(self, condition_dict_reduced):
         label = ""
@@ -1028,27 +1028,31 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         most_left_axis = True if nx == 0 else False
         return n, nx, ny, most_bottom_axis, most_left_axis
 
+    def number_of_lines(self, data_selected=None):
+        data_selected = self.data_selected if data_selected is None else data_selected
+        return len(data_selected.df[[i for i in data_selected.parameter_names if i != self.x_axis_parameter_list.selected_value]].drop_duplicates())
+
     def update_plot_new(self, fig):
-        if len(self.observation_list.selected_data) == 0:
-            print('Please select the items from observation_list that you want to plot.')
-            return
-        self.update_selected_plot_items()
-        if len(self.selected_plot_items) == 0:
-            return
-        self.update_fit_select_table_data()
+        data_selected = self.data_selected
+        if len(data_selected.df) == 0:
+            print('Nothing to plot. You may select something.')
+        # self.update_selected_plot_items()
+        # if len(self.selected_plot_items) == 0:
+        #     return
+        # self.update_fit_select_table_data()
         fig.clear()
         if self.col_ax_parameter_list.selected_value != '__none__' and self.row_ax_parameter_list.selected_value == '__none__':
-            ax_p_list = self.parameter_table_selected_data[self.col_ax_parameter_list.selected_value]
+            ax_p_list = self.parameter_table.selected_data[self.col_ax_parameter_list.selected_value]
             n_tot = len(ax_p_list)
             nx_tot = int(np.ceil(np.sqrt(n_tot)))
             ny_tot = n_tot/float(nx_tot)
             ny_tot = int(ny_tot + 1) if int(ny_tot) == ny_tot else int(np.ceil(ny_tot))
         elif self.col_ax_parameter_list.selected_value != '__none__' and self.row_ax_parameter_list.selected_value != '__none__':
-            ax_p_list = list(itertools.product(self.parameter_table_selected_data[self.row_ax_parameter_list.selected_value], self.parameter_table_selected_data[self.col_ax_parameter_list.selected_value]))
+            ax_p_list = list(itertools.product(self.parameter_table.selected_data[self.row_ax_parameter_list.selected_value], self.parameter_table.selected_data[self.col_ax_parameter_list.selected_value]))
             n_tot = len(ax_p_list)
-            nx_tot = len(self.parameter_table_selected_data[self.col_ax_parameter_list.selected_value])
-            ny_tot = len(self.parameter_table_selected_data[self.row_ax_parameter_list.selected_value])
-            if n_tot < len(self.line_plot_data()):# +1 is for legend
+            nx_tot = len(self.parameter_table.selected_data[self.col_ax_parameter_list.selected_value])
+            ny_tot = len(self.parameter_table.selected_data[self.row_ax_parameter_list.selected_value])
+            if n_tot == nx_tot*ny_tot: # self.number_of_lines:# +1 is for legend, I DONT THINK THIS DID WHAT IT SHOULD, SO I CHANGED IT
                 ny_tot += 1
         else:
             ax_p_list = []
@@ -1057,22 +1061,24 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         for ni in range(1, n_tot+1):
             pd = {}if len(axes) == 0 else {'sharex': axes[0], 'sharey': axes[0]}
             axes.append(fig.add_subplot(ny_tot, nx_tot, ni, **pd))
-        for idx, pdi in enumerate(self.line_plot_data()):
+        for d, d_idx, idx, sub in data_selected.iterator(column_names=[pn for pn in data_selected.parameter_names if pn != self.x_axis_parameter_list.selected_value]):
+        # for idx, pdi in enumerate(self.line_plot_data()):
             if len(ax_p_list) == 0 or self.row_ax_parameter_list.selected_value == '__none__': #len(ax_p_list[0]) == 1:
-                n = np.argwhere(np.array(ax_p_list) == (pdi['condition_dict_reduced'][self.col_ax_parameter_list.selected_value]))[0,0] if self.col_ax_parameter_list.selected_value != '__none__' else 0
+                n = np.argwhere(np.array(ax_p_list) == (d[self.col_ax_parameter_list.selected_value]))[0,0] if self.col_ax_parameter_list.selected_value != '__none__' else 0
             else:
                 for n, cr in enumerate(ax_p_list):
-                    if cr[1] == pdi['condition_dict_reduced'][self.col_ax_parameter_list.selected_value] and cr[0] == pdi['condition_dict_reduced'][self.row_ax_parameter_list.selected_value]:
+                    if cr[1] == d[self.col_ax_parameter_list.selected_value] and cr[0] == d[self.row_ax_parameter_list.selected_value]:
                         break
                 else:
                     continue
-            abcdefg = collections.OrderedDict([(key, val) for key, val in pdi['condition_dict_reduced'].items() if key not in [self.subtract_parameter_list.selected_value, self.col_ax_parameter_list.selected_value, self.row_ax_parameter_list.selected_value]])
-            axes[n].plot(pdi['x'], pdi['y'], '-o', markersize=3, label=self.plot_label(abcdefg))
+            abcdefg = collections.OrderedDict([(key, val) for key, val in d.items() if key not in [self.subtract_parameter_list.selected_value, self.col_ax_parameter_list.selected_value, self.row_ax_parameter_list.selected_value]])
+            for obs in self.observation_list.selected_data:
+                axes[n].plot(sub[self.x_axis_parameter_list.selected_data], sub[obs], '-o', markersize=3, label=self.plot_label(abcdefg))
             if len(ax_p_list) != 0:
                 title_list = []
                 for column_name in [self.col_ax_parameter_list.selected_value, self.row_ax_parameter_list.selected_value]:
                     if column_name != '__none__' and len(self.data.df[self.col_ax_parameter_list.selected_value].unique()) > 1:
-                        title_list.append("{}: {}".format(column_name, pdi['condition_dict_reduced'][column_name]))
+                        title_list.append("{}: {}".format(column_name, d[column_name]))
                 if len(title_list) > 0:
                     axes[n].set_title(", ".join(title_list))
 
