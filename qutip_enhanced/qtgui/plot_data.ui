@@ -54,7 +54,7 @@
       <enum>QAbstractItemView::ExtendedSelection</enum>
      </property>
     </widget>
-    <widget class="QTableWidgetEnhancedDrop" name="parameter_table">
+    <widget class="QTableWidgetEnhancedDrop" name="parameter_table_widget">
      <property name="geometry">
       <rect>
        <x>0</x>
@@ -342,7 +342,7 @@
       <enum>QAbstractItemView::ExtendedSelection</enum>
      </property>
     </widget>
-    <zorder>parameter_table</zorder>
+    <zorder>parameter_table_widget</zorder>
     <zorder>observation_widget</zorder>
     <zorder>gridLayoutWidget</zorder>
     <zorder>gridLayoutWidget_2</zorder>
@@ -364,7 +364,7 @@
     <attribute name="title">
      <string>Fit</string>
     </attribute>
-    <widget class="QTableWidgetEnhanced" name="fit_select_table">
+    <widget class="QTableWidgetEnhanced" name="fit_select_table_widget">
      <property name="geometry">
       <rect>
        <x>0</x>
@@ -377,7 +377,7 @@
       <enum>QAbstractItemView::MultiSelection</enum>
      </property>
     </widget>
-    <widget class="QTableWidgetEnhanced" name="fit_result_table">
+    <widget class="QTableWidgetEnhanced" name="fit_result_table_widget">
      <property name="geometry">
       <rect>
        <x>490</x>

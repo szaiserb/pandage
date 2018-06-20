@@ -543,13 +543,6 @@ class Base:
             if hasattr(self, attr_name):
                 delattr(self, attr_name)
 
-
-class SelectableList(Base):
-    def __init__(self, name='noname', parent=None, **kwargs): # kwargs =dict(delete_names=['_data','_selected_indices',])
-        super(SelectableList, self).__init__(**kwargs)
-        self.parent = parent
-        self.name = name
-
     @property
     @printexception
     def data(self):
@@ -563,15 +556,21 @@ class SelectableList(Base):
         self.update_selected_indices()
 
     @property
+    def selected_indices(self):
+        return self._selected_indices
+
+class SelectableList(Base):
+    def __init__(self, name='noname', parent=None, **kwargs): # kwargs =dict(delete_names=['_data','_selected_indices',])
+        super(SelectableList, self).__init__(**kwargs)
+        self.parent = parent
+        self.name = name
+
+    @property
     @printexception
     def selected_index(self):
         if len(self._selected_indices) != 1:
             raise Exception("Error: No single index selected.")
         return self._selected_indices[0]
-
-    @property
-    def selected_indices(self):
-        return self._selected_indices
 
     @printexception
     def update_selected_indices(self, val=None):
@@ -677,6 +676,60 @@ class AverageParameterList(SelectableList):
     def selected_indices_default(self):
         return [self.data.index('sweeps')] if 'sweeps' in self.data else []
 
+class DataTable(Base):
+
+    def __init__(self, name='noname', parent=None, **kwargs):
+        super(DataTable, self).__init__(**kwargs)
+        self.parent = parent
+        self.name = name
+
+    @printexception
+    def update_selected_indices(self, selected_indices=None):
+        if isinstance(selected_indices, collections.OrderedDict) or selected_indices is None:
+            self._selected_indices = self.selected_indices_default(selected_indices)
+        else:
+            raise Exception(type(selected_indices), selected_indices)
+        if hasattr(self.parent, '_gui'):
+            getattr(getattr(self.parent.gui, self.name), "update_selected_indices")(self.selected_indices)
+
+    @property
+    @printexception
+    def selected_data(self):
+        out = collections.OrderedDict()
+        for cn, val in self.selected_indices.items():
+            data_full = getattr(self.parent.data.df, cn).unique()
+            out[cn] = [data_full[i] for i in val]
+        return out
+
+    @printexception
+    def update_selected_data(self, selected_data):
+        out = collections.OrderedDict()
+        for cn, val in selected_data.items():
+            indices = []
+            for i in val:
+                indices.append(np.where(self.data[cn] == i)[0][0])
+            out[cn] = indices
+        self.update_selected_indices(out)
+
+class ParameterTable(DataTable):
+    def __init__(self, **kwargs):
+        super(ParameterTable, self).__init__(name='parameter_table', delete_names=['_data', '_selected_indices'], **kwargs)
+
+    @printexception
+    def get_data(self):
+        out = collections.OrderedDict()
+        for cn in self.parent.parameter_names_reduced():
+            out[cn] = getattr(self.parent.data.df, cn).unique()
+        return out
+
+    @printexception
+    def selected_indices_default(self, selected_indices):
+        out = collections.OrderedDict([(key, range(len(val))) for key, val in self._data.items()])
+        if selected_indices is not None:
+            for cn, val in selected_indices.items():
+                out[cn] = val
+        return out
+
 class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
     def __init__(self, title=None, parent=None, gui=True, **kwargs):
         """
@@ -696,6 +749,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         self.col_ax_parameter_list = ColAxParameterComboBox(parent=self)
         self.row_ax_parameter_list = RowAxParameterComboBox(parent=self)
         self.subtract_parameter_list = SubtractParameterComboBox(parent=self)
+        self.parameter_table = ParameterTable(parent=self)
         self.set_data(**kwargs)
         if title is not None:
             self.update_window_title(title)
@@ -740,7 +794,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         self.col_ax_parameter_list.update_data()
         self.row_ax_parameter_list.update_data()
         self.subtract_parameter_list.update_data()
-        self.update_parameter_table_data()
+        self.parameter_table.update_data()
         self.observation_list.update_data()
         self.average_parameter_list.update_data()
         self.update_plot()
@@ -749,8 +803,6 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
     def delete_attributes(self):
         for attr_name in [
             '_data',
-            '_parameter_table_data',
-            '_parameter_table_selected_data',
             '_selected_plot_items',
             '_fit_select_table_data',
             '_fit_select_table_selected_rows',
@@ -766,6 +818,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             'col_ax_parameter_list',
             'row_ax_parameter_list',
             'subtract_parameter_list',
+            'parameter_table',
         ]:
             getattr(self, attr_name).delete_attributes()
 
@@ -774,59 +827,59 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         data = self.data if data is None else data
         return [i for i in data.parameter_names if not '_idx' in i]
 
-    @property
-    @printexception
-    def parameter_table_data(self):
-        val_none = collections.OrderedDict([(cn, []) for cn in self.parameter_names_reduced()])
-        return getattr(self, '_parameter_table_data', val_none)
-
-    @printexception
-    def update_parameter_table_data(self):
-        ptd = collections.OrderedDict()
-        for cn in self.parameter_names_reduced():
-            ptd[cn] = getattr(self.data.df, cn).unique()
-        self._parameter_table_data = ptd
-        if hasattr(self, '_gui'):
-            self.gui.update_parameter_table_data(parameter_table_data=self.parameter_table_data)
-        self.update_parameter_table_selected_indices()
-
-    @property
-    @printexception
-    def parameter_table_selected_indices(self):
-        return self._parameter_table_selected_indices
-
-    @printexception
-    def update_parameter_table_selected_indices(self, parameter_table_selected_indices=None):
-        if parameter_table_selected_indices is None:
-            self._parameter_table_selected_indices = collections.OrderedDict([(key, range(len(val))) for key, val in self.parameter_table_data.items()])
-        elif not isinstance(parameter_table_selected_indices, collections.OrderedDict):
-            raise Exception(type(parameter_table_selected_indices), parameter_table_selected_indices)
-        else:
-            out = self._parameter_table_selected_indices = collections.OrderedDict([(key, range(len(val))) for key, val in self.parameter_table_data.items()])
-            for cn, val in parameter_table_selected_indices.items():
-                out[cn] = val
-            self._parameter_table_selected_indices = out
-        if hasattr(self, '_gui'):
-            self.gui.update_parameter_table_selected_indices(self.parameter_table_selected_indices)
-
-    @property
-    @printexception
-    def parameter_table_selected_data(self):
-        out = collections.OrderedDict()
-        for cn, val in self.parameter_table_selected_indices.items():
-            data_full = getattr(self.data.df, cn).unique()
-            out[cn] = [data_full[i] for i in val]
-        return out
-
-    @printexception
-    def update_parameter_table_selected_data(self, parameter_table_selected_data):
-        out = collections.OrderedDict()
-        for cn, val in parameter_table_selected_data.items():
-            indices = []
-            for i in val:
-                indices.append(np.where(self.parameter_table_data[cn] == i)[0][0])
-            out[cn] = indices
-        self.update_parameter_table_selected_indices(out)
+    # @property
+    # @printexception
+    # def parameter_table_data(self):
+    #     val_none = collections.OrderedDict([(cn, []) for cn in self.parameter_names_reduced()])
+    #     return getattr(self, '_parameter_table_data', val_none)
+    #
+    # @printexception
+    # def update_parameter_table_data(self):
+    #     ptd = collections.OrderedDict()
+    #     for cn in self.parameter_names_reduced():
+    #         ptd[cn] = getattr(self.data.df, cn).unique()
+    #     self._parameter_table_data = ptd
+    #     if hasattr(self, '_gui'):
+    #         self.gui.update_parameter_table_data(parameter_table_data=self.parameter_table_data)
+    #     self.update_parameter_table_selected_indices()
+    #
+    # @property
+    # @printexception
+    # def parameter_table_selected_indices(self):
+    #     return self._parameter_table_selected_indices
+    #
+    # @printexception
+    # def update_parameter_table_selected_indices(self, parameter_table_selected_indices=None):
+    #     if parameter_table_selected_indices is None:
+    #         self._parameter_table_selected_indices = collections.OrderedDict([(key, range(len(val))) for key, val in self.parameter_table_data.items()])
+    #     elif not isinstance(parameter_table_selected_indices, collections.OrderedDict):
+    #         raise Exception(type(parameter_table_selected_indices), parameter_table_selected_indices)
+    #     else:
+    #         out = self._parameter_table_selected_indices = collections.OrderedDict([(key, range(len(val))) for key, val in self.parameter_table_data.items()])
+    #         for cn, val in parameter_table_selected_indices.items():
+    #             out[cn] = val
+    #         self._parameter_table_selected_indices = out
+    #     if hasattr(self, '_gui'):
+    #         self.gui.update_parameter_table_selected_indices(self.parameter_table_selected_indices)
+    #
+    # @property
+    # @printexception
+    # def parameter_table_selected_data(self):
+    #     out = collections.OrderedDict()
+    #     for cn, val in self.parameter_table_selected_indices.items():
+    #         data_full = getattr(self.data.df, cn).unique()
+    #         out[cn] = [data_full[i] for i in val]
+    #     return out
+    #
+    # @printexception
+    # def update_parameter_table_selected_data(self, parameter_table_selected_data):
+    #     out = collections.OrderedDict()
+    #     for cn, val in parameter_table_selected_data.items():
+    #         indices = []
+    #         for i in val:
+    #             indices.append(np.where(self.parameter_table_data[cn] == i)[0][0])
+    #         out[cn] = indices
+    #     self.update_parameter_table_selected_indices(out)
 
     @property
     @printexception
@@ -835,7 +888,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
 
     @printexception
     def update_selected_plot_items(self):
-        out = self.parameter_table_selected_data
+        out = self.parameter_table.selected_data
         if all([len(i) == 0 for i in out.values()]):
             self._selected_plot_items = []
             return
@@ -881,7 +934,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
 
     @printexception
     def update_fit_select_table_selected_rows(self, fit_select_table_selected_rows=None):
-        self._fit_select_table_selected_rows = [] if fit_select_table_selected_rows is None else fit_select_table_selected_rows  # self.fit_select_table.selected_items_unique_column_indices()
+        self._fit_select_table_selected_rows = [] if fit_select_table_selected_rows is None else fit_select_table_selected_rows  # self.fit_select_table_widget.selected_items_unique_column_indices()
         if hasattr(self, '_gui'):
             self.gui.update_fit_select_table_selected_rows(self.fit_select_table_selected_rows)
 
@@ -1157,40 +1210,19 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         if hasattr(self, '_gui'):
             self.gui.update_info_text(info_text)
 
-
-class SelectableListQt(PyQt5.QtWidgets.QWidget):
+class BaseQt(PyQt5.QtWidgets.QWidget):
 
     def __init__(self, name, widget_name, parent, *args, **kwargs):
-        super(SelectableListQt, self).__init__(*args, **kwargs)
+        super(BaseQt, self).__init__(*args, **kwargs)
         self.name = name
         self.widget_name = widget_name
         self.parent = parent
 
-    update_data_signal = pyqtSignal(list)
-    update_selected_indices_signal = pyqtSignal(list)
-
     def update_data(self, data):
-        getattr(self, "update_data_signal".format(self.name)).emit(data)
-
-    def update_data_signal_emitted(self, data):
-        widget = getattr(self.parent, self.widget_name)
-        if widget.count() != 0:
-            self.parent.clear_widget(self.widget_name, 'clear')
-        for val in data:
-            widget.addItem(QListWidgetItem(val))
+        self.update_data_signal.emit(data)
 
     def update_selected_indices(self, selected_indices):
         getattr(self, "update_selected_indices_signal").emit(selected_indices)
-
-    def update_selected_indices_signal_emitted(self, update_selected_indices):
-        getattr(self.parent, self.widget_name).blockSignals(True)
-        for i in update_selected_indices:
-            getattr(self.parent, self.widget_name).item(i).setSelected(True)
-        getattr(self.parent, self.widget_name).blockSignals(False)
-
-    @printexception
-    def update_selected_indices_from_gui(self, *args, **kwargs):
-        getattr(self.parent.no_qt, self.name).update_selected_indices([i.row() for i in getattr(self.parent, self.widget_name).selectedIndexes()])
 
     def connect_signals(self):
         for name in [
@@ -1199,19 +1231,32 @@ class SelectableListQt(PyQt5.QtWidgets.QWidget):
         ]:
             getattr(getattr(self, "update_{}_signal".format(name)), 'connect')(getattr(self, "update_{}_signal_emitted".format(name)))
 
-class ParameterCombobox(PyQt5.QtWidgets.QWidget):
-
-    def __init__(self, name, widget_name, parent, *args, **kwargs):
-        super(ParameterCombobox, self).__init__(*args, **kwargs)
-        self.name = name # x_axis_parameter
-        self.widget_name = widget_name#widget_name = x_axis_parameter_comboBox
-        self.parent = parent
+class SelectableListQt(BaseQt):
 
     update_data_signal = pyqtSignal(list)
     update_selected_indices_signal = pyqtSignal(list)
 
-    def update_data(self, data):
-        self.update_data_signal.emit(data)
+    def update_data_signal_emitted(self, data):
+        widget = getattr(self.parent, self.widget_name)
+        if widget.count() != 0:
+            self.parent.clear_widget(self.widget_name, 'clear')
+        for val in data:
+            widget.addItem(QListWidgetItem(val))
+
+    def update_selected_indices_signal_emitted(self, selected_indices):
+        getattr(self.parent, self.widget_name).blockSignals(True)
+        for i in selected_indices:
+            getattr(self.parent, self.widget_name).item(i).setSelected(True)
+        getattr(self.parent, self.widget_name).blockSignals(False)
+
+    @printexception
+    def update_selected_indices_from_gui(self, *args, **kwargs):
+        getattr(self.parent.no_qt, self.name).update_selected_indices([i.row() for i in getattr(self.parent, self.widget_name).selectedIndexes()])
+
+class ParameterCombobox(BaseQt):
+
+    update_data_signal = pyqtSignal(list)
+    update_selected_indices_signal = pyqtSignal(list)
 
     def update_data_signal_emitted(self, data):
         widget = getattr(self.parent, self.widget_name)
@@ -1223,9 +1268,6 @@ class ParameterCombobox(PyQt5.QtWidgets.QWidget):
         if hasattr(getattr(self.parent.no_qt, self.name), '_selected_indices'):
             getattr(self.parent, 'update_parameter_table_item_flags')()
 
-    def update_selected_indices(self, selected_indices):
-        getattr(self, "update_selected_indices_signal").emit(selected_indices)
-
     def update_selected_indices_signal_emitted(self, selected_indices):
         getattr(self.parent, self.widget_name).blockSignals(True)
         getattr(self.parent, self.widget_name).setCurrentText(getattr(self.parent.no_qt, self.name).data[selected_indices[0]])
@@ -1236,12 +1278,58 @@ class ParameterCombobox(PyQt5.QtWidgets.QWidget):
         idx = getattr(self.parent.no_qt, self.name).data.index(str(getattr(self.parent, self.widget_name).currentText()))
         getattr(self.parent.no_qt, self.name).update_selected_indices([idx])
 
-    def connect_signals(self):
-        for name in [
-            'data'.format(self.name),
-            'selected_indices'.format(self.name),
-        ]:
-            getattr(getattr(self, "update_{}_signal".format(name)), 'connect')(getattr(self, "update_{}_signal_emitted".format(name)))
+
+class ParameterTableQt(BaseQt):
+
+    update_data_signal = pyqtSignal(collections.OrderedDict)
+    update_selected_indices_signal = pyqtSignal(collections.OrderedDict)
+
+    def update_data_signal_emitted(self, data):
+        widget = getattr(self.parent, self.widget_name)
+        widget.blockSignals(True)
+        if widget.columnCount() == 0:
+            widget.set_column_names(data.keys())
+        for column_name, val in data.items():
+            widget.set_column(column_name, val)
+        self.update_item_flags()
+        widget.blockSignals(False)
+
+    def update_item_flags(self):
+        pass
+        # self.parameter_table_widget.blockSignals(True)
+        # if len(self.no_qt.x_axis_parameter_list.selected_indices) == 1: #hasattr(self.no_qt, '_x_axis_parameter'):
+        #     for cidx in range(self.parameter_table_widget.columnCount()):
+        #         cn = self.parameter_table_widget.column_name(cidx)
+        #         if cn == self.no_qt.x_axis_parameter_list.selected_value:
+        #             flag = Qt.NoItemFlags
+        #         else:
+        #             flag = Qt.ItemIsSelectable | Qt.ItemIsEnabled
+        #         for ridx in self.parameter_table_widget.column_data_indices(cn):
+        #             self.parameter_table_widget.set_cell(ridx, cidx, flag=flag)
+        # self.parameter_table_widget.blockSignals(False)
+
+    def update_selected_indices_signal_emitted(self, selected_indices):
+        widget = getattr(self.parent, self.widget_name)
+        widget.blockSignals(True)
+        for cn, val in selected_indices.items():
+            cidx = widget.column_index(cn)
+            for ridx in widget.column_data_indices(cn):
+                if val == '__all__' or (not isinstance(val, basestring) and ridx in val):
+                    widget.item(ridx, cidx).setSelected(True)
+                else:
+                    widget.item(ridx, cidx).setSelected(False)
+        widget.blockSignals(False)
+
+    def update_selected_indices_from_gui(self):
+        widget = getattr(self.parent, self.widget_name)
+        out = collections.OrderedDict()
+        column_names = widget.column_names
+        for item in widget.selectedItems():
+            cn = column_names[item.column()]
+            if not cn in out:
+                out[cn] = []
+            out[cn].append(item.row())
+        getattr(self.parent.no_qt, self.name).update_selected_indices(out)
 
 class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
     def __init__(self, parent=None, no_qt=None):
@@ -1251,11 +1339,10 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
         self.col_ax_parameter_list = ParameterCombobox(name='col_ax_parameter_list', widget_name='col_ax_parameter_comboBox', parent=self)
         self.row_ax_parameter_list = ParameterCombobox(name='row_ax_parameter_list', widget_name='row_ax_parameter_comboBox', parent=self)
         self.subtract_parameter_list = ParameterCombobox(name='subtract_parameter_list', widget_name='subtract_parameter_comboBox', parent=self)
-
+        self.parameter_table = ParameterTableQt(name='parameter_table', widget_name='parameter_table_widget', parent=self)
         super(PlotDataQt, self).__init__(parent=parent, no_qt=no_qt, ui_filepath=os.path.join(os.path.dirname(__file__), 'qtgui/plot_data.ui'))
 
-    update_parameter_table_data_signal = pyqtSignal(collections.OrderedDict)
-    update_parameter_table_selected_indices_signal = pyqtSignal(collections.OrderedDict)
+
     update_fit_select_table_data_signal = pyqtSignal(collections.OrderedDict)
     update_fit_select_table_selected_rows_signal = pyqtSignal(list)
     update_fit_result_table_data_signal = pyqtSignal(collections.OrderedDict)
@@ -1273,11 +1360,11 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
             ['col_ax_parameter_comboBox', 'clear'],
             ['row_ax_parameter_comboBox', 'clear'],
             ['subtract_parameter_comboBox', 'clear'],
-            ['parameter_table', 'clear_table_contents'],
+            ['parameter_table_widget', 'clear_table_contents'],
             ['observation_widget', 'clear'],
             ['average_parameter_widget', 'clear'],
-            ['fit_select_table', 'clear_table_contents'],
-            ['fit_result_table', 'clear_table_contents'],
+            ['fit_select_table_widget', 'clear_table_contents'],
+            ['fit_result_table_widget', 'clear_table_contents'],
         ]:
             self.clear_widget(item[0], item[1])
         try:
@@ -1291,89 +1378,89 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
         except:
             pass
 
-    def update_parameter_table_data(self, parameter_table_data):
-        self.update_parameter_table_data_signal.emit(parameter_table_data)
-
-    def update_parameter_table_data_signal_emitted(self, parameter_table_data):
-        self.parameter_table.blockSignals(True)
-        if self.parameter_table.columnCount() == 0:
-            self.parameter_table.set_column_names(parameter_table_data.keys())
-        for column_name, val in parameter_table_data.items():
-            self.parameter_table.set_column(column_name, val)
-        self.update_parameter_table_item_flags()
-        self.parameter_table.blockSignals(False)
-
-    def update_parameter_table_item_flags(self):
-        self.parameter_table.blockSignals(True)
-        if len(self.no_qt.x_axis_parameter_list.selected_indices) == 1: #hasattr(self.no_qt, '_x_axis_parameter'):
-            for cidx in range(self.parameter_table.columnCount()):
-                cn = self.parameter_table.column_name(cidx)
-                if cn == self.no_qt.x_axis_parameter_list.selected_value:
-                    flag = Qt.NoItemFlags
-                else:
-                    flag = Qt.ItemIsSelectable | Qt.ItemIsEnabled
-                for ridx in self.parameter_table.column_data_indices(cn):
-                    self.parameter_table.set_cell(ridx, cidx, flag=flag)
-        self.parameter_table.blockSignals(False)
-
-    def update_parameter_table_selected_indices(self, selected_indices):
-        self.update_parameter_table_selected_indices_signal.emit(selected_indices)
-
-    def update_parameter_table_selected_indices_signal_emitted(self, parameter_table_selected_indices):
-        self.parameter_table.blockSignals(True)
-        for cn, val in parameter_table_selected_indices.items():
-            cidx = self.parameter_table.column_index(cn)
-            for ridx in self.parameter_table.column_data_indices(cn):
-                if val == '__all__' or (not isinstance(val, basestring) and ridx in val):
-                    self.parameter_table.item(ridx, cidx).setSelected(True)
-                else:
-                    self.parameter_table.item(ridx, cidx).setSelected(False)
-        self.parameter_table.blockSignals(False)
-
-    def update_parameter_table_selected_indices_from_gui(self):
-        out = collections.OrderedDict()
-        column_names = self.parameter_table.column_names
-        for item in self.parameter_table.selectedItems():
-            cn = column_names[item.column()]
-            if not cn in out:
-                out[cn] = []
-            out[cn].append(item.row())
-        self.no_qt.update_parameter_table_selected_indices(out)
+    # def update_parameter_table_data(self, parameter_table_data):
+    #     self.update_parameter_table_data_signal.emit(parameter_table_data)
+    #
+    # def update_parameter_table_data_signal_emitted(self, parameter_table_data):
+    #     self.parameter_table_widget.blockSignals(True)
+    #     if self.parameter_table_widget.columnCount() == 0:
+    #         self.parameter_table_widget.set_column_names(parameter_table_data.keys())
+    #     for column_name, val in parameter_table_data.items():
+    #         self.parameter_table_widget.set_column(column_name, val)
+    #     self.update_parameter_table_item_flags()
+    #     self.parameter_table_widget.blockSignals(False)
+    #
+    # def update_parameter_table_item_flags(self):
+    #     self.parameter_table_widget.blockSignals(True)
+    #     if len(self.no_qt.x_axis_parameter_list.selected_indices) == 1: #hasattr(self.no_qt, '_x_axis_parameter'):
+    #         for cidx in range(self.parameter_table_widget.columnCount()):
+    #             cn = self.parameter_table_widget.column_name(cidx)
+    #             if cn == self.no_qt.x_axis_parameter_list.selected_value:
+    #                 flag = Qt.NoItemFlags
+    #             else:
+    #                 flag = Qt.ItemIsSelectable | Qt.ItemIsEnabled
+    #             for ridx in self.parameter_table_widget.column_data_indices(cn):
+    #                 self.parameter_table_widget.set_cell(ridx, cidx, flag=flag)
+    #     self.parameter_table_widget.blockSignals(False)
+    #
+    # def update_parameter_table_selected_indices(self, selected_indices):
+    #     self.update_parameter_table_selected_indices_signal.emit(selected_indices)
+    #
+    # def update_parameter_table_selected_indices_signal_emitted(self, parameter_table_selected_indices):
+    #     self.parameter_table_widget.blockSignals(True)
+    #     for cn, val in parameter_table_selected_indices.items():
+    #         cidx = self.parameter_table_widget.column_index(cn)
+    #         for ridx in self.parameter_table_widget.column_data_indices(cn):
+    #             if val == '__all__' or (not isinstance(val, basestring) and ridx in val):
+    #                 self.parameter_table_widget.item(ridx, cidx).setSelected(True)
+    #             else:
+    #                 self.parameter_table_widget.item(ridx, cidx).setSelected(False)
+    #     self.parameter_table_widget.blockSignals(False)
+    #
+    # def update_parameter_table_selected_indices_from_gui(self):
+    #     out = collections.OrderedDict()
+    #     column_names = self.parameter_table_widget.column_names
+    #     for item in self.parameter_table_widget.selectedItems():
+    #         cn = column_names[item.column()]
+    #         if not cn in out:
+    #             out[cn] = []
+    #         out[cn].append(item.row())
+    #     self.no_qt.update_parameter_table_selected_indices(out)
 
     def update_fit_select_table_data(self, fit_select_table_data):
         self.update_fit_select_table_data_signal.emit(fit_select_table_data)
 
     def update_fit_select_table_data_signal_emitted(self, fit_select_table_data):
-        self.fit_select_table.blockSignals(True)
-        self.fit_select_table.clear_table_contents()
-        self.fit_select_table.set_column_names(fit_select_table_data.keys())
+        self.fit_select_table_widget.blockSignals(True)
+        self.fit_select_table_widget.clear_table_contents()
+        self.fit_select_table_widget.set_column_names(fit_select_table_data.keys())
         for column_name, val in fit_select_table_data.items():
-            self.fit_select_table.set_column(column_name, val, [Qt.ItemIsSelectable | Qt.ItemIsEnabled for _ in range(len(val))])
-        self.fit_select_table.blockSignals(False)
+            self.fit_select_table_widget.set_column(column_name, val, [Qt.ItemIsSelectable | Qt.ItemIsEnabled for _ in range(len(val))])
+        self.fit_select_table_widget.blockSignals(False)
     @printexception
     def update_fit_select_table_selected_rows_from_gui(self):
-        self.no_qt.update_fit_select_table_selected_rows(self.fit_select_table.selected_items_unique_row_indices())
+        self.no_qt.update_fit_select_table_selected_rows(self.fit_select_table_widget.selected_items_unique_row_indices())
 
     def update_fit_select_table_selected_rows(self, selected_rows):
         self.update_fit_select_table_selected_rows_signal.emit(selected_rows)
 
     def update_fit_select_table_selected_rows_signal_emitted(self, fit_select_table_selected_rows):
-        self.fit_select_table.blockSignals(True)
-        for ridx in range(self.fit_select_table.rowCount()):
-            if self.fit_select_table.item(ridx, 0).isSelected() ^ (ridx in fit_select_table_selected_rows):
-                self.fit_select_table.selectRow(ridx)
-        self.fit_select_table.blockSignals(False)
+        self.fit_select_table_widget.blockSignals(True)
+        for ridx in range(self.fit_select_table_widget.rowCount()):
+            if self.fit_select_table_widget.item(ridx, 0).isSelected() ^ (ridx in fit_select_table_selected_rows):
+                self.fit_select_table_widget.selectRow(ridx)
+        self.fit_select_table_widget.blockSignals(False)
 
     def update_fit_result_table_data(self, fit_result_table_data):
         self.update_fit_result_table_data_signal.emit(fit_result_table_data)
 
     def update_fit_result_table_data_signal_emitted(self, fit_result_table_data):
-        self.fit_result_table.blockSignals(True)
-        self.fit_result_table.clear_table_contents()
-        self.fit_result_table.set_column_names(fit_result_table_data.keys())
+        self.fit_result_table_widget.blockSignals(True)
+        self.fit_result_table_widget.clear_table_contents()
+        self.fit_result_table_widget.set_column_names(fit_result_table_data.keys())
         for column_name, val in fit_result_table_data.items():
-            self.fit_result_table.set_column(column_name, val)
-        self.fit_result_table.blockSignals(False)
+            self.fit_result_table_widget.set_column(column_name, val)
+        self.fit_result_table_widget.blockSignals(False)
 
     def update_info_text(self, info_text):
         self.update_info_text_signal.emit(info_text)
@@ -1392,8 +1479,6 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
     def init_gui(self):
         super(PlotDataQt, self).init_gui()
         for name in [
-            'update_parameter_table_data',
-            'update_parameter_table_selected_indices',
             'update_fit_select_table_data',
             'update_fit_select_table_selected_rows',
             'update_fit_result_table_data',
@@ -1406,7 +1491,9 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
             'x_axis_parameter_list',
             'row_ax_parameter_list',
             'col_ax_parameter_list',
-            'subtract_parameter_list'
+            'subtract_parameter_list',
+            'parameter_table'
+
         ]:
             getattr(self, name).connect_signals()
 
@@ -1434,9 +1521,9 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
         self.update_fit_result_button.clicked.connect(lambda: self.no_qt.update_plot_fit(None))
         self.update_plot_button.setAcceptDrops(True)
 
-        self.parameter_table.hdf_file_dropped.connect(self.no_qt.set_data_from_path)
-        self.parameter_table.itemSelectionChanged.connect(self.update_parameter_table_selected_indices_from_gui)
-        self.fit_select_table.itemSelectionChanged.connect(self.update_fit_select_table_selected_rows_from_gui)
+        self.parameter_table_widget.hdf_file_dropped.connect(self.no_qt.set_data_from_path)
+        self.parameter_table_widget.itemSelectionChanged.connect(self.parameter_table.update_selected_indices_from_gui)
+        self.fit_select_table_widget.itemSelectionChanged.connect(self.update_fit_select_table_selected_rows_from_gui)
         self.observation_widget.itemSelectionChanged.connect(self.observation_list.update_selected_indices_from_gui)
         self.average_parameter_widget.itemSelectionChanged.connect(self.average_parameter_list.update_selected_indices_from_gui)
         self.open_code_button.clicked.connect(self.open_measurement_code)
