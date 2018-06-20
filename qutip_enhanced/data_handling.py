@@ -397,7 +397,7 @@ class Data:
     def check_integrity(self):
         if len(self.parameter_names) + len(self.observation_names) != len(self.df.columns):
             cnl = [(i, j) for i, j in zip(self.parameter_names + self.observation_names, self.df.columns)]
-            raise Exception('Error: Integrity corrupted: {}, {}, {}\n{}'.format(len(self.parameter_names), len(self.observation_names), len(self.df.columns)), cnl)
+            raise Exception('Error: Integrity corrupted: {}, {}, {}\n{}'.format(len(self.parameter_names), len(self.observation_names), len(self.df.columns), cnl))
         if not all([i == j for i, j in zip(self.df.columns[:len(self.parameter_names)], self.parameter_names)]):
             raise Exception('Error: Integrity corrupted: {}, {}'.format(self.df.columns, self.parameter_names))
         if not all([i == j for i, j in zip(self.df.columns[-len(self.observation_names):], self.observation_names)]):
@@ -420,14 +420,6 @@ class Data:
         self.check_integrity()
 
     def observations_to_parameters(self, observation_names, new_names, new_parameter_name, new_observation_name='value', new_parameter_dtype=None):
-        """
-        :param observation_names: list of observation names to turn into one single parameter
-        :param new_names:  list of new names replacing the old observation_names
-        :param new_parameter_name: string, name for the new parameter, i.e. the new column in _df
-        :param new_observation_name: string, common name for all previous observation names
-        :param new_dtype: python dtype
-        :return: None
-        """
         df = self.df.rename(dict([(old, new) for old, new in zip(observation_names, new_names)]), axis='columns')
         df = df.melt(id_vars=[cn for cn in df.columns if cn not in new_names])
         self._df = df.rename({'value': new_observation_name, 'variable': new_parameter_name}, axis=1)
@@ -440,35 +432,31 @@ class Data:
         self.change_column_dtype(new_parameter_name, new_parameter_dtype)
         self.check_integrity()
 
-    def subtract_parameter(self, parameter_name, observation_name=None, observation_name_new=None):
-        """
-        Subtracts the values of one observation with respect to one binary parameter (a parameter with two unique values).
-        An example could be
-            observation_name = 'location'
-            parameter_name = 'time' with values 'start', 'end'
-            new_parameter_name = 'distance'
-        Parameter values, for which only one observation was made (e.g. only 'start' was measured) are dropped completely.
-        :param parameter_name: string
-        :param new_parameter_name: string
-        :param observation_name: string
-        :return:
-        """
+    def check_pn_on_helper(self, parameter_name, observation_names):
+        if not parameter_name in self.parameter_names:
+            raise Exception('Error: chosen parameter_name {} is not in self.parameter_names {}.'.format(parameter_name, self.parameter_names))
+        if len(observation_names) == 0:
+            raise Exception('Error: Chose at least on observation.')
+        if any([i not in self.observation_names for i in observation_names]):
+            raise Exception('Error: at least one of the chosen observation_names {} is not in self.observation_names {}'.format(observation_names, self.observation_names))
 
+    def subtract_parameter(self, parameter_name, observation_names):
+        self.check_pn_on_helper(parameter_name, observation_names)
         lnp = len(getattr(self.df, parameter_name).unique())
         if lnp != 2:
             raise Exception('Error: Only parameters with 2 unique items can be subtracted. Parameter {} has {}'.format(parameter_name, lnp))
-        if len(self.observation_names) == 1:
-            observation_name = self.observation_names[0]
-        else:
-            if observation_name is None:
-                raise Exception('Error: observation_name to be subtracted could not be determined and must be given.')
-            else:
-                self.delete_columns([i for i in self.observation_names if i not in observation_name])
-        self._df.dropna()
+        self.delete_columns([i for i in self.observation_names if i not in observation_names])
+        self._df.dropna(inplace=True)
         self.parameter_names = [key for key in self.parameter_names if key != parameter_name]
-        self._df = self.df.groupby(self.parameter_names).filter(lambda x: len(x) == 2).groupby(self.parameter_names).agg({observation_name: lambda x: -1 * np.diff(x)}).reset_index()
-        if observation_name_new is not None:
-            self.rename_column(observation_name, observation_name_new)
+        self._df = self.df.groupby(self.parameter_names).filter(lambda x: len(x) == 2).groupby(self.parameter_names).agg(dict([(obs, lambda x: -1 * np.diff(x)) for obs in observation_names])).reset_index()
+        self.check_integrity()
+
+    def average_parameter(self, parameter_name, observation_names):
+        self.check_pn_on_helper(parameter_name, observation_names)
+        self.delete_columns([i for i in self.observation_names if i not in observation_names])
+        self._df.dropna(inplace=True)
+        self.parameter_names = [key for key in self.parameter_names if key != parameter_name]
+        self._df = self.df.groupby(self.parameter_names).agg(dict([(obs, np.mean) for obs in observation_names])).reset_index()
         self.check_integrity()
 
 def extend_columns(df, other, columns=None):
@@ -670,7 +658,7 @@ class AverageParameterList(SelectableList):
 
     @printexception
     def get_data(self):
-        return [i for i in self.parent.data.non_unary_parameter_names if not i in []]
+        return self.parent.data.parameter_names
 
     @printexception
     def selected_indices_default(self):
@@ -827,59 +815,17 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         data = self.data if data is None else data
         return [i for i in data.parameter_names if not '_idx' in i]
 
-    # @property
-    # @printexception
-    # def parameter_table_data(self):
-    #     val_none = collections.OrderedDict([(cn, []) for cn in self.parameter_names_reduced()])
-    #     return getattr(self, '_parameter_table_data', val_none)
-    #
-    # @printexception
-    # def update_parameter_table_data(self):
-    #     ptd = collections.OrderedDict()
-    #     for cn in self.parameter_names_reduced():
-    #         ptd[cn] = getattr(self.data.df, cn).unique()
-    #     self._parameter_table_data = ptd
-    #     if hasattr(self, '_gui'):
-    #         self.gui.update_parameter_table_data(parameter_table_data=self.parameter_table_data)
-    #     self.update_parameter_table_selected_indices()
-    #
-    # @property
-    # @printexception
-    # def parameter_table_selected_indices(self):
-    #     return self._parameter_table_selected_indices
-    #
-    # @printexception
-    # def update_parameter_table_selected_indices(self, parameter_table_selected_indices=None):
-    #     if parameter_table_selected_indices is None:
-    #         self._parameter_table_selected_indices = collections.OrderedDict([(key, range(len(val))) for key, val in self.parameter_table_data.items()])
-    #     elif not isinstance(parameter_table_selected_indices, collections.OrderedDict):
-    #         raise Exception(type(parameter_table_selected_indices), parameter_table_selected_indices)
-    #     else:
-    #         out = self._parameter_table_selected_indices = collections.OrderedDict([(key, range(len(val))) for key, val in self.parameter_table_data.items()])
-    #         for cn, val in parameter_table_selected_indices.items():
-    #             out[cn] = val
-    #         self._parameter_table_selected_indices = out
-    #     if hasattr(self, '_gui'):
-    #         self.gui.update_parameter_table_selected_indices(self.parameter_table_selected_indices)
-    #
-    # @property
-    # @printexception
-    # def parameter_table_selected_data(self):
-    #     out = collections.OrderedDict()
-    #     for cn, val in self.parameter_table_selected_indices.items():
-    #         data_full = getattr(self.data.df, cn).unique()
-    #         out[cn] = [data_full[i] for i in val]
-    #     return out
-    #
-    # @printexception
-    # def update_parameter_table_selected_data(self, parameter_table_selected_data):
-    #     out = collections.OrderedDict()
-    #     for cn, val in parameter_table_selected_data.items():
-    #         indices = []
-    #         for i in val:
-    #             indices.append(np.where(self.parameter_table_data[cn] == i)[0][0])
-    #         out[cn] = indices
-    #     self.update_parameter_table_selected_indices(out)
+    @property
+    def data_selected(self):
+        other = pd.DataFrame(list(itertools.product(*self.parameter_table.selected_data.values())))
+        other.rename(columns=collections.OrderedDict([(key, val) for key, val in enumerate(self.parameter_table.selected_data.keys())]), inplace=True)
+        data = Data(parameter_names=self.data.parameter_names, observation_names=self.data.observation_names)
+        data._df = df_access(self.data.df, other)
+        if self.subtract_parameter_list.selected_value != '__none__':
+            data.subtract_parameter(self.subtract_parameter_list.selected_value, observation_names=self.observation_list.selected_data)
+        for pn in self.average_parameter_list.selected_data:
+            data.average_parameter(pn, observation_names=self.observation_list.selected_data)
+        return data
 
     @property
     @printexception
@@ -1266,7 +1212,7 @@ class ParameterCombobox(BaseQt):
         widget.addItems(data)
         widget.blockSignals(False)
         if hasattr(getattr(self.parent.no_qt, self.name), '_selected_indices'):
-            getattr(self.parent, 'update_parameter_table_item_flags')()
+            getattr(self.parent.parameter_table, 'update_item_flags')()
 
     def update_selected_indices_signal_emitted(self, selected_indices):
         getattr(self.parent, self.widget_name).blockSignals(True)
@@ -1295,18 +1241,18 @@ class ParameterTableQt(BaseQt):
         widget.blockSignals(False)
 
     def update_item_flags(self):
-        pass
-        # self.parameter_table_widget.blockSignals(True)
-        # if len(self.no_qt.x_axis_parameter_list.selected_indices) == 1: #hasattr(self.no_qt, '_x_axis_parameter'):
-        #     for cidx in range(self.parameter_table_widget.columnCount()):
-        #         cn = self.parameter_table_widget.column_name(cidx)
-        #         if cn == self.no_qt.x_axis_parameter_list.selected_value:
-        #             flag = Qt.NoItemFlags
-        #         else:
-        #             flag = Qt.ItemIsSelectable | Qt.ItemIsEnabled
-        #         for ridx in self.parameter_table_widget.column_data_indices(cn):
-        #             self.parameter_table_widget.set_cell(ridx, cidx, flag=flag)
-        # self.parameter_table_widget.blockSignals(False)
+        widget = getattr(self.parent, self.widget_name)
+        widget.blockSignals(True)
+        if len(self.parent.no_qt.x_axis_parameter_list.selected_indices) == 1:
+            for cidx in range(widget.columnCount()):
+                cn = widget.column_name(cidx)
+                if cn == self.parent.no_qt.subtract_parameter_list.selected_value:
+                    flag = Qt.NoItemFlags
+                else:
+                    flag = Qt.ItemIsSelectable | Qt.ItemIsEnabled
+                for ridx in widget.column_data_indices(cn):
+                    widget.set_cell(ridx, cidx, flag=flag)
+        widget.blockSignals(False)
 
     def update_selected_indices_signal_emitted(self, selected_indices):
         widget = getattr(self.parent, self.widget_name)
