@@ -571,6 +571,11 @@ class SelectableList(Base):
         if hasattr(self.parent, '_gui'):
             getattr(getattr(self.parent.gui, self.name), "update_selected_indices")(self.selected_indices)
 
+    @printexception
+    def update_selected_data(self, val):
+        selected_indices = [self.data.index(i) for i in val]
+        self.update_selected_indices(selected_indices)
+
     @property
     @printexception
     def selected_data(self):
@@ -581,10 +586,9 @@ class SelectableList(Base):
     def selected_value(self):
         return self.data[self.selected_index]
 
-    @selected_value.setter
     @printexception
-    def selected_value(self, val):
-        self.update_selected_indices([self.data.index(val)])
+    def update_selected_value(self, val):
+        self.update_selected_data([val])
 
 class XAxisParameterComboBox(SelectableList):
 
@@ -718,6 +722,28 @@ class ParameterTable(DataTable):
                 out[cn] = val
         return out
 
+class FitResultTable(DataTable):
+    def __init__(self, **kwargs):
+        super(FitResultTable, self).__init__(name='fit_result_table', delete_names=['_data', '_selected_indices'], **kwargs)
+
+    @printexception
+    def get_data(self):
+        if not hasattr(self.parent, '_data_fit_results') or len(self.parent.data_fit_results.df) == 0:
+            out = collections.OrderedDict()
+        else:
+            header = self.parent.data_fit_results.parameter_names + self.parent.data_fit_results.df.fit_result[0].params.keys()
+            out = collections.OrderedDict([(key, []) for key in header])
+            for idx, _I_ in self.parent.data_fit_results.df.iterrows():
+                for key, val in list(_I_.iteritems())[:-1]:
+                    out[key].append(val)
+                for key, val in _I_[-1].params.items():
+                    out[key].append(val.value)
+        return out
+
+    @printexception
+    def selected_indices_default(self, selected_indices):
+        return collections.OrderedDict()
+
 class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
     def __init__(self, title=None, parent=None, gui=True, **kwargs):
         """
@@ -738,6 +764,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         self.row_ax_parameter_list = RowAxParameterComboBox(parent=self)
         self.subtract_parameter_list = SubtractParameterComboBox(parent=self)
         self.parameter_table = ParameterTable(parent=self)
+        self.fit_result_table = FitResultTable(parent=self)
         self.set_data(**kwargs)
         if title is not None:
             self.update_window_title(title)
@@ -785,15 +812,17 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         self.parameter_table.update_data()
         self.observation_list.update_data()
         self.average_parameter_list.update_data()
+        self.set_custom_default_settings()
         self.update_plot()
+
+    def set_custom_default_settings(self):
+        if hasattr(self, '_custom_default_settings'):
+            self._custom_default_settings()
 
     @printexception
     def delete_attributes(self):
         for attr_name in [
             '_data',
-            '_selected_plot_items',
-            '_fit_select_table_data',
-            '_fit_select_table_selected_rows',
             '_fit_results',
             '_fit_result_table_data'
         ]:
@@ -807,6 +836,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             'row_ax_parameter_list',
             'subtract_parameter_list',
             'parameter_table',
+            'fit_results_table',
         ]:
             getattr(self, attr_name).delete_attributes()
 
@@ -827,158 +857,50 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             data.average_parameter(pn, observation_names=self.observation_list.selected_data)
         return data
 
-    # @property
-    # @printexception
-    # def selected_plot_items(self):
-    #     return self._selected_plot_items
-    #
-    # @printexception
-    # def update_selected_plot_items(self):
-    #     out = self.parameter_table.selected_data
-    #     if all([len(i) == 0 for i in out.values()]):
-    #         self._selected_plot_items = []
-    #         return
-    #     spl = [self.x_axis_parameter_list.selected_value, self.col_ax_parameter_list.selected_value, self.row_ax_parameter_list.selected_value, self.subtract_parameter_list.selected_value] + self.average_parameter_list.selected_data
-    #     spl = [i for i in spl if i != '__none__']
-    #     if len(spl) != len(set(spl)):
-    #         self._selected_plot_items = []
-    #         print('Selected plot options are invalid, parameters have been selected multiple times. {}'.format(spl))
-    #         return
-    #     for key, val in out.items():
-    #         if key == self.x_axis_parameter_list.selected_value or key == self.subtract_parameter_list.selected_value:
-    #             out[key] = ['__all__']
-    #         if key in self.average_parameter_list.selected_data:
-    #             out[key] = ['__average__']
-    #     self._selected_plot_items = list(itertools.product(*out.values()))
+    @property
+    @printexception
+    def data_fit_results(self):
+        return self._data_fit_results
 
-    # @property
-    # @printexception
-    # def fit_select_table_data(self):
-    #     return self._fit_select_table_data
-    #
-    # @printexception
-    # def update_fit_select_table_data(self):
-    #     cpd = collections.OrderedDict()
-    #     for idx, spi in enumerate(self.line_plot_data()):
-    #         for column_idx, column_name in enumerate(self.parameter_names_reduced()):
-    #             if column_name in spi['condition_dict_reduced']:
-    #                 if not column_name in cpd:
-    #                     cpd[column_name] = []
-    #                 cpd[column_name].append(spi['condition_dict_reduced'][column_name])
-    #             elif column_name == self.subtract_parameter_list.selected_value:
-    #                 cpd[column_name] = ['diff'.format(self.subtract_parameter_list.selected_value)]
-    #     self._fit_select_table_data = cpd
-    #     if hasattr(self, '_gui'):
-    #         self.gui.update_fit_select_table_data(self.fit_select_table_data)
-    #     self.update_fit_select_table_selected_rows(range(len(self.fit_select_table_data.values()[0])))
-    #
-    #
-    # @property
-    # @printexception
-    # def fit_select_table_selected_rows(self):
-    #     return self._fit_select_table_selected_rows
-    #
-    # @printexception
-    # def update_fit_select_table_selected_rows(self, fit_select_table_selected_rows=None):
-    #     self._fit_select_table_selected_rows = [] if fit_select_table_selected_rows is None else fit_select_table_selected_rows  # self.fit_select_table_widget.selected_items_unique_column_indices()
-    #     if hasattr(self, '_gui'):
-    #         self.gui.update_fit_select_table_selected_rows(self.fit_select_table_selected_rows)
-    #
-    # @property
-    # @printexception
-    # def fit_results(self):
-    #     return self._fit_results
-    #
-    # @printexception
-    # def update_fit_results(self):
-    #     try:
-    #         spi = self.line_plot_data()
-    #         if hasattr(self, 'custom_model'):
-    #             mod = self.custom_model
-    #         elif self.fit_function == 'cosine':
-    #             from . import lmfit_models
-    #             mod = lmfit_models.CosineModel()
-    #         elif self.fit_function == 'exp':
-    #             pass
-    #         elif self.fit_function == 'lorentz':
-    #             from . import lmfit_models
-    #             mod = lmfit.models.LorentzianModel()
-    #         self._fit_results = []
-    #         for idx in self.fit_select_table_selected_rows:
-    #             i = spi[idx]
-    #             params = mod.guess(data=np.array(i['y']), x=np.array(i['x']))
-    #             fp = getattr(self, 'fix_params', {})
-    #             if all(key in params for key in fp.keys()):
-    #                 for key, val in fp.items():
-    #                     params[key].vary = False
-    #                     params[key].value = val
-    #             self._fit_results.append([i, mod.fit(np.array(i['y']), params, x=np.array(i['x']))])
-    #         self.update_fit_result_table_data()
-    #     except ValueError:
-    #         print("Can not fit, input contains nan values")
-    #     except:
-    #         exc_type, exc_value, exc_tb = sys.exc_info()
-    #         traceback.print_exception(exc_type, exc_value, exc_tb)
-    #
-    # @property
-    # @printexception
-    # def fit_result_table_data(self):
-    #     return self._fit_result_table_data
-    #
-    # @printexception
-    # def update_fit_result_table_data(self):
-    #     if len(self.fit_results) == 0:
-    #         out = collections.OrderedDict()
-    #     else:
-    #         header = self.fit_results[0][0]['condition_dict_reduced'].keys() + ['observation_name'] + self.fit_results[0][1].params.keys()
-    #         out = collections.OrderedDict([(key, []) for key in header])
-    #         for fri in self.fit_results:
-    #             for key, val in fri[0]['condition_dict_reduced'].items() + [('observation_name', fri[0]['observation_name'])] + [(key, val.value) for key, val in fri[1].params.items()]:
-    #                 out[key].append(val)
-    #     self._fit_result_table_data = out
-    #     if hasattr(self, '_gui'):
-    #         self.gui.update_fit_result_table_data(self.fit_result_table_data)
-    #
-    # @printexception
-    # def ret_line_plot_data_single(self, condition_dict, observation_name):
-    #     cl = [self.data.df[key] == val for key, val in condition_dict.items() if val not in ['__all__', '__average__']]
-    #     out = self.data.df[functools.reduce(np.logical_and, cl)] if len(cl) != 0 else self.data.df
-    #     # TODO: wont work for dates as can not be averaged
-    #     return out.groupby([key for key, val in condition_dict.items() if val != '__average__']).agg({observation_name: np.mean}).reset_index()
-    #
-    # @printexception
-    # def line_plot_data(self):
-    #     plot_data = []
-    #     if len(self.data.df) > 0:
-    #         for p in self.selected_plot_items:
-    #             condition_dict = collections.OrderedDict([(ni, pi) for ni, pi in zip(self.parameter_names_reduced(), p)])
-    #             for observation_name in self.observation_list.selected_data:
-    #                 if self.subtract_parameter_list.selected_value == '__none__':
-    #                     dfxy = self.ret_line_plot_data_single(condition_dict, observation_name).dropna(subset=[observation_name])
-    #                     condition_dict_reduced = collections.OrderedDict([(key, val) for key, val in condition_dict.items() if val not in ['__average__', '__all__']])
-    #                     plot_data.append(
-    #                         dict(
-    #                             condition_dict_reduced=condition_dict_reduced,
-    #                             observation_name=observation_name,
-    #                             x=getattr(dfxy, self.x_axis_parameter_list.selected_value),
-    #                             y=getattr(dfxy, observation_name)
-    #                         )
-    #                     )
-    #                 else:
-    #                     keys = [key for key, val in condition_dict.items() if val not in ['__average__', '__all__']] + [self.x_axis_parameter_list.selected_value]
-    #                     dfxys = self.ret_line_plot_data_single(condition_dict, observation_name).dropna(subset=[observation_name])
-    #                     dfxy = dfxys.groupby(keys).filter(lambda x: len(x) ==2).groupby(keys).agg({observation_name: lambda x: -1 * np.diff(x)}).reset_index()
-    #                     if len(dfxy) > 1:
-    #                         condition_dict_reduced = collections.OrderedDict([(key, val) for key, val in condition_dict.items() if val not in ['__average__', '__all__']])
-    #                         plot_data.append(
-    #                             dict(
-    #                                 condition_dict_reduced=condition_dict_reduced,
-    #                                 observation_name=observation_name,
-    #                                 x=getattr(dfxy, self.x_axis_parameter_list.selected_value),
-    #                                 y=getattr(dfxy, observation_name)
-    #                             )
-    #                         )
-    #     return plot_data
+    @printexception
+    def update_data_fit_results(self, data_selected=None):
+        data_selected = self.data_selected if data_selected is None else data_selected
+        try:
+            if hasattr(self, 'custom_model'):
+                mod = self.custom_model
+            elif self.fit_function == 'cosine':
+                from . import lmfit_models
+                mod = lmfit_models.CosineModel()
+            elif self.fit_function == 'exp':
+                pass
+            elif self.fit_function == 'lorentz':
+                from . import lmfit_models
+                mod = lmfit.models.LorentzianModel()
+            pnl = [pn for pn in data_selected.parameter_names if pn != self.x_axis_parameter_list.selected_value]
+            for d, d_idx, idx, sub in data_selected.iterator(column_names=pnl, output_data_instance=True):
+                for idx_obs, obs in enumerate(sub.observation_names):
+                    x = np.array(sub.df[self.x_axis_parameter_list.selected_value])
+                    y = np.array(sub.df[obs])
+                    params = mod.guess(data=y, x=x)
+                    fp = getattr(self, 'fix_params', {})
+                    if all(key in params for key in fp.keys()):
+                        for key, val in fp.items():
+                            params[key].vary = False
+                            params[key].value = val
+                    if idx == 0 and idx_obs == 0:
+                        data_fit_results = Data(parameter_names=pnl + ['observation_name'],
+                                           observation_names=['fit_result'],
+                                           dtypes={'fit_result': 'object'})
+                        data_fit_results.init()
+                    data_fit_results.append(collections.OrderedDict([(key, val) for key, val in zip(d.keys() + ['observation_name'], d.values() + [obs])]))
+                    data_fit_results.set_observations(collections.OrderedDict([('fit_result', mod.fit(y, params, x=x))]))
+            self._data_fit_results = data_fit_results
+            self.fit_result_table.update_data()
+        except ValueError:
+            print("Can not fit, input contains nan values")
+        except:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            traceback.print_exception(exc_type, exc_value, exc_tb)
 
     def plot_label(self, condition_dict_reduced):
         label = ""
@@ -1036,10 +958,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         data_selected = self.data_selected
         if len(data_selected.df) == 0:
             print('Nothing to plot. You may select something.')
-        # self.update_selected_plot_items()
-        # if len(self.selected_plot_items) == 0:
-        #     return
-        # self.update_fit_select_table_data()
+        fig.clear()
         fig.clear()
         if self.col_ax_parameter_list.selected_value != '__none__' and self.row_ax_parameter_list.selected_value == '__none__':
             ax_p_list = self.parameter_table.selected_data[self.col_ax_parameter_list.selected_value]
@@ -1117,17 +1036,16 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             self.gui.canvas.draw()
 
     @printexception
-    def update_plot_fit(self, fit_results=None):
-        if fit_results is None:
-            self.update_fit_results()
+    def update_plot_fit(self, data_fit_results=None):
+        if data_fit_results is None:
+            self.update_data_fit_results()
         else:
-            self._fit_results = fit_results
+            self._data_fit_results = data_fit_results
         if hasattr(self, '_gui'):
             self.gui.fig_fit.clear()
             self.gui.ax_fit = self.gui.fig_fit.add_subplot(111)
-            for idx, fi in enumerate(self.fit_results):
+            for r in self.data_fit_results.df.fit_result:
                 color = self.gui.ax_fit._get_lines.get_next_color()
-                r = fi[1]
                 x = r.userkws['x']
                 y = r.eval(params=r.params, x=x)
                 self.gui.ax_fit.plot(x, y, '-', color=color)
@@ -1231,7 +1149,7 @@ class ParameterCombobox(BaseQt):
         getattr(self.parent.no_qt, self.name).update_selected_indices([idx])
 
 
-class ParameterTableQt(BaseQt):
+class TableQt(BaseQt):
 
     update_data_signal = pyqtSignal(collections.OrderedDict)
     update_selected_indices_signal = pyqtSignal(collections.OrderedDict)
@@ -1244,20 +1162,6 @@ class ParameterTableQt(BaseQt):
         for column_name, val in data.items():
             widget.set_column(column_name, val)
         self.update_item_flags()
-        widget.blockSignals(False)
-
-    def update_item_flags(self):
-        widget = getattr(self.parent, self.widget_name)
-        widget.blockSignals(True)
-        if len(self.parent.no_qt.x_axis_parameter_list.selected_indices) == 1:
-            for cidx in range(widget.columnCount()):
-                cn = widget.column_name(cidx)
-                if cn == self.parent.no_qt.subtract_parameter_list.selected_value:
-                    flag = Qt.NoItemFlags
-                else:
-                    flag = Qt.ItemIsSelectable | Qt.ItemIsEnabled
-                for ridx in widget.column_data_indices(cn):
-                    widget.set_cell(ridx, cidx, flag=flag)
         widget.blockSignals(False)
 
     def update_selected_indices_signal_emitted(self, selected_indices):
@@ -1283,6 +1187,32 @@ class ParameterTableQt(BaseQt):
             out[cn].append(item.row())
         getattr(self.parent.no_qt, self.name).update_selected_indices(out)
 
+class ParameterTableQt(TableQt):
+
+    def update_item_flags(self):
+        widget = getattr(self.parent, self.widget_name)
+        widget.blockSignals(True)
+        for cidx in range(widget.columnCount()):
+            cn = widget.column_name(cidx)
+            if cn == self.parent.no_qt.subtract_parameter_list.selected_value:
+                flag = Qt.NoItemFlags
+            else:
+                flag = Qt.ItemIsSelectable | Qt.ItemIsEnabled
+            for ridx in widget.column_data_indices(cn):
+                widget.set_cell(ridx, cidx, flag=flag)
+        widget.blockSignals(False)
+
+class FitResultTableQt(TableQt):
+
+    def update_item_flags(self):
+        widget = getattr(self.parent, self.widget_name)
+        widget.blockSignals(True)
+        for cidx in range(widget.columnCount()):
+            for ridx in widget.column_data_indices(widget.column_name(cidx)):
+                widget.set_cell(ridx, cidx, flag=Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+        widget.blockSignals(False)
+
+
 class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
     def __init__(self, parent=None, no_qt=None):
         self.observation_list = SelectableListQt(name='observation_list', widget_name='observation_widget', parent=self)
@@ -1292,12 +1222,9 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
         self.row_ax_parameter_list = ParameterCombobox(name='row_ax_parameter_list', widget_name='row_ax_parameter_comboBox', parent=self)
         self.subtract_parameter_list = ParameterCombobox(name='subtract_parameter_list', widget_name='subtract_parameter_comboBox', parent=self)
         self.parameter_table = ParameterTableQt(name='parameter_table', widget_name='parameter_table_widget', parent=self)
+        self.fit_result_table = FitResultTableQt(name='fit_result_table', widget_name='fit_result_table_widget', parent=self)
         super(PlotDataQt, self).__init__(parent=parent, no_qt=no_qt, ui_filepath=os.path.join(os.path.dirname(__file__), 'qtgui/plot_data.ui'))
 
-
-    update_fit_select_table_data_signal = pyqtSignal(collections.OrderedDict)
-    update_fit_select_table_selected_rows_signal = pyqtSignal(list)
-    update_fit_result_table_data_signal = pyqtSignal(collections.OrderedDict)
     update_info_text_signal = pyqtSignal(str)
 
     def clear_widget(self, name, clear_method_name):
@@ -1315,7 +1242,6 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
             ['parameter_table_widget', 'clear_table_contents'],
             ['observation_widget', 'clear'],
             ['average_parameter_widget', 'clear'],
-            ['fit_select_table_widget', 'clear_table_contents'],
             ['fit_result_table_widget', 'clear_table_contents'],
         ]:
             self.clear_widget(item[0], item[1])
@@ -1329,90 +1255,6 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
             self.canvas_fit.draw()
         except:
             pass
-
-    # def update_parameter_table_data(self, parameter_table_data):
-    #     self.update_parameter_table_data_signal.emit(parameter_table_data)
-    #
-    # def update_parameter_table_data_signal_emitted(self, parameter_table_data):
-    #     self.parameter_table_widget.blockSignals(True)
-    #     if self.parameter_table_widget.columnCount() == 0:
-    #         self.parameter_table_widget.set_column_names(parameter_table_data.keys())
-    #     for column_name, val in parameter_table_data.items():
-    #         self.parameter_table_widget.set_column(column_name, val)
-    #     self.update_parameter_table_item_flags()
-    #     self.parameter_table_widget.blockSignals(False)
-    #
-    # def update_parameter_table_item_flags(self):
-    #     self.parameter_table_widget.blockSignals(True)
-    #     if len(self.no_qt.x_axis_parameter_list.selected_indices) == 1: #hasattr(self.no_qt, '_x_axis_parameter'):
-    #         for cidx in range(self.parameter_table_widget.columnCount()):
-    #             cn = self.parameter_table_widget.column_name(cidx)
-    #             if cn == self.no_qt.x_axis_parameter_list.selected_value:
-    #                 flag = Qt.NoItemFlags
-    #             else:
-    #                 flag = Qt.ItemIsSelectable | Qt.ItemIsEnabled
-    #             for ridx in self.parameter_table_widget.column_data_indices(cn):
-    #                 self.parameter_table_widget.set_cell(ridx, cidx, flag=flag)
-    #     self.parameter_table_widget.blockSignals(False)
-    #
-    # def update_parameter_table_selected_indices(self, selected_indices):
-    #     self.update_parameter_table_selected_indices_signal.emit(selected_indices)
-    #
-    # def update_parameter_table_selected_indices_signal_emitted(self, parameter_table_selected_indices):
-    #     self.parameter_table_widget.blockSignals(True)
-    #     for cn, val in parameter_table_selected_indices.items():
-    #         cidx = self.parameter_table_widget.column_index(cn)
-    #         for ridx in self.parameter_table_widget.column_data_indices(cn):
-    #             if val == '__all__' or (not isinstance(val, basestring) and ridx in val):
-    #                 self.parameter_table_widget.item(ridx, cidx).setSelected(True)
-    #             else:
-    #                 self.parameter_table_widget.item(ridx, cidx).setSelected(False)
-    #     self.parameter_table_widget.blockSignals(False)
-    #
-    # def update_parameter_table_selected_indices_from_gui(self):
-    #     out = collections.OrderedDict()
-    #     column_names = self.parameter_table_widget.column_names
-    #     for item in self.parameter_table_widget.selectedItems():
-    #         cn = column_names[item.column()]
-    #         if not cn in out:
-    #             out[cn] = []
-    #         out[cn].append(item.row())
-    #     self.no_qt.update_parameter_table_selected_indices(out)
-
-    def update_fit_select_table_data(self, fit_select_table_data):
-        self.update_fit_select_table_data_signal.emit(fit_select_table_data)
-
-    def update_fit_select_table_data_signal_emitted(self, fit_select_table_data):
-        self.fit_select_table_widget.blockSignals(True)
-        self.fit_select_table_widget.clear_table_contents()
-        self.fit_select_table_widget.set_column_names(fit_select_table_data.keys())
-        for column_name, val in fit_select_table_data.items():
-            self.fit_select_table_widget.set_column(column_name, val, [Qt.ItemIsSelectable | Qt.ItemIsEnabled for _ in range(len(val))])
-        self.fit_select_table_widget.blockSignals(False)
-    @printexception
-    def update_fit_select_table_selected_rows_from_gui(self):
-        self.no_qt.update_fit_select_table_selected_rows(self.fit_select_table_widget.selected_items_unique_row_indices())
-
-    def update_fit_select_table_selected_rows(self, selected_rows):
-        self.update_fit_select_table_selected_rows_signal.emit(selected_rows)
-
-    def update_fit_select_table_selected_rows_signal_emitted(self, fit_select_table_selected_rows):
-        self.fit_select_table_widget.blockSignals(True)
-        for ridx in range(self.fit_select_table_widget.rowCount()):
-            if self.fit_select_table_widget.item(ridx, 0).isSelected() ^ (ridx in fit_select_table_selected_rows):
-                self.fit_select_table_widget.selectRow(ridx)
-        self.fit_select_table_widget.blockSignals(False)
-
-    def update_fit_result_table_data(self, fit_result_table_data):
-        self.update_fit_result_table_data_signal.emit(fit_result_table_data)
-
-    def update_fit_result_table_data_signal_emitted(self, fit_result_table_data):
-        self.fit_result_table_widget.blockSignals(True)
-        self.fit_result_table_widget.clear_table_contents()
-        self.fit_result_table_widget.set_column_names(fit_result_table_data.keys())
-        for column_name, val in fit_result_table_data.items():
-            self.fit_result_table_widget.set_column(column_name, val)
-        self.fit_result_table_widget.blockSignals(False)
 
     def update_info_text(self, info_text):
         self.update_info_text_signal.emit(info_text)
@@ -1431,9 +1273,6 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
     def init_gui(self):
         super(PlotDataQt, self).init_gui()
         for name in [
-            'update_fit_select_table_data',
-            'update_fit_select_table_selected_rows',
-            'update_fit_result_table_data',
             'update_info_text'
         ]:
             getattr(getattr(self, "{}_signal".format(name)), 'connect')(getattr(self, "{}_signal_emitted".format(name)))
@@ -1444,7 +1283,8 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
             'row_ax_parameter_list',
             'col_ax_parameter_list',
             'subtract_parameter_list',
-            'parameter_table'
+            'parameter_table',
+            'fit_result_table'
 
         ]:
             getattr(self, name).connect_signals()
@@ -1475,7 +1315,6 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
 
         self.parameter_table_widget.hdf_file_dropped.connect(self.no_qt.set_data_from_path)
         self.parameter_table_widget.itemSelectionChanged.connect(self.parameter_table.update_selected_indices_from_gui)
-        self.fit_select_table_widget.itemSelectionChanged.connect(self.update_fit_select_table_selected_rows_from_gui)
         self.observation_widget.itemSelectionChanged.connect(self.observation_list.update_selected_indices_from_gui)
         self.average_parameter_widget.itemSelectionChanged.connect(self.average_parameter_list.update_selected_indices_from_gui)
         self.open_code_button.clicked.connect(self.open_measurement_code)
