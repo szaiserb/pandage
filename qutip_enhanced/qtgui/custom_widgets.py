@@ -136,7 +136,8 @@ class QTableWidgetEnhanced(QTableWidget):
         for column_name in self.column_names:
             self.clear_column_data(column_name)
             self.clear_column_flags(column_name)
-        self.clear()
+        super(QTableWidgetEnhanced, self).clear()
+        # self.clear()
         self.setRowCount(0)
         self.setColumnCount(0)
 
