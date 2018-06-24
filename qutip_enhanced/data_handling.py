@@ -558,7 +558,6 @@ class SelectableList(Base):
         return self._selected_indices[0]
 
     def update_selected_indices(self, val=None):
-        other = 'noindices' if not hasattr(self, '_selected_indices') else self._selected_indices
         if val is not None:
             self._selected_indices = val
         elif not hasattr(self, '_selected_indices') or (any([i not in self.data for i in self.selected_data]) and len(self.data) > 0):
@@ -856,11 +855,10 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
                     x = np.array(sub.df[self.x_axis_parameter_list.selected_value])
                     y = np.array(sub.df[obs])
                     params = mod.guess(data=y, x=x)
-                    fp = getattr(self, 'fix_params', {})
-                    if all(key in params for key in fp.keys()):
-                        for key, val in fp.items():
-                            params[key].vary = False
-                            params[key].value = val
+                    for key, val in getattr(self, 'custom_params', {}).items():
+                        if key not in params:
+                            raise Exception('Error: invalid custom_params {} for fit. Key {} not found'.format(self.custom_params, key))
+                        params[key] = val
                     if idx == 0 and idx_obs == 0:
                         data_fit_results = Data(parameter_names=pnl + ['observation_name'],
                                                 observation_names=['fit_result'],
