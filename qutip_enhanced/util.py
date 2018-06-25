@@ -5,16 +5,16 @@ __metaclass__ = type
 from numbers import Number
 import numpy as np
 
-import functools, traceback, sys
+import functools, traceback, sys, inspect
 def printexception(func):
     @functools.wraps(func)
     def wrapper(*a, **kw):
         try:
             return func(*a, **kw)
         except:
-            print('THROWN_FROM_PRINTEXCEPTIONWRAPPER')
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
+            raise
 
     return wrapper
 

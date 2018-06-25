@@ -2,7 +2,7 @@ from __future__ import print_function, absolute_import, division
 
 __metaclass__ = type
 
-from .util import ret_property_typecheck, ret_property_list_element, check_type, check_array_like
+from .util import ret_property_typecheck, ret_property_list_element, check_type, check_array_like, printexception
 from .data_handling import df_drop_duplicate_rows, df_pop, Data
 
 from collections import Counter, OrderedDict
@@ -39,6 +39,7 @@ class DataGeneration:
         return self._parameters
 
     @parameters.setter
+    @printexception
     def parameters(self, val):
         if type(val) != OrderedDict:
             raise Exception('Error: {}, {}'.format(type(val), val))
@@ -57,22 +58,21 @@ class DataGeneration:
         return getattr(self, '_dtypes', None)
 
     @dtypes.setter
+    @printexception
     def dtypes(self, val):
-        try:
-            if isinstance(val, dict):
-                for k, v in val.items():
-                    if not (k in self.parameters.keys() or isinstance(v, str)):
-                        raise Exception("Error: {}".format(val))
-                self._dtypes = val
-        except Exception:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            traceback.print_exception(exc_type, exc_value, exc_tb)
+        if isinstance(val, dict):
+            for k, v in val.items():
+                if not (k in self.parameters.keys() or isinstance(v, str)):
+                    raise Exception("Error: {}".format(val))
+            self._dtypes = val
 
     @property
+    @printexception
     def observation_names(self):
         return self._observation_names
 
     @property
+    @printexception
     def number_of_simultaneous_measurements(self):
         if hasattr(self, '_number_of_simultaneous_measurements'):
             return self._number_of_simultaneous_measurements
@@ -80,6 +80,7 @@ class DataGeneration:
             return 1
 
     @number_of_simultaneous_measurements.setter
+    @printexception
     def number_of_simultaneous_measurements(self, val):
         if type(val) is int:
             self._number_of_simultaneous_measurements = val
@@ -87,6 +88,7 @@ class DataGeneration:
             raise Exception('Error: {}'.format(val))
 
     @property
+    @printexception
     def data(self):
         return self.pld.data
 

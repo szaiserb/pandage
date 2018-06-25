@@ -154,7 +154,7 @@ class Data:
 
     def change_column_dtype(self, column_name, new_dtype=None):
         if new_dtype is not None:
-            self._df[[column_name]] = self.df[[column_name]].astype(new_dtype)
+            self.df[[column_name]] = self.df[[column_name]].astype(new_dtype)
         if column_name in self.observation_names:
             self.dtypes[column_name] = new_dtype
         self.reinstate_integrity()
@@ -287,7 +287,7 @@ class Data:
     def save(self, filepath, notify=False):
         if filepath.endswith('.csv'):
             t0 = time.time()
-            self._df.to_csv(filepath, index=False, compression='gzip')
+            self.df.to_csv(filepath, index=False, compression='gzip')
             print("csv data saved ({:.2f}s).\n If speed is an issue, use hdf. csv format is useful ony for py2-py3-compatibility.".format(time.time() - t0))
         elif filepath.endswith('.hdf'):
             t0 = time.time()
@@ -297,7 +297,7 @@ class Data:
                 self.hdf_lock.acquire()
                 print('Ok.. hdf_lock acquired.')
             store = pd.HDFStore(filepath)
-            store.put('df', self._df, table=True)
+            store.put('df', self.df, table=True)
             for key in ["parameter_names", 'observation_names', 'dtypes']:
                 setattr(store.get_storer('df').attrs, key, getattr(self, key))
             store.close()
@@ -320,6 +320,8 @@ class Data:
             for k, v in self.dtypes.items():
                 if v == 'datetime':
                     l_obs[idx][k] = datetime.datetime(1900, 1, 1)  # datetime.datetime.min is also an option, but leads to OutOfBoundsDatetime: Out of bounds nanosecond timestamp: 1-01-01 00:00:00, when calling data = self.df.iloc[index.row(), index.column()]
+                elif v.startswith('numpy'):
+                    l_obs[idx][k] = getattr(np, v.split('.')[1])()
                 else:
                     l_obs[idx][k] = getattr(__builtin__, v)()
         return pd.DataFrame(columns=self.observation_names, data=l_obs)
@@ -330,15 +332,15 @@ class Data:
         if len(self.df) == 0:
             self._df = df_append
         else:
-            self._df = self._df.append(df_append, ignore_index=True)
+            self._df = self.df.append(df_append, ignore_index=True)
         self.check_integrity()
 
     def set_observations(self, l, start_idx=None):
-        start_idx = len(self._df) - 1 if start_idx is None else start_idx
+        start_idx = len(self.df) - 1 if start_idx is None else start_idx
         l = l_to_df(l)
         for idx, row in l.iterrows():
             for obs, val in zip(l.columns, row):
-                self._df.at[start_idx - len(l) + idx + 1, obs] = val
+                self.df.at[start_idx - len(l) + idx + 1, obs] = val
         self.check_integrity()
 
     def df_access(self, other):
@@ -422,7 +424,7 @@ class Data:
         self.observation_names = [i for i in self.observation_names if i not in observation_names]
         self.observation_names.insert(previous_observation_location, new_observation_name)
         new_column_names = self.parameter_names + self.observation_names
-        self._df = self._df[new_column_names]
+        self._df = self.df[new_column_names]
         self.change_column_dtype(new_parameter_name, new_parameter_dtype)
         self.check_integrity()
 
@@ -440,7 +442,7 @@ class Data:
         if lnp != 2:
             raise Exception('Error: Only parameters with 2 unique items can be subtracted. Parameter {} has {}'.format(parameter_name, lnp))
         self.delete_columns([i for i in self.observation_names if i not in observation_names])
-        self._df.dropna(inplace=True)
+        self.df.dropna(inplace=True)
         self.parameter_names = [key for key in self.parameter_names if key != parameter_name]
         self._df = self.df.groupby(self.parameter_names).filter(lambda x: len(x) == 2).groupby(self.parameter_names).agg(dict([(obs, lambda x: -1 * np.diff(x)) for obs in observation_names])).reset_index()
         self.check_integrity()
@@ -450,7 +452,7 @@ class Data:
         self.delete_columns([i for i in self.observation_names if i not in observation_names])
         # self._df.dropna(inplace=True)
         self.parameter_names = [key for key in self.parameter_names if key != parameter_name]
-        self._df = self.df.groupby(self.parameter_names).agg(dict([(obs, np.mean) for obs in observation_names])).reset_index()
+        self._df = self.df.groupby(self.parameter_names).agg(collections.OrderedDict([(obs, np.mean) for obs in observation_names])).reset_index()
         self.check_integrity()
 
 
@@ -520,9 +522,11 @@ def df_drop_duplicate_rows(df, other):
 
 class Base:
 
+    @printexception
     def __init__(self, delete_names=None):
         self.delete_names = [] if delete_names is None else delete_names
 
+    @printexception
     def delete_attributes(self):
         for attr_name in self.delete_names:
             if hasattr(self, attr_name):
@@ -531,9 +535,11 @@ class Base:
             getattr(self.parent.gui, self.name).clear()
 
     @property
+    @printexception
     def data(self):
         return getattr(self, '_data')
 
+    @printexception
     def update_data(self):
         self._data = self.get_data()
         if hasattr(self.parent, '_gui'):
@@ -541,44 +547,51 @@ class Base:
         self.update_selected_indices()
 
     @property
+    @printexception
     def selected_indices(self):
         return self._selected_indices
 
 
 class SelectableList(Base):
+
+    @printexception
     def __init__(self, name='noname', parent=None, **kwargs):  # kwargs =dict(delete_names=['_data','_selected_indices',])
         super(SelectableList, self).__init__(**kwargs)
         self.parent = parent
         self.name = name
 
     @property
+    @printexception
     def selected_index(self):
         if len(self._selected_indices) != 1:
             raise Exception("Error: No single index selected.")
         return self._selected_indices[0]
 
+    @printexception
     def update_selected_indices(self, val=None):
         if val is not None:
             self._selected_indices = val
         elif not hasattr(self, '_selected_indices') or (any([i not in self.data for i in self.selected_data]) and len(self.data) > 0):
             self._selected_indices = self.selected_indices_default()
-        else:
-            return
         if hasattr(self.parent, '_gui'):
             getattr(getattr(self.parent.gui, self.name), "update_selected_indices")(self.selected_indices)
 
+    @printexception
     def update_selected_data(self, val=None):
         selected_indices = val if val is None else [self.data.index(i) for i in val]
         self.update_selected_indices(selected_indices)
 
     @property
+    @printexception
     def selected_data(self):
         return [self.data[i] for i in self.selected_indices]
 
     @property
+    @printexception
     def selected_value(self):
         return self.data[self.selected_index]
 
+    @printexception
     def update_selected_value(self, val=None):
         selected_data = val if val is None else [val]
         self.update_selected_data(selected_data)
@@ -586,83 +599,103 @@ class SelectableList(Base):
 
 class XAxisParameterComboBox(SelectableList):
 
+    @printexception
     def __init__(self, **kwargs):
         super(XAxisParameterComboBox, self).__init__(name='x_axis_parameter_list', delete_names=['_data', '_selected_indices'], **kwargs)
 
+    @printexception
     def get_data(self):
         return [cn for cn in self.parent.parameter_names_reduced()]
 
+    @printexception
     def selected_indices_default(self, selected_indices=None):
         return [np.argmax([len(getattr(self.parent.data.df, p).unique()) for p in self.data])]
 
 
 class ColAxParameterComboBox(SelectableList):
 
+    @printexception
     def __init__(self, **kwargs):
         super(ColAxParameterComboBox, self).__init__(name='col_ax_parameter_list', delete_names=['_data', '_selected_indices'], **kwargs)
 
+    @printexception
     def get_data(self):
         return ['__none__'] + [cn for cn in self.parent.parameter_names_reduced()]
 
+    @printexception
     def selected_indices_default(self, selected_indices=None):
         return [0]
 
 
 class RowAxParameterComboBox(SelectableList):
 
+    @printexception
     def __init__(self, **kwargs):
         super(RowAxParameterComboBox, self).__init__(name='row_ax_parameter_list', delete_names=['_data', '_selected_indices'], **kwargs)
 
+    @printexception
     def get_data(self):
         return ['__none__'] + [cn for cn in self.parent.parameter_names_reduced()]
 
+    @printexception
     def selected_indices_default(self, selected_indices=None):
         return [0]
 
 
 class SubtractParameterComboBox(SelectableList):
 
+    @printexception
     def __init__(self, **kwargs):
         super(SubtractParameterComboBox, self).__init__(name='subtract_parameter_list', delete_names=['_data', '_selected_indices'], **kwargs)
 
+    @printexception
     def get_data(self):
         return ['__none__'] + [cn for cn in self.parent.parameter_names_reduced()]
 
+    @printexception
     def selected_indices_default(self, selected_indices=None):
         return [0]
 
 
 class ObservationList(SelectableList):
 
+    @printexception
     def __init__(self, **kwargs):
         super(ObservationList, self).__init__(name='observation_list', delete_names=['_data', '_selected_indices'], **kwargs)
 
+    @printexception
     def get_data(self):
         return [i for i in self.parent.data.observation_names if not i in ['trace', 'start_time', 'end_time', 'thresholds']]
 
+    @printexception
     def selected_indices_default(self, selected_indices=None):
         return []
 
 
 class AverageParameterList(SelectableList):
 
+    @printexception
     def __init__(self, **kwargs):
         super(AverageParameterList, self).__init__(name='average_parameter_list', delete_names=['_data', '_selected_indices'], **kwargs)
 
+    @printexception
     def get_data(self):
         return self.parent.data.parameter_names
 
+    @printexception
     def selected_indices_default(self, selected_indices=None):
         return []
 
 
 class DataTable(Base):
 
+    @printexception
     def __init__(self, name='noname', parent=None, **kwargs):
         super(DataTable, self).__init__(**kwargs)
         self.parent = parent
         self.name = name
 
+    @printexception
     def update_selected_indices(self, selected_indices=None):
         if isinstance(selected_indices, collections.OrderedDict) or selected_indices is None:
             self._selected_indices = self.selected_indices_default(selected_indices)
@@ -672,6 +705,7 @@ class DataTable(Base):
             getattr(getattr(self.parent.gui, self.name), "update_selected_indices")(self.selected_indices)
 
     @property
+    @printexception
     def selected_data(self):
         out = collections.OrderedDict()
         for cn, val in self.selected_indices.items():
@@ -679,6 +713,7 @@ class DataTable(Base):
             out[cn] = [data_full[i] for i in val]
         return out
 
+    @printexception
     def update_selected_data(self, selected_data):
         out = collections.OrderedDict()
         for cn, val in selected_data.items():
@@ -690,20 +725,27 @@ class DataTable(Base):
 
 
 class ParameterTable(DataTable):
+
+    @printexception
     def __init__(self, **kwargs):
         super(ParameterTable, self).__init__(name='parameter_table', delete_names=['_data', '_selected_indices'], **kwargs)
 
+    @printexception
     def get_data(self):
         out = collections.OrderedDict()
         for cn in self.parent.parameter_names_reduced():
             out[cn] = getattr(self.parent.data.df, cn).unique()
         return out
 
+    @printexception
     def selected_indices_default(self, selected_indices=None):
-        out = collections.OrderedDict([(key, range(len(val))) for key, val in self._data.items()])
-        if selected_indices is not None:
-            for cn, val in selected_indices.items():
-                out[cn] = val
+        out = collections.OrderedDict()
+        if hasattr(self, '_data'):
+            for key, val in self._data.items():
+                if selected_indices is not None and key in selected_indices:
+                    out[key] = selected_indices[key]
+                else:
+                    out[key] = range(len(val))
         return out
 
 
@@ -711,6 +753,7 @@ class FitResultTable(DataTable):
     def __init__(self, **kwargs):
         super(FitResultTable, self).__init__(name='fit_result_table', delete_names=['_data', '_selected_indices'], **kwargs)
 
+    @printexception
     def get_data(self):
         if not hasattr(self.parent, '_data_fit_results') or len(self.parent.data_fit_results.df) == 0:
             out = collections.OrderedDict()
@@ -724,11 +767,14 @@ class FitResultTable(DataTable):
                     out[key].append(val.value)
         return out
 
+    @printexception
     def selected_indices_default(self, selected_indices=None):
         return collections.OrderedDict()
 
 
 class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
+
+    @printexception
     def __init__(self, title=None, parent=None, gui=True, **kwargs):
         """
 
@@ -756,6 +802,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
     fit_function = 'cosine'
     show_legend = False
 
+    @printexception
     def set_data(self, **kwargs):
         if 'path' in kwargs:
             self.data = Data(iff=kwargs['path'])
@@ -765,20 +812,24 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             self.update_window_title(self.data.filepath)
             matplotlib.rcParams["savefig.directory"] = os.path.dirname(self.data.filepath)
 
+    @printexception
     def set_data_from_path(self, path):
         self.set_data(path=path)
 
     @property
+    @printexception
     def data(self):
         if hasattr(self, '_data'):
             return self._data
 
     @data.setter
+    @printexception
     def data(self, val):
         self.delete_attributes()
         self._data = val
         self.new_data_arrived()
 
+    @printexception
     def new_data_arrived(self):
         if hasattr(self.data, 'filepath') and matplotlib.rcParams["savefig.directory"] != os.path.dirname(self.data.filepath):
             matplotlib.rcParams["savefig.directory"] = os.path.dirname(self.data.filepath)
@@ -792,10 +843,12 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         self.set_custom_default_settings()
         self.update_plot()
 
+    @printexception
     def set_custom_default_settings(self):
         if hasattr(self, '_custom_default_settings'):
             self._custom_default_settings()
 
+    @printexception
     def delete_attributes(self):
         for attr_name in [
             '_data',
@@ -816,16 +869,18 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         ]:
             getattr(self, attr_name).delete_attributes()
 
+    @printexception
     def parameter_names_reduced(self, data=None):
         data = self.data if data is None else data
         return [i for i in data.parameter_names if not '_idx' in i]
 
     @property
+    @printexception
     def data_selected(self):
         other = pd.DataFrame(list(itertools.product(*self.parameter_table.selected_data.values())))
         other.rename(columns=collections.OrderedDict([(key, val) for key, val in enumerate(self.parameter_table.selected_data.keys())]), inplace=True)
-        data = Data(parameter_names=self.data.parameter_names, observation_names=self.data.observation_names)
-        data._df = df_access(self.data.df, other)
+        data = Data(parameter_names=self.data.parameter_names, observation_names=self.observation_list.selected_data)
+        data._df = df_access(self.data.df[self.data.parameter_names + self.observation_list.selected_data], other)
         if self.subtract_parameter_list.selected_value != '__none__':
             data.subtract_parameter(self.subtract_parameter_list.selected_value, observation_names=self.observation_list.selected_data)
         for pn in self.average_parameter_list.selected_data:
@@ -833,11 +888,16 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         return data
 
     @property
+    @printexception
     def data_fit_results(self):
         return self._data_fit_results
 
     def update_data_fit_results(self, data_selected=None):
         data_selected = self.data_selected if data_selected is None else data_selected
+        x_axis_parameter = self.x_axis_parameter_list.selected_value
+        if not x_axis_parameter in data_selected.parameter_names:
+            print('Can not fit!\nx_axis_parameter {} is not in data_selected'.format(x_axis_parameter))
+            return
         try:
             if hasattr(self, 'custom_model'):
                 mod = self.custom_model
@@ -849,10 +909,10 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             elif self.fit_function == 'lorentz':
                 from . import lmfit_models
                 mod = lmfit.models.LorentzianModel()
-            pnl = [pn for pn in data_selected.parameter_names if pn != self.x_axis_parameter_list.selected_value]
+            pnl = [pn for pn in data_selected.parameter_names if pn != x_axis_parameter]
             for d, d_idx, idx, sub in data_selected.iterator(column_names=pnl, output_data_instance=True):
                 for idx_obs, obs in enumerate(sub.observation_names):
-                    x = np.array(sub.df[self.x_axis_parameter_list.selected_value])
+                    x = np.array(sub.df[x_axis_parameter])
                     y = np.array(sub.df[obs])
                     params = mod.guess(data=y, x=x)
                     for key, val in getattr(self, 'custom_params', {}).items():
@@ -886,6 +946,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         return label[:-2]
 
     @staticmethod
+    @printexception
     def get_subplot_grid_location_parameters(nx_tot, ny_tot, n_tot, **kwargs):
         """
         NOTE: index numbers (e.g. n, nx, ny start from 0 as is common in python, not from 1 as is common in matlab and partially in matplotlib
@@ -922,6 +983,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         most_left_axis = True if nx == 0 else False
         return n, nx, ny, most_bottom_axis, most_left_axis
 
+    @printexception
     def number_of_lines(self, data_selected=None):
         data_selected = self.data_selected if data_selected is None else data_selected
         return len(data_selected.df[[i for i in data_selected.parameter_names if i != self.x_axis_parameter_list.selected_value]].drop_duplicates())
@@ -929,20 +991,28 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
     @printexception
     def update_plot_new(self, fig, data_selected=None):
         data_selected = self.data_selected if data_selected is None else data_selected
+        x_axis_parameter = self.x_axis_parameter_list.selected_value
+        col_ax_parameter = self.col_ax_parameter_list.selected_value
+        row_ax_parameter = self.row_ax_parameter_list.selected_value
         if len(data_selected.df) == 0:
             print('Nothing to plot. You may select something.')
+        for name in ['x_axis_parameter', 'col_ax_parameter', 'row_ax_parameter']:
+            val = locals()[name]
+            if val != '__none__' and not val in data_selected.parameter_names:
+                print('Can not plot!\n{} {} is not in data_selected'.format(name, val))
+                return
         fig.clear()
-        if self.col_ax_parameter_list.selected_value != '__none__' and self.row_ax_parameter_list.selected_value == '__none__':
-            ax_p_list = self.parameter_table.selected_data[self.col_ax_parameter_list.selected_value]
+        if col_ax_parameter != '__none__' and row_ax_parameter == '__none__':
+            ax_p_list = self.parameter_table.selected_data[col_ax_parameter]
             n_tot = len(ax_p_list)
             nx_tot = int(np.ceil(np.sqrt(n_tot)))
             ny_tot = n_tot / float(nx_tot)
             ny_tot = int(ny_tot + 1) if int(ny_tot) == ny_tot else int(np.ceil(ny_tot))
-        elif self.col_ax_parameter_list.selected_value != '__none__' and self.row_ax_parameter_list.selected_value != '__none__':
-            ax_p_list = list(itertools.product(self.parameter_table.selected_data[self.row_ax_parameter_list.selected_value], self.parameter_table.selected_data[self.col_ax_parameter_list.selected_value]))
+        elif col_ax_parameter != '__none__' and row_ax_parameter != '__none__':
+            ax_p_list = list(itertools.product(self.parameter_table.selected_data[row_ax_parameter], self.parameter_table.selected_data[col_ax_parameter]))
             n_tot = len(ax_p_list)
-            nx_tot = len(self.parameter_table.selected_data[self.col_ax_parameter_list.selected_value])
-            ny_tot = len(self.parameter_table.selected_data[self.row_ax_parameter_list.selected_value])
+            nx_tot = len(self.parameter_table.selected_data[col_ax_parameter])
+            ny_tot = len(self.parameter_table.selected_data[row_ax_parameter])
             if n_tot == nx_tot * ny_tot:  # self.number_of_lines:# +1 is for legend, I DONT THINK THIS DID WHAT IT SHOULD, SO I CHANGED IT
                 ny_tot += 1
         else:
@@ -953,21 +1023,21 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             pd = {} if len(axes) == 0 else {'sharex': axes[0], 'sharey': axes[0]}
             axes.append(fig.add_subplot(ny_tot, nx_tot, ni, **pd))
         for d, d_idx, idx, sub in data_selected.iterator(column_names=[pn for pn in data_selected.parameter_names if pn != self.x_axis_parameter_list.selected_value]):
-            if len(ax_p_list) == 0 or self.row_ax_parameter_list.selected_value == '__none__':  # len(ax_p_list[0]) == 1:
-                n = np.argwhere(np.array(ax_p_list) == (d[self.col_ax_parameter_list.selected_value]))[0, 0] if self.col_ax_parameter_list.selected_value != '__none__' else 0
+            if len(ax_p_list) == 0 or row_ax_parameter == '__none__':  # len(ax_p_list[0]) == 1:
+                n = np.argwhere(np.array(ax_p_list) == (d[col_ax_parameter]))[0, 0] if col_ax_parameter != '__none__' else 0
             else:
                 for n, cr in enumerate(ax_p_list):
-                    if cr[1] == d[self.col_ax_parameter_list.selected_value] and cr[0] == d[self.row_ax_parameter_list.selected_value]:
+                    if cr[1] == d[col_ax_parameter] and cr[0] == d[row_ax_parameter]:
                         break
                 else:
                     continue
-            abcdefg = collections.OrderedDict([(key, val) for key, val in d.items() if key not in [self.subtract_parameter_list.selected_value, self.col_ax_parameter_list.selected_value, self.row_ax_parameter_list.selected_value]])
+            abcdefg = collections.OrderedDict([(key, val) for key, val in d.items() if key not in [self.subtract_parameter_list.selected_value, col_ax_parameter, row_ax_parameter]])
             for obs in self.observation_list.selected_data:
                 axes[n].plot(sub[self.x_axis_parameter_list.selected_data], sub[obs], '-o', markersize=3, label=self.plot_label(abcdefg))
             if len(ax_p_list) != 0:
                 title_list = []
-                for column_name in [self.col_ax_parameter_list.selected_value, self.row_ax_parameter_list.selected_value]:
-                    if column_name != '__none__' and len(self.data.df[self.col_ax_parameter_list.selected_value].unique()) > 1:
+                for column_name in [col_ax_parameter, row_ax_parameter]:
+                    if column_name != '__none__' and len(self.data.df[col_ax_parameter].unique()) > 1:
                         title_list.append("{}: {}".format(column_name, d[column_name]))
                 if len(title_list) > 0:
                     axes[n].set_title(", ".join(title_list))
@@ -1027,24 +1097,18 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
     @printexception
     def save_plot(self, filepath):
         plt.ioff()
-        fig, ax = plt.subplots(1, 1)
-        cn = self.parameter_names_reduced()
-        if cn[0] == 'sweeps' and self.x_axis_parameter_list.selected_value != 'sweeps':
-            del cn[0]
-        cn.remove(self.x_axis_parameter_list.selected_value)
-        for d, d_idx, idx, df_sub in self.data.iterator(cn):
-            for observation in self.observation_list.selected_data:
-                dfagg = df_sub.groupby([self.x_axis_parameter_list.selected_value]).agg({observation: np.mean}).reset_index()
-                ax.plot(getattr(dfagg, self.x_axis_parameter_list.selected_value), getattr(dfagg, observation))
-        fig.tight_layout()
+        fig = plt.figure()
+        axes = self.update_plot_new(fig=fig)
         fig.savefig(filepath)
         plt.close(fig)
         plt.ion()
 
     @property
+    @printexception
     def info_text(self):
         return self._info_text
 
+    @printexception
     def update_info_text(self, info_text):
         self._info_text = info_text
         if hasattr(self, '_gui'):
@@ -1078,9 +1142,13 @@ class BaseQt(PyQt5.QtWidgets.QWidget):
     @printexception
     def clear(self):
         widget = getattr(self.parent, self.widget_name)
-        widget.blockSignals(True)
-        widget.clear()
-        widget.blockSignals(False)
+        try:
+            widget.blockSignals(True)
+            widget.clear()
+        except:
+            raise
+        finally:
+            widget.blockSignals(False)
 
 class SelectableListQt(BaseQt):
     update_data_signal = pyqtSignal(list)
@@ -1090,22 +1158,31 @@ class SelectableListQt(BaseQt):
     def update_data_signal_emitted(self, data):
         widget = getattr(self.parent, self.widget_name)
         widget.blockSignals(True)
-        if widget.count() != 0:
-            getattr(self.parent, self.widget_name).clear()
-        for val in data:
-            widget.addItem(QListWidgetItem(val))
-        widget.blockSignals(True)
+        try:
+            if widget.count() != 0:
+                getattr(self.parent, self.widget_name).clear()
+            for val in data:
+                widget.addItem(QListWidgetItem(val))
+        except:
+            raise
+        finally:
+            widget.blockSignals(False)
 
     @printexception
     def update_selected_indices_signal_emitted(self, selected_indices):
         widget = getattr(self.parent, self.widget_name)
-        widget.blockSignals(True)
-        for i in selected_indices:
-            widget.item(i).setSelected(True)
-        widget.blockSignals(False)
+        try:
+            widget.blockSignals(True)
+            for i in selected_indices:
+                widget.item(i).setSelected(True)
+        except:
+            raise
+        finally:
+            widget.blockSignals(False)
 
     @printexception
     def update_selected_indices_from_gui(self, *args, **kwargs):
+        print('Item selection has been changed.')
         getattr(self.parent.no_qt, self.name).update_selected_indices([i.row() for i in getattr(self.parent, self.widget_name).selectedIndexes()])
 
 
@@ -1117,10 +1194,14 @@ class ParameterCombobox(BaseQt):
     def update_data_signal_emitted(self, data):
         widget = getattr(self.parent, self.widget_name)
         widget.blockSignals(True)
-        if widget.count() != 0:
-            getattr(self.parent, self.widget_name).clear()
-        widget.addItems(data)
-        widget.blockSignals(False)
+        try:
+            if widget.count() != 0:
+                getattr(self.parent, self.widget_name).clear()
+            widget.addItems(data)
+        except:
+            raise
+        finally:
+            widget.blockSignals(False)
         if hasattr(getattr(self.parent.no_qt, self.name), '_selected_indices'):
             getattr(self.parent.parameter_table, 'update_item_flags')()
 
@@ -1144,27 +1225,35 @@ class TableQt(BaseQt):
     def update_data_signal_emitted(self, data):
         widget = getattr(self.parent, self.widget_name)
         widget.blockSignals(True)
-        if widget.columnCount() != 0:
-            getattr(self.parent, self.widget_name).clear_table_contents()
-        if widget.columnCount() == 0:
-            widget.set_column_names(data.keys())
-        for column_name, val in data.items():
-            widget.set_column(column_name, val)
-        self.update_item_flags()
-        widget.blockSignals(False)
+        try:
+            if widget.columnCount() != 0:
+                getattr(self.parent, self.widget_name).clear_table_contents()
+            if widget.columnCount() == 0:
+                widget.set_column_names(data.keys())
+            for column_name, val in data.items():
+                widget.set_column(column_name, val)
+            self.update_item_flags()
+        except:
+            raise
+        finally:
+            widget.blockSignals(False)
 
     @printexception
     def update_selected_indices_signal_emitted(self, selected_indices):
         widget = getattr(self.parent, self.widget_name)
         widget.blockSignals(True)
-        for cn, val in selected_indices.items():
-            cidx = widget.column_index(cn)
-            for ridx in widget.column_data_indices(cn):
-                if val == '__all__' or (not isinstance(val, basestring) and ridx in val):
-                    widget.item(ridx, cidx).setSelected(True)
-                else:
-                    widget.item(ridx, cidx).setSelected(False)
-        widget.blockSignals(False)
+        try:
+            for cn, val in selected_indices.items():
+                cidx = widget.column_index(cn)
+                for ridx in widget.column_data_indices(cn):
+                    if val == '__all__' or (not isinstance(val, basestring) and ridx in val):
+                        widget.item(ridx, cidx).setSelected(True)
+                    else:
+                        widget.item(ridx, cidx).setSelected(False)
+        except:
+            raise
+        finally:
+            widget.blockSignals(False)
 
     @printexception
     def update_selected_indices_from_gui(self):
@@ -1185,16 +1274,19 @@ class ParameterTableQt(TableQt):
     def update_item_flags(self):
         widget = getattr(self.parent, self.widget_name)
         widget.blockSignals(True)
-        for cidx in range(widget.columnCount()):
-            cn = widget.column_name(cidx)
-            if cn == self.parent.no_qt.subtract_parameter_list.selected_value:
-                flag = Qt.NoItemFlags
-            else:
-                flag = Qt.ItemIsSelectable | Qt.ItemIsEnabled
-            for ridx in widget.column_data_indices(cn):
-                widget.set_cell(ridx, cidx, flag=flag)
-        widget.blockSignals(False)
-
+        try:
+            for cidx in range(widget.columnCount()):
+                cn = widget.column_name(cidx)
+                if cn == self.parent.no_qt.subtract_parameter_list.selected_value:
+                    flag = Qt.NoItemFlags
+                else:
+                    flag = Qt.ItemIsSelectable | Qt.ItemIsEnabled
+                for ridx in widget.column_data_indices(cn):
+                    widget.set_cell(ridx, cidx, flag=flag)
+        except:
+            raise
+        finally:
+            widget.blockSignals(False)
 
 class FitResultTableQt(TableQt):
 
@@ -1202,10 +1294,14 @@ class FitResultTableQt(TableQt):
     def update_item_flags(self):
         widget = getattr(self.parent, self.widget_name)
         widget.blockSignals(True)
-        for cidx in range(widget.columnCount()):
-            for ridx in widget.column_data_indices(widget.column_name(cidx)):
-                widget.set_cell(ridx, cidx, flag=Qt.ItemIsSelectable | Qt.ItemIsEnabled)
-        widget.blockSignals(False)
+        try:
+            for cidx in range(widget.columnCount()):
+                for ridx in widget.column_data_indices(widget.column_name(cidx)):
+                    widget.set_cell(ridx, cidx, flag=Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+        except:
+            raise
+        finally:
+            widget.blockSignals(False)
 
 
 class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
