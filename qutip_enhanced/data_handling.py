@@ -608,8 +608,10 @@ class XAxisParameterComboBox(SelectableList):
         return [cn for cn in self.parent.parameter_names_reduced()]
 
     @printexception
-    def selected_indices_default(self, selected_indices=None):
-        return [np.argmax([len(getattr(self.parent.data.df, p).unique()) for p in self.data])]
+    def selected_indices_default(self, selected_indices=None, exclude_names=None):
+        exclude_names = [] if exclude_names is None else exclude_names
+        arr = np.array([[idx, len(getattr(self.parent.data.df, p).unique())] for idx, p in enumerate(self.data) if p not in exclude_names])
+        return [arr[:, 0][np.argmax(arr[:, 1])]]
 
 
 class ColAxParameterComboBox(SelectableList):
@@ -852,8 +854,6 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
     def delete_attributes(self):
         for attr_name in [
             '_data',
-            '_fit_results',
-            '_fit_result_table_data'
         ]:
             if hasattr(self, attr_name):
                 delattr(self, attr_name)
@@ -865,7 +865,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             'row_ax_parameter_list',
             'subtract_parameter_list',
             'parameter_table',
-            'fit_results_table',
+            'fit_result_table',
         ]:
             getattr(self, attr_name).delete_attributes()
 
@@ -1417,14 +1417,14 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
         self.subtract_parameter_comboBox.currentIndexChanged.connect(self.subtract_parameter_list.update_selected_indices_from_gui)
 
     @printexception
-    def open_measurement_code(self):
+    def open_measurement_code(self, *args, **kwargs):
         if hasattr(self.no_qt.data, 'filepath'):
             subprocess.Popen(r"start {}/meas_code.py".format(os.path.dirname(self.no_qt.data.filepath)), shell=True)
         else:
             print('No filepath.')
 
     @printexception
-    def open_explorer(self):
+    def open_explorer(self, *args, **kwargs):
         if hasattr(self.no_qt.data, 'filepath'):
             subprocess.Popen("explorer {}".format(os.path.abspath(os.path.dirname(self.no_qt.data.filepath))), shell=True)
         else:
@@ -1434,13 +1434,20 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
 def cpd():
     hdfl = [fn for fn in os.listdir(os.getcwd()) if fn.endswith('.hdf')]
     if not 'data.hdf' in hdfl and len(hdfl) != 1:
-        raise Exception('Error: {}'.format(hdfl))
+        raise Exception('Error: No hdf file found in files {}'.format(os.listdir(os.getcwd())))
     data = Data(iff=os.path.join(os.getcwd(), hdfl[0]))
     if 'prepare_data.py' in os.listdir(os.getcwd()):
         from prepare_data import prepare_data
         data = prepare_data(data)
-    # out = PlotData(path=os.path.join(os.getcwd(), hdfl[0]))
     out = PlotData(data=data)
+    if 'sweeps' in data.parameter_names:
+        out.x_axis_parameter_list.update_selected_indices(out.x_axis_parameter_list.selected_indices_default(exclude_names=['sweeps']))
+        out.average_parameter_list.update_selected_data(['sweeps'])
+    if any(['result_' in out.observation_list.data]):
+        out.observation_list.update_selected_data([i for i in out.observation_list.data if i.startswith('result_')])
+    else:
+        out.observation_list.update_selected_indices([0])
+    out.update_plot()
     out.gui.show_gui()
     return out
 
@@ -1454,6 +1461,7 @@ def cpd_thread():
         for fn in os.listdir(os.getcwd()):
             if fn.endswith('.hdf'):
                 out.set_data_from_path(fn)
+
         out.gui.show_gui()
 
     t = threading.Thread(target=run)
@@ -1513,15 +1521,3 @@ def replot_all_hdf(folder):
                 pld = PlotData(gui=False, data=Data(iff=os.path.join(root, name)))
                 pld.save_plot(os.path.join(root, 'plot1.png'))
                 print(root)
-
-# if __name__ == '__main__':
-#     df = pd.DataFrame({'a': [1, 2], 'b': [.5, 1.5], 'c': ['alpha', 'beta']})
-#     other = pd.DataFrame({'a': [1], 'b': [.5]})
-#     reload(dh)
-#     data = dh.Data(parameter_names = ['a', 'b'], observation_names=['c'], dtypes=collections.OrderedDict([('c', "object")]))
-#     data.init()
-#     data.append(collections.OrderedDict([('a', 1), ('b', 13.5)]))
-#     data.set_observations(l=collections.OrderedDict([('c', 'ffff')]))
-#     data.append(collections.OrderedDict([('a', 1), ('b', 20.5)]))
-#     data.set_observations(l=collections.OrderedDict([('c', 'ggggg')]))
-#     data.dict_delete(l=collections.OrderedDict([('a', 1), ('b', 20.5)]))
