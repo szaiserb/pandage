@@ -877,6 +877,8 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
     @property
     @printexception
     def data_selected(self):
+        if len(self.data.df) == 0:
+            return
         other = pd.DataFrame(list(itertools.product(*self.parameter_table.selected_data.values())))
         other.rename(columns=collections.OrderedDict([(key, val) for key, val in enumerate(self.parameter_table.selected_data.keys())]), inplace=True)
         data = Data(parameter_names=self.data.parameter_names, observation_names=self.observation_list.selected_data)
@@ -991,11 +993,12 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
     @printexception
     def update_plot_new(self, fig, data_selected=None):
         data_selected = self.data_selected if data_selected is None else data_selected
+        if data_selected is None or len(data_selected.df) == 0:
+            print('Nothing to plot. You may select something.')
+            return
         x_axis_parameter = self.x_axis_parameter_list.selected_value
         col_ax_parameter = self.col_ax_parameter_list.selected_value
         row_ax_parameter = self.row_ax_parameter_list.selected_value
-        if len(data_selected.df) == 0:
-            print('Nothing to plot. You may select something.')
         for name in ['x_axis_parameter', 'col_ax_parameter', 'row_ax_parameter']:
             val = locals()[name]
             if val != '__none__' and not val in data_selected.parameter_names:
