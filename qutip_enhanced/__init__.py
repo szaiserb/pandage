@@ -1,7 +1,15 @@
 # import matplotlib
 # matplotlib.use('Qt5Agg')
 
-import pandas as pd #THIS IS NECESSARY FOR PYTHON 3, LEAVE IT HERE
+
+
+
+import pandas as pd
+pd.set_option('display.height', 1000)
+pd.set_option('display.max_rows', 500)
+pd.set_option('display.max_columns', 500)
+pd.set_option('display.width', 1000)
+
 from .qutip_enhanced import *
 
 from . import analyze
