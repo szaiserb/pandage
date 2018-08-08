@@ -178,6 +178,34 @@ class Data:
         self._df = self.df.drop(column_names, axis=1)
         self.reinstate_integrity()
 
+    def append_columns(self, values_dict, no_new_columns_warning=True, **kwargs):
+        if len(kwargs) != 1:
+            raise Exception('Error: give one dictionary of column_names or observation_names. {}'.format(kwargs))
+        od = {'parameter_names': 'observation_names', 'observation_names': 'parameter_names'}
+        if type(values_dict) != collections.OrderedDict:
+            raise Exception("Error: {}".format(values_dict))
+        is_in_other = [cn for cn in kwargs.values()[0] if cn in getattr(self, od[kwargs.keys()[0]])]
+        if len(is_in_other) > 0:
+            raise Exception("Error: {} is in od[kwargs.keys()[0]]".format(is_in_other))
+        not_in = [cn for cn in kwargs.values()[0] if cn not in getattr(self, kwargs.keys()[0])]
+        if len(not_in) == 0:
+            if no_new_columns_warning:
+                raise Exception("Error: No new columns given. {}".format(kwargs))
+            else:
+                return
+        if len(values_dict) != len(not_in):
+            raise Exception('Error: {}, {}'.format(values_dict, not_in))
+        not_in_values_dict = [not_in_i for not_in_i in not_in if not_in_i not in values_dict.keys()]
+        if len(not_in_values_dict) > 0:
+            raise Exception('Error: {}'.format(not_in_values_dict))
+        setattr(self, kwargs.keys()[0], kwargs.values()[0])
+        for column, value in values_dict.items():
+            loc = getattr(self, kwargs.keys()[0]).index(column)
+            if kwargs.keys()[0] == 'observation_names':
+                loc += len(self.parameter_names)
+            self.df.insert(loc, column, value, allow_duplicates=False)
+        self.reinstate_integrity()
+
     @property
     def variables(self):
         return self.parameter_names + self.observation_names
