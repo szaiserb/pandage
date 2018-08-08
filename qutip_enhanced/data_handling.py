@@ -79,7 +79,15 @@ def ptrepack_all(folder):
         for file in files:
             if file.endswith(".hdf"):
                 ptrepack(file, root)
-
+# vega10_rgb_codes = plt.cm.Vega10.colors
+# vega10_names = ["Vega10{}".format(i) for i in range(len(vega10_rgb_codes))]
+#
+# def color_string(name, rgb_code):
+#     return "\definecolor{{{}}}{{rgb}}{{{}}}".format(name, ", ".join([unicode(i) for i in rgb_code]))
+#
+# with open('color.tex', 'w') as f:
+#     for name, rgb_code in zip(vega10_names, vega10_rgb_codes):
+#         f.write(color_string(name, rgb_code) + "\n")
 
 def df_pop(df, n):
     out = df.head(n)

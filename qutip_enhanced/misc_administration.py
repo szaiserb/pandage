@@ -7,7 +7,8 @@ import shutil
 import os
 import time
 
-old = r"C:\Users\BigSk_000\AppData\Local\Microsoft\Outlook"
+
+old = r"C:\Users\Basti\AppData\Local\Swiss Academic Software\Citavi"
 new = "D:\Sonstiges"
 
 def unlock(path):
@@ -23,3 +24,4 @@ if not (src_exists ^ dst_exists):
 if src_exists:
     shutil.move(old, nf)
 subprocess.call(['mklink',  "/J", old, nf], shell=True)
+
