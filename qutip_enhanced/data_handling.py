@@ -27,6 +27,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import functools
 import time
+import logging
 
 if sys.version_info.major == 2:
     import __builtin__
@@ -320,6 +321,9 @@ class Data:
         self._df = value
         self.reinstate_integrity()
 
+    def seconds_since_last_save(self, filepath):
+        return os.stat(filepath).st_mtime - time.time()
+
     def save(self, filepath, notify=False):
         if filepath.endswith('.csv'):
             t0 = time.time()
@@ -327,21 +331,35 @@ class Data:
             print("csv data saved ({:.2f}s).\n If speed is an issue, use hdf. csv format is useful ony for py2-py3-compatibility.".format(time.time() - t0))
         elif filepath.endswith('.hdf'):
             t0 = time.time()
+            t = []
             if not self.hdf_lock.acquire(False):
                 print('Trying to save data to hdf.')
                 print('Waiting for hdf_lock..')
                 self.hdf_lock.acquire()
                 print('Ok.. hdf_lock acquired.')
+            t.append(time.time() -t0)
+            print(t)
             store = pd.HDFStore(filepath)
             store.put('df', self.df, table=True)
             for key in ["parameter_names", 'observation_names', 'dtypes']:
                 setattr(store.get_storer('df').attrs, key, getattr(self, key))
             store.close()
+            print(t)
+            t.append(time.time() - t0)
             self.hdf_lock.release()
-            ptrepack_thread(file=os.path.split(filepath)[1], folder=os.path.split(filepath)[0], lock=self.hdf_lock)
+            t.append(time.time() - t0)
+            if getattr(self, 'save_dur_list', [0])[-1] < 5. or self.seconds_since_last_save(filepath) > 3600.:
+                ptrepack_thread(file=os.path.split(filepath)[1], folder=os.path.split(filepath)[0], lock=self.hdf_lock)
+            else:
+                logging.getLogger().info('hdf-file is not repacked. {} {}', self.save_dur_list[-1], self.seconds_since_last_save(filepath))
+            t.append(time.time() - t0)
             self.filepath = filepath
             if notify:
-                print("hdf data saved in ({:.2f})".format(time.time() - t0))
+                logging.getLogger().info("hdf data saved in ({})".format(" ".join("{:.2f}".format(x) for x in t)))
+                if hasattr(self, 'save_dur_list'):
+                    self.save_dur_list.append(sum(t))
+                else:
+                    self.save_dur_list = [sum(t)]
 
     def get_parameters_df(self, l):
         df_append = l_to_df(l)
@@ -464,6 +482,8 @@ class Data:
         self.change_column_dtype(new_parameter_name, new_parameter_dtype)
         self.check_integrity()
 
+
+
     def check_pn_on_helper(self, parameter_name, observation_names):
         if not parameter_name in self.parameter_names:
             raise Exception('Error: chosen parameter_name {} is not in self.parameter_names {}.'.format(parameter_name, self.parameter_names))
@@ -483,14 +503,18 @@ class Data:
         self._df = self.df.groupby(self.parameter_names).filter(lambda x: len(x) == 2).groupby(self.parameter_names).agg(dict([(obs, lambda x: -1 * np.diff(x)) for obs in observation_names])).reset_index()
         self.check_integrity()
 
-    def average_parameter(self, parameter_name, observation_names):
+    def eliminate_parameter(self, parameter_name, observation_names, operation):
         self.check_pn_on_helper(parameter_name, observation_names)
         self.delete_columns([i for i in self.observation_names if i not in observation_names])
-        # self._df.dropna(inplace=True)
         self.parameter_names = [key for key in self.parameter_names if key != parameter_name]
-        self._df = self.df.groupby(self.parameter_names).agg(collections.OrderedDict([(obs, np.mean) for obs in observation_names])).reset_index()
+        self._df = self.df.groupby(self.parameter_names).agg(collections.OrderedDict([(obs, operation) for obs in observation_names])).reset_index()
         self.check_integrity()
 
+    def average_parameter(self, parameter_name, observation_names):
+        self.eliminate_parameter(operation=np.mean, parameter_name=parameter_name, observation_names=observation_names)
+
+    def sum_parameter(self, parameter_name, observation_names):
+        self.eliminate_parameter(operation=np.sum, parameter_name=parameter_name, observation_names=observation_names)
 
 def extend_columns(df, other, columns=None):
     """
@@ -965,12 +989,23 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
                     data_fit_results.append(collections.OrderedDict([(key, val) for key, val in zip(d.keys() + ['observation_name'], d.values() + [obs])]))
                     data_fit_results.set_observations(collections.OrderedDict([('fit_result', mod.fit(y, params, x=x))]))
             self._data_fit_results = data_fit_results
+            self.extend_data_fit_results_by_parameters()
             self.fit_result_table.update_data()
         except ValueError:
             print("Can not fit, input contains nan values")
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
+
+    def extend_data_fit_results_by_parameters(self):
+        new_observation_names = self._data_fit_results.df.loc[0, 'fit_result'].params.keys()
+        values_dict = collections.OrderedDict([(key, np.nan) for key in new_observation_names])
+        observation_names = self._data_fit_results.observation_names[:-1] + new_observation_names + [self._data_fit_results.observation_names[-1]]
+        self._data_fit_results.append_columns(values_dict=values_dict, observation_names=observation_names)
+        for idx, _I_ in self._data_fit_results.df.iterrows():
+            for pn, pv in _I_['fit_result'].params.items():
+                self._data_fit_results.df.loc[idx, pn] = pv
+
 
     def plot_label(self, condition_dict_reduced):
         label = ""
@@ -1134,13 +1169,16 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
                 self.gui.canvas_fit.draw()
 
     @printexception
-    def save_plot(self, filepath):
+    def save_plot(self, filepath, notify=False):
+        t0 = time.time()
         plt.ioff()
         fig = plt.figure()
         axes = self.update_plot_new(fig=fig)
         fig.savefig(filepath)
         plt.close(fig)
         plt.ion()
+        if notify:
+            logging.getLogger().info('Plot saved to {} in ({:.3f}s)'.format(filepath, time.time() -t0))
 
     @property
     @printexception
@@ -1165,6 +1203,7 @@ class BaseQt(PyQt5.QtWidgets.QWidget):
     @printexception
     def update_data(self, data):
         self.update_data_signal.emit(data)
+
 
     @printexception
     def update_selected_indices(self, selected_indices):

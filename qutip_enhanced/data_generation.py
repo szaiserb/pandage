@@ -17,6 +17,8 @@ import datetime
 import sys
 import os
 import time
+import logging
+
 
 
 class DataGeneration:
@@ -115,7 +117,7 @@ class DataGeneration:
     def progress(self):
         return getattr(self, '_progress', 0)
 
-    def init_data(self, init_from_file=None, iff=None, move_folder=True):
+    def init_data(self, init_from_file=None, iff=None, move_folder=True, drop_nan=True):
         init_from_file = iff if iff is not None else init_from_file
         self.init_from_file = init_from_file
         self.move_folder = move_folder
@@ -125,7 +127,8 @@ class DataGeneration:
             dtypes=self.dtypes,
             init_from_file=init_from_file
         )
-        self.data.dropnan(max_expected_rows=self.number_of_simultaneous_measurements)
+        if drop_nan:
+            self.data.dropnan(max_expected_rows=self.number_of_simultaneous_measurements)
 
     def update_current_str(self, separate_parameters_indices=False):
         if hasattr(self, 'current_iterator_df') and len(self.current_iterator_df) > 0:
@@ -244,14 +247,17 @@ class DataGeneration:
 
     def save(self, name='', notify=False):
         t0 = time.time()
+        t = [t0]
         if not os.path.exists(self.save_dir):
             self.make_save_dir()
+        t.append(time.time() - t0)
         if self.init_from_file is not None and self.move_folder:
             new_iff_path = os.path.join(self.save_dir, os.path.basename(os.path.dirname(self.init_from_file)) + '_tbc', os.path.basename(self.init_from_file))
             if not os.path.exists(new_iff_path):
                 folder = os.path.dirname(self.init_from_file)
                 os.rename(folder, folder + '_tbc')
                 shutil.move(folder + '_tbc', self.save_dir)
+        t.append(time.time() - t0)
         if len(self.iterator_df_done) >= 0:
             if hasattr(self, 'file_notes'):
                 with open("{}/notes.dat".format(self.save_dir), "w") as text_file:
@@ -259,10 +265,13 @@ class DataGeneration:
             if hasattr(self, '_meas_code'):
                 with open("{}/meas_code.py".format(self.save_dir), "w") as text_file:
                     text_file.write(self.meas_code)
-            self.data.save("{}/data.hdf".format(self.save_dir))
-            self.pld.save_plot("{}/plot.png".format(self.save_dir))
+            t.append(time.time() - t0)
+            self.data.save("{}/data.hdf".format(self.save_dir), notify=notify)
+            t.append(time.time() - t0)
+            self.pld.save_plot("{}/plot.png".format(self.save_dir), notify=notify)
+            t.append(time.time() - t0)
             if notify:
-                print("saved {} to '{} ({:.3f})".format(name, self.save_dir, time.time() - t0))
+                logging.getLogger().info("saved {} to '{} ()".format(name, self.save_dir, " ".join("{:.2f}".format(x) for x in t)))
 
     def remeasure(self, df):
         indices = self.data.df[self.data.df.loc[:, self.data.parameter_names].isin(df).all(axis=1)].index  # get indices in self.df.data to be replaced
