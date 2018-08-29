@@ -469,20 +469,21 @@ class Data:
                 del self.dtypes[key]
         self.check_integrity()
 
-    def observations_to_parameters(self, observation_names, new_names, new_parameter_name, new_observation_name='value', new_parameter_dtype=None):
-        df = self.df.rename(dict([(old, new) for old, new in zip(observation_names, new_names)]), axis='columns')
-        df = df.melt(id_vars=[cn for cn in df.columns if cn not in new_names])
-        self._df = df.rename({'value': new_observation_name, 'variable': new_parameter_name}, axis=1)
+    def update_observation_names_combine(self, observation_names, new_observation_name):
+        observation_names = [i for i in self.observation_names if i not in observation_names]
+        observation_names.insert(min([self.observation_names.index(i) for i in self.observation_names]), new_observation_name)
+        self.observation_names = observation_names
+
+    def observations_to_parameters(self, observation_names, new_parameter_name, new_observation_name='value'):
+        df = pd.melt(
+            self.df,
+            id_vars=[cn for cn in self.df.columns if cn not in observation_names],
+            value_vars=observation_names,
+            var_name=new_parameter_name,
+            value_name=new_observation_name)
         self.parameter_names.append(new_parameter_name)
-        previous_observation_location = min([self.observation_names.index(i) for i in observation_names])
-        self.observation_names = [i for i in self.observation_names if i not in observation_names]
-        self.observation_names.insert(previous_observation_location, new_observation_name)
-        new_column_names = self.parameter_names + self.observation_names
-        self._df = self.df[new_column_names]
-        self.change_column_dtype(new_parameter_name, new_parameter_dtype)
-        self.check_integrity()
-
-
+        self.update_observation_names_combine(observation_names, new_observation_name)
+        self.df = df[self.parameter_names + self.observation_names]
 
     def check_pn_on_helper(self, parameter_name, observation_names):
         if not parameter_name in self.parameter_names:
@@ -492,29 +493,52 @@ class Data:
         if any([i not in self.observation_names for i in observation_names]):
             raise Exception('Error: at least one of the chosen observation_names {} is not in self.observation_names {}'.format(observation_names, self.observation_names))
 
-    def subtract_parameter(self, parameter_name, observation_names):
+    def eliminate_parameter(self, parameter_name, observation_names, operations, dropna=False):
         self.check_pn_on_helper(parameter_name, observation_names)
+        self.delete_columns([i for i in self.observation_names if i not in observation_names])
+        self.parameter_names = [key for key in self.parameter_names if key != parameter_name]
+        if len(operations) == 1:
+            operations = itertools.repeat(operations[0])
+        elif len(operations) != len(observation_names):
+            raise Exception('Error: ', operations, observation_names)
+        self._df = self.df.groupby(self.parameter_names).agg(collections.OrderedDict([(observation_name, operation) for observation_name, operation in zip(observation_names, operations)])).reset_index()
+        self.check_integrity()
+
+    def average_parameter(self, parameter_name, observation_names, observation_name_weight=None):
+        if observation_name_weight is None:
+            operations = [np.mean]
+        else:
+            def weight_mean(w):
+                def _weight_mean(d):
+                    try:
+                        #             return d.mean()
+                        return (d * w).sum() / w[d.index].sum()
+                    except ZeroDivisionError:
+                        return np.NaN
+
+                return _weight_mean
+
+            operations = [weight_mean(self.df[observation_name_weight])]
+        self.eliminate_parameter(operations=operations, parameter_name=parameter_name, observation_names=observation_names, dropna=False)
+
+    def sum_parameter(self, parameter_name, observation_names):
+        self.eliminate_parameter(operations=[np.sum], parameter_name=parameter_name, observation_names=observation_names, dropna=True)
+
+    def subtract_parameter(self, parameter_name, observation_names):
         lnp = len(getattr(self.df, parameter_name).unique())
         if lnp != 2:
             raise Exception('Error: Only parameters with 2 unique items can be subtracted. Parameter {} has {}'.format(parameter_name, lnp))
-        self.delete_columns([i for i in self.observation_names if i not in observation_names])
-        self.df.dropna(inplace=True)
-        self.parameter_names = [key for key in self.parameter_names if key != parameter_name]
-        self._df = self.df.groupby(self.parameter_names).filter(lambda x: len(x) == 2).groupby(self.parameter_names).agg(dict([(obs, lambda x: -1 * np.diff(x)) for obs in observation_names])).reset_index()
-        self.check_integrity()
+        self.eliminate_parameter(operations=[np.diff], parameter_name=parameter_name, observation_names=observation_names, dropna=True)
 
-    def eliminate_parameter(self, parameter_name, observation_names, operation):
-        self.check_pn_on_helper(parameter_name, observation_names)
-        self.delete_columns([i for i in self.observation_names if i not in observation_names])
-        self.parameter_names = [key for key in self.parameter_names if key != parameter_name]
-        self._df = self.df.groupby(self.parameter_names).agg(collections.OrderedDict([(obs, operation) for obs in observation_names])).reset_index()
-        self.check_integrity()
-
-    def average_parameter(self, parameter_name, observation_names):
-        self.eliminate_parameter(operation=np.mean, parameter_name=parameter_name, observation_names=observation_names)
-
-    def sum_parameter(self, parameter_name, observation_names):
-        self.eliminate_parameter(operation=np.sum, parameter_name=parameter_name, observation_names=observation_names)
+    def subtract_observations(self, observation_names, new_observation_name, dropna=False):
+        print('functionality untested')
+        if len(observation_names) != 2:
+            raise Exception('Error :', observation_names)
+        self._df[[observation_names[0]]] = self.df[observation_names[1]] - self.df[observation_names[0]]
+        if dropna:
+            self.df.dropna(subset=observation_names)
+        self.rename_column(observation_names[0], new_observation_name)
+        self.delete_columns([self.observation_names[1]])
 
 def extend_columns(df, other, columns=None):
     """
