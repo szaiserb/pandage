@@ -80,15 +80,14 @@ def ptrepack_all(folder):
         for file in files:
             if file.endswith(".hdf"):
                 ptrepack(file, root)
-# vega10_rgb_codes = plt.cm.Vega10.colors
-# vega10_names = ["Vega10{}".format(i) for i in range(len(vega10_rgb_codes))]
-#
-# def color_string(name, rgb_code):
-#     return "\definecolor{{{}}}{{rgb}}{{{}}}".format(name, ", ".join([unicode(i) for i in rgb_code]))
-#
-# with open('color.tex', 'w') as f:
-#     for name, rgb_code in zip(vega10_names, vega10_rgb_codes):
-#         f.write(color_string(name, rgb_code) + "\n")
+def weight_mean(w):
+    def _weight_mean(d):
+        try:
+            #             return d.mean()
+            return (d * w).sum() / w[d.index].sum()
+        except ZeroDivisionError:
+            return np.NaN
+    return _weight_mean
 
 def df_pop(df, n):
     out = df.head(n)
@@ -485,6 +484,17 @@ class Data:
         self.update_observation_names_combine(observation_names, new_observation_name)
         self.df = df[self.parameter_names + self.observation_names]
 
+    def observations_to_parameters(self, observation_names, new_parameter_name, new_observation_name='value'):
+        df = pd.melt(
+            self.df,
+            id_vars=[cn for cn in self.df.columns if cn not in observation_names],
+            value_vars=observation_names,
+            var_name=new_parameter_name,
+            value_name=new_observation_name)
+        self.parameter_names.append(new_parameter_name)
+        self.update_observation_names_combine(observation_names, new_observation_name)
+        self.df = df[self.parameter_names + self.observation_names]
+
     def check_pn_on_helper(self, parameter_name, observation_names):
         if not parameter_name in self.parameter_names:
             raise Exception('Error: chosen parameter_name {} is not in self.parameter_names {}.'.format(parameter_name, self.parameter_names))
@@ -508,16 +518,6 @@ class Data:
         if observation_name_weight is None:
             operations = [np.mean]
         else:
-            def weight_mean(w):
-                def _weight_mean(d):
-                    try:
-                        #             return d.mean()
-                        return (d * w).sum() / w[d.index].sum()
-                    except ZeroDivisionError:
-                        return np.NaN
-
-                return _weight_mean
-
             operations = [weight_mean(self.df[observation_name_weight])]
         self.eliminate_parameter(operations=operations, parameter_name=parameter_name, observation_names=observation_names, dropna=False)
 
