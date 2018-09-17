@@ -337,13 +337,11 @@ class Data:
                 self.hdf_lock.acquire()
                 print('Ok.. hdf_lock acquired.')
             t.append(time.time() -t0)
-            print(t)
             store = pd.HDFStore(filepath)
             store.put('df', self.df, table=True)
             for key in ["parameter_names", 'observation_names', 'dtypes']:
                 setattr(store.get_storer('df').attrs, key, getattr(self, key))
             store.close()
-            print(t)
             t.append(time.time() - t0)
             self.hdf_lock.release()
             t.append(time.time() - t0)
@@ -845,12 +843,7 @@ class FitResultTable(DataTable):
             out = collections.OrderedDict()
         else:
             header = self.parent.data_fit_results.parameter_names + self.parent.data_fit_results.df.fit_result[0].params.keys()
-            out = collections.OrderedDict([(key, []) for key in header])
-            for idx, _I_ in self.parent.data_fit_results.df.iterrows():
-                for key, val in list(_I_.iteritems())[:-1]:
-                    out[key].append(val)
-                for key, val in _I_[-1].params.items():
-                    out[key].append(val.value)
+            out = self.parent.data_fit_results.df[header].to_dict('list', into=collections.OrderedDict)
         return out
 
     @printexception
@@ -1579,14 +1572,14 @@ def subfolders_with_hdf(folder):
     return l
 
 
-def number_of_points_of_hdf_files_in_subfolders(folder):
+def number_of_points_of_hdf_files_in_subfolders(folder, endswith='data.hdf'):
     l = subfolders_with_hdf(folder)
     out_openable = []
     out_failed = []
     for subdir in l:
         for root, dirs, files in os.walk(subdir):
             for file in files:
-                if file.endswith(".hdf"):
+                if file.endswith(endswith):
                     try:
                         d = Data(iff=os.path.join(root, file))
                         out_openable.append({'root': root, 'file': file, 'points': len(d.df)})
@@ -1614,12 +1607,3 @@ def move_folder(folder_list_dict=None, destination_folder=None):
             failed += 1
             print("Folder {} could not be moved. Lets hope it has tbc in its name".format(i['root']))
     print("Successfully moved: {}. Failed: {}".format(len(folder_list_dict) - failed, failed))
-
-
-def replot_all_hdf(folder):
-    for root, dirs, files in os.walk(os.path.join(folder), topdown=False):
-        for name in files:
-            if name == 'data.hdf' and 'sim_code' in root:
-                pld = PlotData(gui=False, data=Data(iff=os.path.join(root, name)))
-                pld.save_plot(os.path.join(root, 'plot1.png'))
-                print(root)
