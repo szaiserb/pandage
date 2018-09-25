@@ -82,15 +82,14 @@ def ptrepack_all(folder):
         for file in files:
             if file.endswith(".hdf"):
                 ptrepack(file, root)
-# vega10_rgb_codes = plt.cm.Vega10.colors
-# vega10_names = ["Vega10{}".format(i) for i in range(len(vega10_rgb_codes))]
-#
-# def color_string(name, rgb_code):
-#     return "\definecolor{{{}}}{{rgb}}{{{}}}".format(name, ", ".join([unicode(i) for i in rgb_code]))
-#
-# with open('color.tex', 'w') as f:
-#     for name, rgb_code in zip(vega10_names, vega10_rgb_codes):
-#         f.write(color_string(name, rgb_code) + "\n")
+def weight_mean(w):
+    def _weight_mean(d):
+        try:
+            #             return d.mean()
+            return (d * w).sum() / w[d.index].sum()
+        except ZeroDivisionError:
+            return np.NaN
+    return _weight_mean
 
 def df_pop(df, n):
     out = df.head(n)
@@ -344,13 +343,11 @@ class Data:
                 self.hdf_lock.acquire()
                 print('Ok.. hdf_lock acquired.')
             t.append(time.time() -t0)
-            print(t)
             store = pd.HDFStore(filepath)
             store.put('df', self.df, table=True)
             for key in ["parameter_names", 'observation_names', 'dtypes']:
                 setattr(store.get_storer('df').attrs, key, getattr(self, key))
             store.close()
-            print(t)
             t.append(time.time() - t0)
             self.hdf_lock.release()
             t.append(time.time() - t0)
@@ -492,6 +489,17 @@ class Data:
         self.update_observation_names_combine(observation_names, new_observation_name)
         self.df = df[self.parameter_names + self.observation_names]
 
+    def observations_to_parameters(self, observation_names, new_parameter_name, new_observation_name='value'):
+        df = pd.melt(
+            self.df,
+            id_vars=[cn for cn in self.df.columns if cn not in observation_names],
+            value_vars=observation_names,
+            var_name=new_parameter_name,
+            value_name=new_observation_name)
+        self.parameter_names.append(new_parameter_name)
+        self.update_observation_names_combine(observation_names, new_observation_name)
+        self.df = df[self.parameter_names + self.observation_names]
+
     def check_pn_on_helper(self, parameter_name, observation_names):
         if not parameter_name in self.parameter_names:
             raise Exception('Error: chosen parameter_name {} is not in self.parameter_names {}.'.format(parameter_name, self.parameter_names))
@@ -515,16 +523,6 @@ class Data:
         if observation_name_weight is None:
             operations = [np.mean]
         else:
-            def weight_mean(w):
-                def _weight_mean(d):
-                    try:
-                        #             return d.mean()
-                        return (d * w).sum() / w[d.index].sum()
-                    except ZeroDivisionError:
-                        return np.NaN
-
-                return _weight_mean
-
             operations = [weight_mean(self.df[observation_name_weight])]
         self.eliminate_parameter(operations=operations, parameter_name=parameter_name, observation_names=observation_names, dropna=False)
 
@@ -852,12 +850,7 @@ class FitResultTable(DataTable):
             out = collections.OrderedDict()
         else:
             header = self.parent.data_fit_results.parameter_names + self.parent.data_fit_results.df.fit_result[0].params.keys()
-            out = collections.OrderedDict([(key, []) for key in header])
-            for idx, _I_ in self.parent.data_fit_results.df.iterrows():
-                for key, val in list(_I_.iteritems())[:-1]:
-                    out[key].append(val)
-                for key, val in _I_[-1].params.items():
-                    out[key].append(val.value)
+            out = self.parent.data_fit_results.df[header].to_dict('list', into=collections.OrderedDict)
         return out
 
     @printexception
@@ -1589,14 +1582,14 @@ def subfolders_with_hdf(folder):
     return l
 
 
-def number_of_points_of_hdf_files_in_subfolders(folder):
+def number_of_points_of_hdf_files_in_subfolders(folder, endswith='data.hdf'):
     l = subfolders_with_hdf(folder)
     out_openable = []
     out_failed = []
     for subdir in l:
         for root, dirs, files in os.walk(subdir):
             for file in files:
-                if file.endswith(".hdf"):
+                if file.endswith(endswith):
                     try:
                         d = Data(iff=os.path.join(root, file))
                         out_openable.append({'root': root, 'file': file, 'points': len(d.df)})
@@ -1624,12 +1617,3 @@ def move_folder(folder_list_dict=None, destination_folder=None):
             failed += 1
             print("Folder {} could not be moved. Lets hope it has tbc in its name".format(i['root']))
     print("Successfully moved: {}. Failed: {}".format(len(folder_list_dict) - failed, failed))
-
-
-def replot_all_hdf(folder):
-    for root, dirs, files in os.walk(os.path.join(folder), topdown=False):
-        for name in files:
-            if name == 'data.hdf' and 'sim_code' in root:
-                pld = PlotData(gui=False, data=Data(iff=os.path.join(root, name)))
-                pld.save_plot(os.path.join(root, 'plot1.png'))
-                print(root)
