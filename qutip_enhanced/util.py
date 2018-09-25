@@ -95,7 +95,7 @@ def check_range_type(val, name, typ, start, stop):
 
 
 def check_array_like(val, name):
-    at = [list, np.ndarray]
+    at = [list, np.ndarray, range]
     if type(val) in at:
         return val
     else:

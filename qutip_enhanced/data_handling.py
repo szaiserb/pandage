@@ -5,6 +5,8 @@ __metaclass__ = type
 
 import os, sys
 
+from six import string_types
+
 import numpy as np
 import pandas as pd
 import itertools
@@ -105,10 +107,11 @@ def l_to_df(l):
     if type(l) == pd.DataFrame:
         return l
     else:
-        if type(l) in [collections.OrderedDict, dict]:
+        if type(l) == dict:
+            raise Exception('Error')
+        if type(l) in [collections.OrderedDict]:
             l = [l]
-        return pd.concat([pd.Series(i) for i in l], axis=1).transpose()
-
+        return pd.DataFrame.from_records(l)
 
 def df_access(df, other):
     if type(other) == pd.Series:
@@ -144,13 +147,13 @@ class Data:
             self.init(**kwargs)
         self.hdf_lock = threading.Lock()
 
-    parameter_names = ret_property_array_like_types('parameter_names', [str, unicode])
-    observation_names = ret_property_array_like_types('observation_names', [str, unicode])
+    parameter_names = ret_property_array_like_types('parameter_names', [string_types])
+    observation_names = ret_property_array_like_types('observation_names', [string_types])
 
     @property
     def dtypes(self):
         if not hasattr(self, '_dtypes'):
-            self._dtypes = dict([(key, 'float') for key in self.observation_names])
+            self._dtypes = collections.OrderedDict([(key, 'float') for key in self.observation_names])
         return self._dtypes
 
     @dtypes.setter
@@ -186,6 +189,9 @@ class Data:
             raise Exception('Error: column_names {} are in parameter_names but are non_unary. Columns can not be deleted.'.format(non_unary_parameter_names_to_be_deleted))
         self._df = self.df.drop(column_names, axis=1)
         self.reinstate_integrity()
+
+    def delete_nonunary_parameter_names(self):
+        self.delete_columns([pn for pn in self.parameter_names if pn not in self.non_unary_parameter_names])
 
     def append_columns(self, values_dict, no_new_columns_warning=True, **kwargs):
         if len(kwargs) != 1:
@@ -261,8 +267,8 @@ class Data:
 
     def read_hdf(self, init_from_file):
         store = pd.HDFStore(init_from_file)
-        if hasattr(store, 'df'):
-            df = store['df']
+        if hasattr(store, '/df'):
+            df = store['/df']
             for key in ["parameter_names", 'observation_names', 'dtypes']:
                 attr_name = "_{}".format(key)
                 if hasattr(store.get_storer('df').attrs, key):
@@ -464,10 +470,11 @@ class Data:
         self._df = self.df.drop(cnl, axis=1)
         self.parameter_names = [i for i in self.parameter_names if i in self.df.columns]
         self.observation_names = [i for i in self.observation_names if i in self.df.columns]
-        for key in self.dtypes.keys():
-            if key in self.dtypes and key not in self.df.columns:
-                del self.dtypes[key]
-        self.check_integrity()
+        self.dtypes = collections.OrderedDict([(key, val) for key, val in self.dtypes.items() if not (key in self.dtypes and key not in self.df.columns)])
+        # for key in self.dtypes.keys():
+        #     if key in self.dtypes and key not in self.df.columns:
+        #         del self.dtypes[key]
+        # self.check_integrity()
 
     def update_observation_names_combine(self, observation_names, new_observation_name):
         observation_names = [i for i in self.observation_names if i not in observation_names]
@@ -1031,7 +1038,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
                 self._data_fit_results.df.loc[idx, pn] = pv
 
 
-    def plot_label(self, condition_dict_reduced):
+    def plot_label(self, condition_dict_reduced, obs):
         label = ""
         for key in self.data.non_unary_parameter_names:
             if key in condition_dict_reduced:
@@ -1040,7 +1047,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
                     label += "{}:{}, ".format(key, val)
                 else:
                     label += "{}:{:g}, ".format(key, val)
-        return label[:-2]
+        return label[:-2] + obs
 
     @staticmethod
     @printexception
@@ -1120,7 +1127,10 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         for ni in range(1, n_tot + 1):
             pd = {} if len(axes) == 0 else {'sharex': axes[0], 'sharey': axes[0]}
             axes.append(fig.add_subplot(ny_tot, nx_tot, ni, **pd))
-        for d, d_idx, idx, sub in data_selected.iterator(column_names=[pn for pn in data_selected.parameter_names if pn != self.x_axis_parameter_list.selected_value]):
+        cn =[ pn for pn in data_selected.parameter_names if pn != self.x_axis_parameter_list.selected_value]
+        if len(list(data_selected.column_product(column_names=cn))) > getattr(self, 'max_plots', 100):
+            return
+        for d, d_idx, idx, sub in data_selected.iterator(column_names=cn):
             if len(ax_p_list) == 0 or row_ax_parameter == '__none__':  # len(ax_p_list[0]) == 1:
                 n = np.argwhere(np.array(ax_p_list) == (d[col_ax_parameter]))[0, 0] if col_ax_parameter != '__none__' else 0
             else:
@@ -1131,7 +1141,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
                     continue
             abcdefg = collections.OrderedDict([(key, val) for key, val in d.items() if key not in [self.subtract_parameter_list.selected_value, col_ax_parameter, row_ax_parameter]])
             for obs in self.observation_list.selected_data:
-                axes[n].plot(sub[self.x_axis_parameter_list.selected_data], sub[obs], '-o', markersize=3, label=self.plot_label(abcdefg))
+                axes[n].plot(sub.loc[:, self.x_axis_parameter_list.selected_data[0]], sub[obs], '-o', markersize=3, label=self.plot_label(abcdefg, obs))
             if len(ax_p_list) != 0:
                 title_list = []
                 for column_name in [col_ax_parameter, row_ax_parameter]:
@@ -1348,7 +1358,7 @@ class TableQt(BaseQt):
             for cn, val in selected_indices.items():
                 cidx = widget.column_index(cn)
                 for ridx in widget.column_data_indices(cn):
-                    if val == '__all__' or (not isinstance(val, basestring) and ridx in val):
+                    if val == '__all__' or (not isinstance(val, string_types) and ridx in val):
                         widget.item(ridx, cidx).setSelected(True)
                     else:
                         widget.item(ridx, cidx).setSelected(False)

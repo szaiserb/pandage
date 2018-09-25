@@ -11,9 +11,7 @@ import more_itertools
 import lmfit.lineshapes
 import collections
 import traceback
-import operator
 from .qutip_enhanced import coordinates
-from qutip import Qobj
 
 
 class pd(dict):
@@ -209,7 +207,7 @@ class Arbitrary:
             return self._controls
         elif type(self.column_dict) is not collections.OrderedDict:
             raise Exception("Error: {}, {}".format(self.column_dict, type(self.column_dict)))
-        return self.column_dict.keys()
+        return list(self.column_dict.keys())
 
     @property
     def n_columns(self):
@@ -338,7 +336,7 @@ class Arbitrary:
                 if export_name in step:
                     nl_d[name] += 1
                     osln.append(nl_d[name])
-            fsn[i] = nl_d.values()
+            fsn[i] = list(nl_d.values())
             out.append([', '.join(step), ', '.join(['{:d}'.format(int(i)) for i in osln])])
         return out
 

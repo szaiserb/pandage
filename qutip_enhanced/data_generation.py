@@ -1,5 +1,4 @@
 from __future__ import print_function, absolute_import, division
-
 __metaclass__ = type
 
 from .util import ret_property_typecheck, ret_property_list_element, check_type, check_array_like, printexception
@@ -108,7 +107,7 @@ class DataGeneration:
     def set_iterator_df(self):
         self.iterator_df = pd.DataFrame(
             list(itertools.product(*self.parameters.values())),
-            columns=self.parameters.keys()
+            columns=list(self.parameters.keys())
         )
         for cn in self.iterator_df.columns:
             setattr(self.iterator_df, cn, getattr(self.iterator_df, cn).astype(type(self.parameters[cn][0])))
@@ -122,7 +121,7 @@ class DataGeneration:
         self.init_from_file = init_from_file
         self.move_folder = move_folder
         self.pld._data = Data(
-            parameter_names=self.parameters.keys(),
+            parameter_names=list(self.parameters.keys()),
             observation_names=self.observation_names,
             dtypes=self.dtypes,
             init_from_file=init_from_file

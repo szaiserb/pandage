@@ -1,7 +1,7 @@
 # coding=utf-8
 from __future__ import print_function, absolute_import, division
-
 __metaclass__ = type
+
 from qutip import tensor, ket2dm, expect, jmat, Qobj
 from .data_generation import DataGeneration
 from .data_handling import PlotData
@@ -16,6 +16,7 @@ import numbers
 
 import traceback
 import sys
+
 
 class NVHamFit14nParams():
 
@@ -89,17 +90,20 @@ class NVHamFit14nParams():
             f.append(-get_transition_frequency(h_diag=h_diag, dims=nvham.dims, transition=self.transitions[i]))
         return f
 
+
 def purity(dm):
     """should work for qudits also"""
     s = range(len(dm.dims[0]))
     comb = list(chain.from_iterable(combinations(s, r) for r in range(len(s) + 1)))[1:]
     return dict((i, ((dm.ptrace(i)) ** 2).tr()) for i in comb)
 
+
 def measurement_result(dm, operator):
-    return np.abs((operator.dag()*operator*dm).tr())
+    return np.abs((operator.dag() * operator * dm).tr())
+
 
 def test_states_single(dim, pure=False):
-    m = (dim - 1.)/2.
+    m = (dim - 1.) / 2.
     out = dict()
     for axis in ['x', 'y', 'z']:
         out["s{}".format(axis)] = []
@@ -109,14 +113,17 @@ def test_states_single(dim, pure=False):
             out["{}{}".format(axis, idx)] = state
             out["s{}".format(axis)].append(state)
         out["s{}".format(axis)] = sum(out["s{}".format(axis)])
-        out["s{}".format(axis)] = out["s{}".format(axis)]/out["s{}".format(axis)].norm()
+        out["s{}".format(axis)] = out["s{}".format(axis)] / out["s{}".format(axis)].norm()
     return out
 
-__TEST_STATES_SINGLE_PURE__ = dict([(dim, test_states_single(dim=dim, pure=True)) for dim in [2,3]])
-__TEST_STATES_SINGLE__ = dict([(dim, test_states_single(dim=dim, pure=False)) for dim in [2,3]])
+
+__TEST_STATES_SINGLE_PURE__ = dict([(dim, test_states_single(dim=dim, pure=True)) for dim in [2, 3]])
+__TEST_STATES_SINGLE__ = dict([(dim, test_states_single(dim=dim, pure=False)) for dim in [2, 3]])
+
 
 def chunk(s, size=2):
     return list(map(''.join, zip(*[iter(s)] * size)))
+
 
 def test_states(dims=None, pure=False, **kwargs):
     """
@@ -130,14 +137,14 @@ def test_states(dims=None, pure=False, **kwargs):
     if 'names_multi_list' in kwargs:
         names_multi_list = kwargs.get('names_multi_list')
         l_ok_list = [len(i) == len(dims) for i in names_multi_list]
-        if not all(l_ok_list):#:for i in names_multi_list:
+        if not all(l_ok_list):  #:for i in names_multi_list:
             raise Exception('Error: {}, {}, {}, {}, {}'.format(len(dims), dims, names_multi_list, l_ok_list, [[len(i), i, len(dims)] for i in names_multi_list]))
     elif 'names_multi_list_str' in kwargs:
         nmls = kwargs.get('names_multi_list_str')
         names_multi_list = []
         for i in nmls:
             if type(i) != str:
-                raise Exception('Error: each item of names_multi_list_str must be {} (is {})'. format(str, type(i)))
+                raise Exception('Error: each item of names_multi_list_str must be {} (is {})'.format(str, type(i)))
             if len(i) != 2 * len(dims):
                 raise Exception("Error: {}, {}, {}, {}".format(dims, 2 * len(dims), i, len(i)))
             names_multi_list.append(chunk(i))
@@ -151,6 +158,7 @@ def test_states(dims=None, pure=False, **kwargs):
             out[name_multi] = ket2dm(out[name_multi]).unit()
     return out
 
+
 def propagate_test_states(gates, test_states):
     out = {}
     if type(test_states) is dict:
@@ -160,6 +168,7 @@ def propagate_test_states(gates, test_states):
         for key, val in enumerate(gates):
             out[key] = val * test_states * val.dag()
     return out
+
 
 # def single_quantum_transition(states):
 #     """
@@ -204,6 +213,7 @@ def single_quantum_transition_hf_spins(states_list, hf_spin_list='all'):
                     out.append([s, tuple(ts)])
     return out
 
+
 def single_quantum_transitions_non_hf_spins(states_list, hf_spin_list='all'):
     """
     :param states_list:
@@ -237,6 +247,7 @@ def single_quantum_transitions_non_hf_spins(states_list, hf_spin_list='all'):
                     out.append([s, tuple(ts)])
     return out
 
+
 def flipped_spin_numbers(transition):
     """
     :param transition: example [(0, 0, 0), (0, 1, 0)]
@@ -249,15 +260,19 @@ def flipped_spin_numbers(transition):
             l.append(i)
     return l
 
+
 def single_quantum_transition(states_list, hf_spin_list='all'):
     return single_quantum_transition_hf_spins(states_list=states_list, hf_spin_list=hf_spin_list) + \
            single_quantum_transitions_non_hf_spins(states_list=states_list, hf_spin_list=hf_spin_list)
 
+
 def state_num2name(state, name_list):
     return tuple([name_list[i][val] for i, val in enumerate(state)])
 
+
 def state_name2num(state, name_list):
     return tuple([name_list[i].index(val) for i, val in enumerate(state)])
+
 
 def state_num_name(state, name_list):
     if type(state) is list:
@@ -273,6 +288,7 @@ def state_num_name(state, name_list):
     else:
         return f(state, name_list)
 
+
 def get_transition_frequency(**kwargs):
     if 'h' in kwargs:
         dims = kwargs['h'].dims[0]
@@ -284,6 +300,7 @@ def get_transition_frequency(**kwargs):
 
     def t(s0, s1):
         return h_diag[m_list.index(s1)] - h_diag[m_list.index(s0)]
+
     if 'transition' in kwargs:
         return t(*kwargs['transition'])
     if 's0' in kwargs and 's1' in kwargs:
@@ -295,6 +312,7 @@ def get_transition_frequency(**kwargs):
         else:
             states_list_string = kwargs['states_list']
         return dict([(str(sstr), t(s[0], s[1])) for sstr, s in zip(states_list_string, kwargs.get('states_list'))])
+
 
 class Simulate(DataGeneration):
 
@@ -338,7 +356,6 @@ class Simulate(DataGeneration):
             raise Exception('ERROR: {}'.format(val.keys()))
         self._section_dict = val
 
-
     @staticmethod
     def get_section_dict(times_fields_dict):
         section_length_list = []
@@ -356,7 +373,7 @@ class Simulate(DataGeneration):
                 section_length_list.append(len(val))
                 fields_list.append(val)
 
-        return collections.OrderedDict([(key, val) for key, val in zip(times_fields_dict.keys(), np.cumsum(section_length_list)-1)])
+        return collections.OrderedDict([(key, val) for key, val in zip(times_fields_dict.keys(), np.cumsum(section_length_list) - 1)])
 
     def calc_number_of_simultaneous_measurements(self):
         if 'initial_state' in self.parameters:
@@ -368,11 +385,9 @@ class Simulate(DataGeneration):
                     l.append(len(val))
             f_initial_state = int(np.prod(l))
         if 'observation_type' in self.parameters:
-            return int(np.product([len(i) for i in self.parameters.values()[self.parameters.keys().index('observation_type'):]])*f_initial_state)
+            return int(np.product([len(i) for i in list(self.parameters.values())[list(self.parameters.keys()).index('observation_type'):]]) * f_initial_state)
         else:
-            return len(self.parameters['to_bin']) * len(self.parameters['spin_num']) * len(self.parameters['axis'])*f_initial_state
-
-
+            return len(self.parameters['to_bin']) * len(self.parameters['spin_num']) * len(self.parameters['axis']) * f_initial_state
 
     @property
     def observation_names(self):
@@ -386,7 +401,13 @@ class Simulate(DataGeneration):
             self.progress_bar.value = self.progress
 
     def detunings(self, iterator_df_row):
-        return dict([(key, val) for key, val in iterator_df_row.iteritems() if 'detuning' in key])
+        return dict([(key, val) for key, val in iterator_df_row.items() if 'detuning' in key])
+
+    def h_mhz_changed(self, iterator_df_changed_idx):
+        changed = False
+        if self.current_iterator_df_changes.loc[iterator_df_changed_idx, [cn for cn in self.data.parameter_names if '_detuning' in cn]].any():
+            changed = True
+        return changed
 
     def initial_state(self, _I_):
         if 'initial_state' in _I_:
@@ -406,25 +427,24 @@ class Simulate(DataGeneration):
     def probability(self, _I_, pts):
         id = [idx for idx, val in enumerate(chunk(_I_['measurement_operator'])) if val != 'nn']
         dim_sub = [self.dims[i] for i in id]
-        mos_sub = [i for i in chunk(_I_['measurement_operator'])[id[0]:id[-1]+1]]
-        op = test_states(dims=dim_sub, pure=False, names_multi_list=[mos_sub]).values()[0]
+        mos_sub = [i for i in chunk(_I_['measurement_operator'])[id[0]:id[-1] + 1]]
+        op = list(test_states(dims=dim_sub, pure=False, names_multi_list=[mos_sub]).values())[0]
         dm = pts[0].ptrace(id)
         return measurement_result(dm, op)
-
 
     def run(self, abort=None):
         self.init_run(init_from_file=None, iff=None)
         try:
             for idxo, _ in enumerate(self.iterator()):
                 if abort is not None and abort.is_set(): break
-                if idxo == 0:
-                    u_list_reduced, u_list_mult = self.generate_u_list_mult()
                 observation_dict_list = []
                 for idx, _I_ in self.current_iterator_df.iterrows():
+                    if self.h_mhz_changed(idx):
+                        u_list_reduced, u_list_mult = self.generate_u_list_mult()
                     u_list_reduced, u_list_mult = self.f(u_list_reduced=u_list_reduced, u_list_mult=u_list_mult, idxo=idxo, idx=idx, _I_=_I_, abort=abort)
                     if abort is not None and abort.is_set(): break
-                    ts = test_states(dims=self.dims, pure=False, names_multi_list_str=[self.initial_state(_I_)]).values()[0]
-                    to_bin = self.section_dict.values().index(_I_['to_bin'])
+                    ts = list(test_states(dims=self.dims, pure=False, names_multi_list_str=[self.initial_state(_I_)]).values())[0]
+                    to_bin = list(self.section_dict.values()).index(_I_['to_bin'])
                     pts = propagate_test_states([u_list_mult[to_bin]], ts)
                     if _I_.get('observation_type', 'expect') == 'expect':
                         value = self.expect(_I_, pts)
@@ -432,6 +452,8 @@ class Simulate(DataGeneration):
                         value = self.probability(_I_, pts)
                     elif _I_['observation_type'] == 'purity':
                         value = purity(pts[0])[tuple([int(i) for i in _I_['spin_nums']])]
+                    else:
+                        raise Exception('Error!')
                     observation_dict_list.append(collections.OrderedDict([('value', value)]))
                 self.data.set_observations(observation_dict_list)
                 if self.gui:
@@ -457,7 +479,7 @@ class Simulate(DataGeneration):
                     sequence_creator.unitary_propagator_list_mult(
                         sequence_creator.unitary_propagator_list(
                             h_mhz=h_mhz,
-                            times=val[:,0],
+                            times=val[:, 0],
                             fields=val[:, 1:],
                             L_Bc=self.L_Bc
                         )

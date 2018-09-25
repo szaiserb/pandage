@@ -5,7 +5,7 @@ __metaclass__ = type
 
 from qutip import *
 
-from . import coordinates
+
 import scipy.linalg
 
 import numpy as np
@@ -16,7 +16,7 @@ from mpl_toolkits.mplot3d import proj3d
 import itertools
 import zipfile
 import copy
-
+from . import coordinates
 np.set_printoptions(suppress=True, linewidth=100000)
 
 def save_qutip_enhanced(destination_dir):
@@ -220,10 +220,12 @@ def gate_expand_1toN_qudit(U, dims, target):
                   [identity(dim1) for dim1 in dims[target+1:]])
 
 def extend_operator(dims, target_spin, operator, control_dict=None):
-    control_dict = {} if control_dict is None else copy.deepcopy(control_dict)
+
+    control_dict = collections.OrderedDict() if control_dict is None else copy.deepcopy(control_dict)
     for idx, dim in enumerate(dims):
         if idx not in control_dict and idx != target_spin:
-            control_dict[idx] = range(dim)
+            control_dict[idx] = list(range(dim))
+    control_dict = dict(sorted(control_dict.items()))
     if target_spin in control_dict:
         raise Exception('Error: rotated_spin must not be in control_dict!!\n{}, {}'.format(dims, control_dict))
     sl = ["".join(str(j) for j in i) for i in itertools.product(*control_dict.values())]
@@ -240,7 +242,6 @@ def extend_operator(dims, target_spin, operator, control_dict=None):
                     ol.append(operation)
                 else:
                     ol.append(fock_dm(dims[idx], int(item)))
-
             out.append(tensor(ol))
     return qsum(out)
 
@@ -355,3 +356,58 @@ if __name__ == '__main__':
                   [0. + 0.j, 0. - 1.j, 0. + 0.j, 0. + 0.j],
                   [0. + 0.j, 0. + 0.j, 0. + 1.j, 0. + 0.j],
                   [0. + 0., 0. + 0.j, 0. + 0.j, 0. + 1.j]])
+
+
+# """
+# ============
+# Pgf Preamble
+# ============
+#
+# """
+# # -*- coding: utf-8 -*-
+# from __future__ import (absolute_import, division, print_function,
+#                         unicode_literals)
+#
+# import six
+#
+# import matplotlib as mpl
+# mpl.use("pgf")
+# pgf_with_custom_preamble = {
+#     "pgf.rcfonts": False,    # don't setup fonts from rc parameters
+# }
+# mpl.rcParams.update(pgf_with_custom_preamble)
+#
+# import matplotlib.pyplot as plt
+# plt.figure(figsize=(4.5, 2.5))
+# plt.plot(range(5))
+# # plt.xlabel("unicode text: я, ψ, €, ü, \\unitfrac[10]{°}{µm}")
+# # plt.ylabel("\\XeLaTeX")
+# # plt.legend([r"unicode math: $\lambda = \sum_0^{N}{p(i)$"])
+# plt.tight_layout(.5)
+#
+# plt.savefig(r"D:\Dropbox\Dokumente\PI3\Thesis\phd-thesis\fig\nv_hybrid\pgf_preamble.pgf")
+# plt.savefig(r"D:\Dropbox\Dokumente\PI3\Thesis\phd-thesis\fig\nv_hybrid\pgf_preamble.png")
+
+# import matplotlib as mpl
+# import matplotlib.pyplot as plt
+# import numpy as np
+#
+# fig_size = (4.5, 2.5)
+# params = {'backend': 'pgf',
+#           'axes.labelsize': 12,
+#           'text.fontsize': 12,
+#           'legend.fontsize': 12,
+#           'xtick.labelsize': 12,
+#           'ytick.labelsize': 12,
+#           'text.usetex': True,
+#           'figure.figsize': fig_size}
+# mpl.rcParams.update(params)
+#
+# x = np.linspace(0, 1)
+# y = np.sin(4 * np.pi * x) * np.exp(-5 * x)
+# plt.fill(x, y, 'r', label=r"$y=e^{-5x} \sin 4 \pi x$")
+# plt.legend(loc='upper right')
+# plt.grid(True)
+# #plt.show()
+# plt.savefig(r"D:\Dropbox\Dokumente\PI3\Thesis\phd-thesis\fig\nv_hybrid\pgf_preamble.pgf", bbox_inches='tight',pad_inches=0)
+

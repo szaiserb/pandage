@@ -31,7 +31,7 @@ STy = jmat(1., 'y')  # np.array([[0.0, -1.0j, 0.0], [1.0j, 0.0, -1.0j], [0.0, 1.
 STz = jmat(1., 'z')  # np.array([[1.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, -1.0]], dtype='complex_')
 
 
-def f_drift(x, fwhm, center=0.0, drift_width=0.0, f='lorentzian'):
+def f_drift(x, fwhm, center=0.0, drift_width=0.0, f='gaussian'):
     if f == 'lorentzian':
         sigma = fwhm / 2.
     elif f == 'gaussian':
