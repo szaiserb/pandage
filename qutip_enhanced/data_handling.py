@@ -294,6 +294,9 @@ class Data:
                 self.observation_names = list(self.df.columns[lpi:])
             if not hasattr(self, '_dtypes'):
                 self._dtypes = list(self.df.dtypes[lpi:])
+        parameter_names_to_delete = ["{}_idx".format(pn) for pn in self.parameter_names if "{}_idx".format(pn) in self.parameter_names]
+        self._df = self.df.drop(columns=parameter_names_to_delete)
+        self._parameter_names = [pn for pn in self.parameter_names if not pn in parameter_names_to_delete]
 
     def init(self, last_parameter=None, df=None, init_from_file=None, iff=None, path=None):
         init_from_file = iff if iff is not None else init_from_file
@@ -332,7 +335,7 @@ class Data:
     def save(self, filepath, notify=False):
         if filepath.endswith('.csv'):
             t0 = time.time()
-            self.df.to_csv(filepath, index=False, compression='gzip')
+            self.df.to_csv(filepath, index=False)
             print("csv data saved ({:.2f}s).\n If speed is an issue, use hdf. csv format is useful ony for py2-py3-compatibility.".format(time.time() - t0))
         elif filepath.endswith('.hdf'):
             t0 = time.time()
