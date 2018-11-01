@@ -153,7 +153,7 @@ class NVHam:
     @nitrogen_levels.setter
     def nitrogen_levels(self, val):
         if self.n_type is not None:
-            fl = range(2 * self.j[self.n_type] + 1)
+            fl = range(int(2 * self.j[self.n_type] + 1))
             if val is None:
                 self._nitrogen_levels = fl
             elif set(fl).issuperset(set(val)):
@@ -267,11 +267,11 @@ if __name__ == '__main__':
     e = Eigenvector(dims=[2, 3])
     B_list = np.linspace(0.1, 0.105, 50)
     h_nv = NVHam(magnet_field={'z': 0.0}, n_type='14n', nitrogen_levels=[0, 1, 2], electron_levels=[1, 2])
-    # for i in B_list:
-    #     h_nv = NVHam(magnet_field={'z': i}, n_type='14n', nitrogen_levels=[0, 1, 2], electron_levels=[1, 2]).h_nv
-    #     e.sort(h_nv.eigenstates()[1], h_nv.eigenenergies())
-    # import matplotlib.pyplot as plt
-    # plt.plot(B_list, e.evals_sorted_list)
+    for i in B_list:
+        h_nv = NVHam(magnet_field={'z': i}, n_type='14n', nitrogen_levels=[0, 1, 2], electron_levels=[1, 2]).h_nv
+        e.sort(h_nv.eigenstates()[1], h_nv.eigenenergies())
+    import matplotlib.pyplot as plt
+    plt.plot(B_list, e.evals_sorted_list)
 
     # def h_nv_rotating_frame(self, rotation_operator):
     #     U = (1j * rotation_operator * 2 * pi * t).expm()
