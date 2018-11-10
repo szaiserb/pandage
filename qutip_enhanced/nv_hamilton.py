@@ -4,7 +4,7 @@ from __future__ import print_function, absolute_import, division
 __metaclass__ = type
 
 import numpy as np
-from scipy.constants import mu_0, pi, h
+from scipy.constants import mu_0, hbar
 
 np.set_printoptions(suppress=True, linewidth=500, threshold=np.nan)
 
@@ -16,7 +16,7 @@ gamma = {'e': -2.0028 * 1.6021766208e-19 / (4 * np.pi * 9.10938356e-31) * 1e-6,
          '15n': -4.3156}
 
 
-def hft_13c_dd(location):
+def hft_13c_dd(location, gamman=None):
     """
     Calculates 13C hyperfine tensor for pure dipolar coupling at position location.
     location must be inserted according to module coordinates.
@@ -26,10 +26,11 @@ def hft_13c_dd(location):
     example: {'rho': 1e-9, 'elev': np.pi / 2, 'azim': 0}
     :return: hyperfine tensor in amtrix notation
     """
+    gamman = gamma['13c'] if gamman is None else gamman
     loc_cart = coordinates.Coord().coord_unit(location, 'cart')
     rho = coordinates.Coord().coord(location, 'sph')['rho']
     x, y, z = [loc_cart[i] for i in ['x', 'y', 'z']]
-    prefactor = mu_0 / (4.0 * pi) * h * gamma['e'] * 1e6 * gamma['13c'] * 1e6 / rho ** 3  # given in Hertz
+    prefactor = mu_0 / (2.0) * hbar * gamma['e'] * 1e6 * gamman * 1e6 / rho ** 3  # given in Hertz
     prefactor_mhz = prefactor * 1e-6  # given in MHz
     mat = np.matrix([[1 - 3 * x * x, -3 * x * y, -3 * x * z],
                      [-3 * x * y, 1 - 3 * y * y, -3 * y * z],
