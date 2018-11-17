@@ -32,9 +32,8 @@ def save_qutip_enhanced(destination_dir):
                         zf.write(os.path.join(root, file), os.path.join(root.replace(os.path.commonprefix([root, src]), ""), file))
         zf.close()
 
-
 class Eigenvector:
-    def __init__(self, dims, track_evals=False):
+    def __init__(self, dims):
         """
         Eigenvalues are not sorted in any way which makes plotting or
         following special level at anticrossings difficult. This class follows energy levels
@@ -44,28 +43,77 @@ class Eigenvector:
 
         """
         self.dims = np.array(dims)
-        self.evecs_old_transposed = np.eye(self.dims.prod())
-        self.idx = np.arange(self.dims.prod())
-        self.track_evals = track_evals
+        self.evecs_old = make_vector_basis(dims)
+        self.idx = np.array(range(self.dims.prod()))
+        self.evals_sorted_list = None
 
-    def update_evals_sorted_list(self):
-        if self.track_evals:
-            if not hasattr(self, 'evals_sorted_list'):
-                self.evals_sorted_list = np.array([self.evals_sorted])
-            else:
-                self.evals_sorted_list = np.append(self.evals_sorted_list, np.array([self.evals_sorted]), axis=0)
-
-    def sort(self, evec_matrix_new, evals_new):
+    def sort(self, evecs_new, evals_new):
         """
         keep order of eigenvalues by comparing the
         eigenvectors from former and current run
         -evecs_new is a numpy array of qutip eigenvectors in arbitrary order like given by evals, evec = Qobj.eigenstates()
         -evals_new is numpy array of eigenvalues like given by evals, evec = Qobj.eigenstates()
         """
-        self.idx = np.array(np.dot(self.evecs_old_transposed, evec_matrix_new).argmax(axis=1))[:, 0]
-        self.evecs_old_transposed = evec_matrix_new.transpose()[self.idx, :]
-        self.evals_sorted = evals_new[self.idx]
-        self.update_evals_sorted_list()
+        self.idx_new = copy.deepcopy(self.idx)
+        for i in range(self.dims.prod()):
+            for j in range(self.dims.prod()):
+                if (self.evecs_old[i].trans() * evecs_new[j]).norm() >= 0.5 and (
+                            self.evecs_old[1].trans() * evecs_new[j]).norm() <= 1.5:
+                    self.idx_new[i] = j
+                    break
+                elif j == self.dims.prod() - 1:
+                    raise Exception("No two orthonormal EV have been found. Try to make more steps. {}".format((self.evecs_old[i].trans() * evecs_new[j]).norm() ))
+        self.evals_sorted = np.take(evals_new, self.idx_new)
+        self.evecs_old = np.take(evecs_new, self.idx_new)
+        if self.evals_sorted_list is None:
+            self.evals_sorted_list = np.array([self.evals_sorted])
+        else:
+            self.evals_sorted_list = np.append(self.evals_sorted_list, np.array([self.evals_sorted]), axis=0)
+
+
+
+# class Eigenvector:
+#     def __init__(self, dims, track_evals=False):
+#         """
+#         Eigenvalues are not sorted in any way which makes plotting or
+#         following special level at anticrossings difficult. This class follows energy levels
+#         according to their eigenvectors.
+#         For every newly calculated eigenvectors and eigenvalues the sort function must be called.
+#         -dims must be numpy array of system dimensions, e.g. np.array([3,3]) for electron + 14N
+#
+#         """
+#         self.dims = np.array(dims)
+#         self.evecs_old = np.eye(self.dims.prod())
+#         self.idx = np.arange(self.dims.prod())
+#         self.track_evals = track_evals
+#
+#     def update_evals_sorted_list(self):
+#         if self.track_evals:
+#             if not hasattr(self, 'evals_sorted_list'):
+#                 self.evals_sorted_list = np.array([self.evals_sorted])
+#             else:
+#                 self.evals_sorted_list = np.append(self.evals_sorted_list, np.array([self.evals_sorted]), axis=0)
+#
+#     def sort(self, evec_matrix_new, evals_new):
+#         """
+#         keep order of eigenvalues by comparing the
+#         eigenvectors from former and current run
+#         -evecs_new is a numpy array of qutip eigenvectors in arbitrary order like given by evals, evec = Qobj.eigenstates()
+#         -evals_new is numpy array of eigenvalues like given by evals, evec = Qobj.eigenstates()
+#         """
+#         idx = []
+#         for vold in self.evecs_old.T:
+#             l = []
+#             for vnew in evec_matrix_new.T:
+#                 l.append(np.vdot(vold, vnew))
+#             idx.append(np.array(l).argmax())
+#         print(idx)
+#         self.idx = idx
+#         # self.idx = np.array(np.real(np.dot(self.evecs_old.conjugate().transpose(), evec_matrix_new)).argmax(axis=0))
+#         self.evecs_old = evec_matrix_new[:, self.idx]
+#         np.set_printoptions(precision=2)
+#         self.evals_sorted = evals_new[self.idx]
+#         self.update_evals_sorted_list()
 
 
 def sort_eigenvalues_standard_basis(dims, evec, evals):

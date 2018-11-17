@@ -10,6 +10,7 @@ import itertools
 import scipy
 import collections
 import operator
+import copy
 
 from .analyze import NVHamFit14nParams
 
@@ -98,6 +99,7 @@ class SincModel(lmfit.Model):
         super(SincModel, self).__init__(sinc, *args, **kwargs)
 
     def guess(self, data, x=None, **kwargs):
+        data = copy.deepcopy(data)
         mod = lmfit.models.LorentzianModel() + lmfit.models.LinearModel()
         result = mod.fit(data=data, x=x, params=guess_from_peak(model=mod, y=data, x=x, negative=self.negative, **kwargs))
         center = result.params['center'].value

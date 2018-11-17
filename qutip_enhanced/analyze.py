@@ -81,7 +81,7 @@ class NVHamFit14nParams():
     def transition_frequencies(self, magnetic_field, transition_numbers, gamma, qp, hf_para_n, hf_perp_n):
         nvham = self.nvham(magnetic_field=magnetic_field, gamma=gamma, qp=qp, hf_para_n=hf_para_n, hf_perp_n=hf_perp_n)
         if self.diag:
-            h_diag = sort_eigenvalues_standard_basis(nvham.dims, *np.linalg.eig(nvham.h_nv.data.todense())[::-1])
+            h_diag = sort_eigenvalues_standard_basis(nvham.dims, *nvham.h_nv.eigenstates()[::-1])
         else:
             print('Not diagonalizing, just taking diagonal.')
             h_diag = np.diag(nvham.h_nv.data.todense())

@@ -4,7 +4,7 @@ from __future__ import print_function, absolute_import, division
 __metaclass__ = type
 
 import numpy as np
-from scipy.constants import mu_0, pi, h
+from scipy.constants import mu_0, hbar
 
 np.set_printoptions(suppress=True, linewidth=500, threshold=np.nan)
 
@@ -16,7 +16,7 @@ gamma = {'e': -2.0028 * 1.6021766208e-19 / (4 * np.pi * 9.10938356e-31) * 1e-6,
          '15n': -4.3156}
 
 
-def hft_13c_dd(location):
+def hft_13c_dd(location, gamman=None):
     """
     Calculates 13C hyperfine tensor for pure dipolar coupling at position location.
     location must be inserted according to module coordinates.
@@ -26,10 +26,11 @@ def hft_13c_dd(location):
     example: {'rho': 1e-9, 'elev': np.pi / 2, 'azim': 0}
     :return: hyperfine tensor in amtrix notation
     """
+    gamman = gamma['13c'] if gamman is None else gamman
     loc_cart = coordinates.Coord().coord_unit(location, 'cart')
     rho = coordinates.Coord().coord(location, 'sph')['rho']
     x, y, z = [loc_cart[i] for i in ['x', 'y', 'z']]
-    prefactor = mu_0 / (4.0 * pi) * h * gamma['e'] * 1e6 * gamma['13c'] * 1e6 / rho ** 3  # given in Hertz
+    prefactor = mu_0 / (2.0) * hbar * gamma['e'] * 1e6 * gamman * 1e6 / rho ** 3  # given in Hertz
     prefactor_mhz = prefactor * 1e-6  # given in MHz
     mat = np.matrix([[1 - 3 * x * x, -3 * x * y, -3 * x * z],
                      [-3 * x * y, 1 - 3 * y * y, -3 * y * z],
@@ -153,7 +154,7 @@ class NVHam:
     @nitrogen_levels.setter
     def nitrogen_levels(self, val):
         if self.n_type is not None:
-            fl = range(2 * self.j[self.n_type] + 1)
+            fl = range(int(2 * self.j[self.n_type] + 1))
             if val is None:
                 self._nitrogen_levels = fl
             elif set(fl).issuperset(set(val)):
@@ -267,11 +268,11 @@ if __name__ == '__main__':
     e = Eigenvector(dims=[2, 3])
     B_list = np.linspace(0.1, 0.105, 50)
     h_nv = NVHam(magnet_field={'z': 0.0}, n_type='14n', nitrogen_levels=[0, 1, 2], electron_levels=[1, 2])
-    # for i in B_list:
-    #     h_nv = NVHam(magnet_field={'z': i}, n_type='14n', nitrogen_levels=[0, 1, 2], electron_levels=[1, 2]).h_nv
-    #     e.sort(h_nv.eigenstates()[1], h_nv.eigenenergies())
-    # import matplotlib.pyplot as plt
-    # plt.plot(B_list, e.evals_sorted_list)
+    for i in B_list:
+        h_nv = NVHam(magnet_field={'z': i}, n_type='14n', nitrogen_levels=[0, 1, 2], electron_levels=[1, 2]).h_nv
+        e.sort(h_nv.eigenstates()[1], h_nv.eigenenergies())
+    import matplotlib.pyplot as plt
+    plt.plot(B_list, e.evals_sorted_list)
 
     # def h_nv_rotating_frame(self, rotation_operator):
     #     U = (1j * rotation_operator * 2 * pi * t).expm()
