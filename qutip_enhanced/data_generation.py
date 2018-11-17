@@ -110,7 +110,7 @@ class DataGeneration:
             columns=list(self.parameters.keys())
         )
         for cn in self.iterator_df.columns:
-            setattr(self.iterator_df, cn, getattr(self.iterator_df, cn).astype(type(self.parameters[cn][0])))
+            self.iterator_df[cn] = self.iterator_df[cn].astype(type(self.parameters[cn][0]))
 
     @property
     def progress(self):
