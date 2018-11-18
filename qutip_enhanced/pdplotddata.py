@@ -9,80 +9,27 @@ import PyQt5.QtWidgets
 from PyQt5.QtCore import Qt, pyqtSignal
 
 from .util import printexception
-import qutip_enhanced.qtgui.gui_helpers
+from . import pddata
+try:
+    import qutip_enhanced.qtgui.gui_helpers
+except:
+    pass
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 import matplotlib
 import matplotlib.pyplot as plt
 import lmfit
-
-from .pddata import *
-
-
-
-def extend_columns(df, other, columns=None):
-    """
-    Extends df horizontally to include all columns of other
-    Necessary workaround due to pandas deficiencies regarding missing data (only float has a realy missing data type)
-    Order of columns is important.
-
-    Example:
-        df.columns = ['A', 'B', 'C']
-        other.columns = ['B', 'C', 'D']
-        result: df.columns = ['A', 'B', 'C', 'D']
-
-    :param df: pandas.DataFrame
-        DataFrame whose columns should be extended
-    :param other: pandas.DataFrame
-        DataFrame to take extra columns from
-    :return: pandas.DataFrame
-    """
-    columns = None
-    columns = other.columns if columns is None else columns
-    if type(columns) != pd.core.indexes.base.Index:
-        raise Exception('Error: unexpected behaviour.')
-    if not all([i in other.columns for i in df.columns]):
-        raise Exception('Error: all columns of other ({}) must be in df ({})'.format(other.columns, df.columns))
-    if len(df.columns) == len(columns) and (df.columns == columns).all():
-        return df
-    else:
-        print('This should work but is untested and to my knowledge not used right now. (data_handling.extend_columns)')
-        df_missing_columns = pd.Index([i for i in other.columns if i not in df.columns])  # df.columns.append(other.columns).drop_duplicates(keep=False)
-        return pd.concat([df, pd.concat([other.loc[:, df_missing_columns].iloc[0:1, :]] * len(df)).reset_index(drop=True)], axis=1).reset_index(drop=True)
-
-
-def df_take_duplicate_rows(df, other):
-    df_columns = df.columns  # here for security reasons, leave it!
-    df_dtypes = df.dtypes  # here for security reasons, leave it!
-    df_all = df.merge(other.drop_duplicates(), on=list(other.columns), how='left', indicator=True)
-    out = df_all[df_all._merge == 'both'].iloc[:, :-1].reset_index(drop=True)
-    if not (out.columns == df_columns).all():  # here for security reasons, leave it!
-        print(out.columns, df_columns)
-    if not (out.dtypes == df_dtypes).all():  # here for security reasons, leave it!
-        print(out.columns, df.columns)
-    return out
-
-
-def df_drop_duplicate_rows(df, other):
-    """
-
-    :param df: dataframe
-    :param other: dataframe
-    :param columns: pd.core.indexes.base.Index
-        columns to compare
-        default: right.columns
-    :return:
-    """
-    df_columns = df.columns  # here for security reasons, leave it!
-    df_dtypes = df.dtypes  # here for security reasons, leave it!
-    df_all = df.merge(other.drop_duplicates(), on=list(other.columns), how='left', indicator=True)
-    out = df_all[df_all._merge == 'left_only'].iloc[:, :-1].reset_index(drop=True)
-    if not (out.columns == df_columns).all():  # here for security reasons, leave it!
-        print(out.columns, df_columns)
-    if not (out.dtypes == df_dtypes).all():  # here for security reasons, leave it!
-        print(out.columns, df.columns)
-    return out
+import numpy as np
+import pandas as pd
+import collections
+import os
+import itertools
+import sys
+import time
+import logging
+from six import string_types
+import subprocess
 
 
 class Base:
@@ -367,7 +314,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
     @printexception
     def set_data(self, **kwargs):
         if 'path' in kwargs:
-            self.data = Data(iff=kwargs['path'])
+            self.data = pddata.Data(iff=kwargs['path'])
         elif 'data' in kwargs:
             self.data = kwargs['data']
         if hasattr(self.data, 'filepath'):
@@ -441,8 +388,8 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             return
         other = pd.DataFrame(list(itertools.product(*self.parameter_table.selected_data.values())))
         other.rename(columns=collections.OrderedDict([(key, val) for key, val in enumerate(self.parameter_table.selected_data.keys())]), inplace=True)
-        data = Data(parameter_names=self.data.parameter_names, observation_names=self.observation_list.selected_data)
-        data._df = df_access(self.data.df[self.data.parameter_names + self.observation_list.selected_data], other)
+        data = pddata.Data(parameter_names=self.data.parameter_names, observation_names=self.observation_list.selected_data)
+        data._df = pddata.df_access(self.data.df[self.data.parameter_names + self.observation_list.selected_data], other)
         if self.subtract_parameter_list.selected_value != '__none__':
             data.subtract_parameter(self.subtract_parameter_list.selected_value, observation_names=self.observation_list.selected_data)
         for pn in self.average_parameter_list.selected_data:
@@ -460,17 +407,17 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         if not x_axis_parameter in data_selected.parameter_names:
             print('Can not fit!\nx_axis_parameter {} is not in data_selected'.format(x_axis_parameter))
             return
+        if hasattr(self, 'custom_model'):
+            mod = self.custom_model
+        elif self.fit_function == 'cosine':
+            from . import lmfit_custom_models
+            mod = lmfit_custom_models.CosineModel()
+        elif self.fit_function == 'exp':
+            pass
+        elif self.fit_function == 'lorentz':
+            from . import lmfit_custom_models
+            mod = lmfit_custom_models.LorentzianModel()
         try:
-            if hasattr(self, 'custom_model'):
-                mod = self.custom_model
-            elif self.fit_function == 'cosine':
-                from . import lmfit_models
-                mod = lmfit_models.CosineModel()
-            elif self.fit_function == 'exp':
-                pass
-            elif self.fit_function == 'lorentz':
-                from . import lmfit_models
-                mod = lmfit.models.LorentzianModel()
             pnl = [pn for pn in data_selected.parameter_names if pn != x_axis_parameter]
             for d, d_idx, idx, sub in data_selected.iterator(column_names=pnl, output_data_instance=True):
                 for idx_obs, obs in enumerate(sub.observation_names):
@@ -482,9 +429,9 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
                             raise Exception('Error: invalid custom_params {} for fit. Key {} not found'.format(self.custom_params, key))
                         params[key] = val
                     if idx == 0 and idx_obs == 0:
-                        data_fit_results = Data(parameter_names=pnl + ['observation_name'],
-                                                observation_names=['fit_result'],
-                                                dtypes={'fit_result': 'object'})
+                        data_fit_results = pddata.Data(parameter_names=pnl + ['observation_name'],
+                                                       observation_names=['fit_result'],
+                                                       dtypes={'fit_result': 'object'})
                         data_fit_results.init()
                     data_fit_results.append(collections.OrderedDict([(key, val) for key, val in zip(d.keys() + ['observation_name'], d.values() + [obs])]))
                     data_fit_results.set_observations(collections.OrderedDict([('fit_result', mod.fit(y, params, x=x))]))
@@ -492,7 +439,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
             self.extend_data_fit_results_by_parameters()
             self.fit_result_table.update_data()
         except ValueError:
-            print("Can not fit, input contains nan values")
+            print("Can not fit, maybe input contains nan values")
         except:
             exc_type, exc_value, exc_tb = sys.exc_info()
             traceback.print_exception(exc_type, exc_value, exc_tb)
@@ -505,7 +452,6 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         for idx, _I_ in self._data_fit_results.df.iterrows():
             for pn, pv in _I_['fit_result'].params.items():
                 self._data_fit_results.df.loc[idx, pn] = pv
-
 
     def plot_label(self, condition_dict_reduced, obs):
         label = ""
@@ -596,7 +542,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         for ni in range(1, n_tot + 1):
             pd = {} if len(axes) == 0 else {'sharex': axes[0], 'sharey': axes[0]}
             axes.append(fig.add_subplot(ny_tot, nx_tot, ni, **pd))
-        cn =[ pn for pn in data_selected.parameter_names if pn != self.x_axis_parameter_list.selected_value]
+        cn = [pn for pn in data_selected.parameter_names if pn != self.x_axis_parameter_list.selected_value]
         if len(list(data_selected.column_product(column_names=cn))) > getattr(self, 'max_plots', 100):
             return
         for d, d_idx, idx, sub in data_selected.iterator(column_names=cn):
@@ -681,7 +627,7 @@ class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
         plt.close(fig)
         plt.ion()
         if notify:
-            logging.getLogger().info('Plot saved to {} in ({:.3f}s)'.format(filepath, time.time() -t0))
+            logging.getLogger().info('Plot saved to {} in ({:.3f}s)'.format(filepath, time.time() - t0))
 
     @property
     @printexception
@@ -707,7 +653,6 @@ class BaseQt(PyQt5.QtWidgets.QWidget):
     def update_data(self, data):
         self.update_data_signal.emit(data)
 
-
     @printexception
     def update_selected_indices(self, selected_indices):
         getattr(self, "update_selected_indices_signal").emit(selected_indices)
@@ -730,6 +675,7 @@ class BaseQt(PyQt5.QtWidgets.QWidget):
             raise
         finally:
             widget.blockSignals(False)
+
 
 class SelectableListQt(BaseQt):
     update_data_signal = pyqtSignal(list)
@@ -869,6 +815,7 @@ class ParameterTableQt(TableQt):
         finally:
             widget.blockSignals(False)
 
+
 class FitResultTableQt(TableQt):
 
     @printexception
@@ -911,7 +858,7 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
             'average_parameter_widget',
             'fit_result_table_widget',
         ]:
-            getattr(self, name).clear() #self.clear_widget(name)
+            getattr(self, name).clear()  # self.clear_widget(name)
         try:
             self.fig.clf()
             self.canvas.draw()
@@ -1010,86 +957,3 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
             subprocess.Popen("explorer {}".format(os.path.abspath(os.path.dirname(self.no_qt.data.filepath))), shell=True)
         else:
             print('No filepath.')
-
-
-def cpd():
-    hdfl = [fn for fn in os.listdir(os.getcwd()) if fn.endswith('.hdf')]
-    if not 'data.hdf' in hdfl and len(hdfl) != 1:
-        raise Exception('Error: No hdf file found in files {}'.format(os.listdir(os.getcwd())))
-    data = Data(iff=os.path.join(os.getcwd(), hdfl[0]))
-    if 'prepare_data.py' in os.listdir(os.getcwd()):
-        from prepare_data import prepare_data
-        data = prepare_data(data)
-    out = PlotData(data=data)
-    if 'sweeps' in data.parameter_names:
-        out.x_axis_parameter_list.update_selected_indices(out.x_axis_parameter_list.selected_indices_default(exclude_names=['sweeps']))
-        out.average_parameter_list.update_selected_data(['sweeps'])
-    if any(['result_' in out.observation_list.data]):
-        out.observation_list.update_selected_data([i for i in out.observation_list.data if i.startswith('result_')])
-    else:
-        out.observation_list.update_selected_indices([0])
-    out.update_plot()
-    out.gui.show_gui()
-    return out
-
-
-def cpd_thread():
-    import threading
-    out = PlotData()
-
-    def run():
-
-        for fn in os.listdir(os.getcwd()):
-            if fn.endswith('.hdf'):
-                out.set_data_from_path(fn)
-
-        out.gui.show_gui()
-
-    t = threading.Thread(target=run)
-    t.start()
-
-
-def subfolders_with_hdf(folder):
-    l = []
-    for root, dirs, files in os.walk(folder):
-        for file in files:
-            if file.endswith(".hdf"):
-                l.append(root)
-    return l
-
-
-def number_of_points_of_hdf_files_in_subfolders(folder, endswith='data.hdf'):
-    l = subfolders_with_hdf(folder)
-    out_openable = []
-    out_failed = []
-    for subdir in l:
-        for root, dirs, files in os.walk(subdir):
-            for file in files:
-                if file.endswith(endswith):
-                    try:
-                        d = Data(iff=os.path.join(root, file))
-                        out_openable.append({'root': root, 'file': file, 'points': len(d.df)})
-                    except:
-                        out_failed.append({'root': root, 'file': file})
-    return out_openable, out_failed
-
-
-def hdf_files_in_subfolders_with_less_than_n_points(folder, n):
-    out_openable, out_failed = number_of_points_of_hdf_files_in_subfolders(folder)
-    out_smaller = [i for i in out_openable if i['points'] < n]
-    out_larger_equal = [i for i in out_openable if i['points'] >= n]
-    return out_smaller, out_larger_equal, out_failed
-
-
-def move_folder(folder_list_dict=None, destination_folder=None):
-    import shutil
-    failed = 0
-    for i in folder_list_dict:
-        try:
-            src = i['root']
-            dst = os.path.join(destination_folder, os.path.basename(i['root']))
-            shutil.move(src, dst)
-        except:
-            failed += 1
-            print("Folder {} could not be moved. Lets hope it has tbc in its name".format(i['root']))
-    print("Successfully moved: {}. Failed: {}".format(len(folder_list_dict) - failed, failed))

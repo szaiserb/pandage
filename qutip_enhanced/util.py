@@ -5,7 +5,7 @@ __metaclass__ = type
 from numbers import Number
 import numpy as np
 
-import functools, traceback, sys, inspect
+import functools, traceback, sys
 def printexception(func):
     @functools.wraps(func)
     def wrapper(*a, **kw):

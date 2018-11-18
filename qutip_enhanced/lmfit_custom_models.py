@@ -8,11 +8,10 @@ import lmfit.models
 import lmfit.lineshapes
 import itertools
 import scipy
-import collections
 import operator
 import copy
 
-from .analyze import NVHamFit14nParams
+
 
 def guess_from_peak(model, y, x, negative, ampscale=1.0, sigscale=1.0):
     """Estimate amp, cen, sigma for a peak, create params."""
@@ -71,25 +70,6 @@ def sinc(x, amplitude, center, rabi_frequency, y0):
     """
     a = (rabi_frequency ** 2 + (x - center) ** 2)
     return amplitude * rabi_frequency ** 2 / a * np.sin(np.sqrt(a) * np.pi / (2 * rabi_frequency)) ** 2 + y0
-
-
-class NVHam14NModel(lmfit.Model):
-
-    def __init__(self, fd, diag=True, *args, **kwargs):
-        def calc_transition_frequency(x, magnet_field, gamma_e, gamma_n, qp, hf_para_n, hf_perp_n):
-            nvham = NVHamFit14nParams(diag=diag)
-            nvham.set_frequency_dict(collections.OrderedDict(fd))
-            return nvham.transition_frequencies(
-                magnetic_field=magnet_field,
-                transition_numbers=np.int32(x),
-                gamma={'e': gamma_e, '14n': gamma_n},
-                qp={'14n': qp},
-                hf_para_n={'14n': hf_para_n},
-                hf_perp_n={'14n': hf_perp_n}
-            )
-
-        super(NVHam14NModel, self).__init__(calc_transition_frequency, *args, **kwargs)
-
 
 class SincModel(lmfit.Model):
     def __init__(self, rabi_frequency=None, vary_rabi_frequency=True, negative=False, *args, **kwargs):
