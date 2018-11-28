@@ -16,6 +16,7 @@ setup(name='qutip_enhanced',
         'six',
         'matplotlib',
         'lmfit',
-        'PyQt5'
+        'PyQt5',
+		'more_itertools'
     ],
     zip_safe=False)

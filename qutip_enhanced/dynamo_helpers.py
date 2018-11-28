@@ -9,11 +9,13 @@ if sys.version_info.major == 2:
 else:
     from io import StringIO
 
-import matlab.engine
+try:
+	import matlab.engine
+except:
+	print('matlab.engine could not be loaded')
 
 from qutip_enhanced import *
 import shutil
-import matlab.engine
 import itertools
 import datetime
 import time
