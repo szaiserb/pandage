@@ -73,7 +73,7 @@ class QtGuiClass(PyQt5.QtWidgets.QMainWindow):
         # widget = PyQt5.QtWidgets.QWidget()
         #PyQt5.uic.loadUi(self.ui_filepath, widget)
         #self.setCentralWidget(widget)
-        self.setCentralWidget(self.parameter_tab)
+        #self.setCentralWidget(self.parameter_tab)
         self.init_gui()
 
 
