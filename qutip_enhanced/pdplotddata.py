@@ -842,7 +842,10 @@ class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
         self.subtract_parameter_list = ParameterCombobox(name='subtract_parameter_list', widget_name='subtract_parameter_comboBox', parent=self)
         self.parameter_table = ParameterTableQt(name='parameter_table', widget_name='parameter_table_widget', parent=self)
         self.fit_result_table = FitResultTableQt(name='fit_result_table', widget_name='fit_result_table_widget', parent=self)
-        super(PlotDataQt, self).__init__(parent=parent, no_qt=no_qt, ui_filepath=os.path.join(os.path.dirname(__file__), 'qtgui/plot_data.ui'))
+        #print(self.layout())
+        super(PlotDataQt, self).__init__(parent=parent, no_qt=no_qt, ui_filepath=os.path.join(os.path.dirname(__file__), 'qtgui/plot_data_vv3.ui'))
+        #print(self.layout())
+
 
     update_info_text_signal = pyqtSignal(str)
 

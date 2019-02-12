@@ -53,6 +53,10 @@ def abs_cosine_minus_amp_half_decay(x, amplitude, T, x0, c, t2, p):
 def exp_power_decay(x, amplitude, dec, x0, p, c):
     return amplitude * np.exp(-((x-x0) / dec) ** p) + c
 
+def exp_power_decay_pos0(x, amplitude, dec, p, c):
+    return amplitude * np.exp(-((x) / dec) ** p) + c
+
+
 def sinc(x, amplitude, center, rabi_frequency, y0):
     """
 
@@ -273,6 +277,7 @@ class ExpDecayModel(lmfit.Model):
 class ExpPowerDecayModel(lmfit.Model):
 
     def __init__(self, *args, **kwargs):
+        #super(ExpPowerDecayModel, self).__init__(exp_power_decay, *args, **kwargs)
         super(ExpPowerDecayModel, self).__init__(exp_power_decay, *args, **kwargs)
 
     def guess(self, data, x=None, **kwargs):

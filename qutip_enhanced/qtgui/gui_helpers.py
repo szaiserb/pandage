@@ -67,8 +67,15 @@ class QtGuiClass(PyQt5.QtWidgets.QMainWindow):
         super(QtGuiClass, self).__init__(parent=parent)
         self.no_qt = no_qt
         self.ui_filepath = ui_filepath
+
         PyQt5.uic.loadUi(self.ui_filepath, self)
+        # It was working! But not connected to the Fields...
+        # widget = PyQt5.QtWidgets.QWidget()
+        #PyQt5.uic.loadUi(self.ui_filepath, widget)
+        #self.setCentralWidget(widget)
+        self.setCentralWidget(self.parameter_tab)
         self.init_gui()
+
 
     def init_gui(self):
         for name in [
