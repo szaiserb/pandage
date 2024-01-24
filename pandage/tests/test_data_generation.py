@@ -125,14 +125,6 @@ class TestDataGeneration(unittest.TestCase):
         dgu = self.getDgu()
         dgu.init_run()
         dgu.number_of_simultaneous_measurements = __NUMBER_OF_SIMULTANEOUS_MEASUREMENTS__
-        # dgu.process_remeasure_items()
-        # dgu.set_iterator_df_done()
-        # dgu.set_iterator_df()
-        # dgu.iterator_df_drop_done()
-        # dgu.update_progress()
-        # from pandage.data_handling import df_pop
-        # dgu.iterator_df, dgu.current_iterator_df = df_pop(dgu.iterator_df, min(dgu.number_of_simultaneous_measurements, len(dgu.iterator_df)))
-        # dgu.changes_from_previous(dgu.current_iterator_df)
         for current_iterator_df, current_iterator_df_changes in dgu.iterator():
             assert_frame_equal(current_iterator_df, get_iterator_df(__PARAMETERS__).iloc[:__NUMBER_OF_SIMULTANEOUS_MEASUREMENTS__].reset_index(drop=True))
             self.assertEqual(dgu.progress, 0)
