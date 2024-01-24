@@ -448,7 +448,7 @@ class Data:
         if len(self.df) == 0:
             self._df = df_append
         else:
-            self._df = self.df.append(df_append, ignore_index=True)
+            self._df = pd.concat([self.df, df_append], ignore_index=True)
         self.check_integrity()
 
     def set_observations(self, l, start_idx=None):

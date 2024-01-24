@@ -1,13 +1,12 @@
 from setuptools import setup
 
-setup(name='qutip_enhanced',
+setup(name='pandage',
     version='1.0',
-    description='Enhancements to qutip regarding NV spin physics',
+    description='A pandas based tool for data acquisition, storage, manipulation and visualization. ',
     author='Sebastian Zaiser',
-    author_email='s.zaiser@physik.uni-stuttgart.de',
     license='BSD',
-    packages=['qutip_enhanced'],
-    package_data={'qutip_enhanced': ['qtgui/*.ui', 'qtgui/*.py']},
+    packages=['pandage'],
+    package_data={'pandage': ['qtgui/*.ui', 'qtgui/*.py']},
     include_package_data=True,
     install_requires=[
         'numpy',
@@ -15,8 +14,7 @@ setup(name='qutip_enhanced',
         'pandas',
         'six',
         'matplotlib',
-        'lmfit',
         'PyQt5',
-	'more_itertools'
+        'more_itertools'
     ],
     zip_safe=False)

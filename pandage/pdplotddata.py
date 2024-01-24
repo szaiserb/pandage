@@ -11,7 +11,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from .util import printexception
 from . import pddata
 try:
-    import qutip_enhanced.qtgui.gui_helpers
+    import pandage.qtgui.gui_helpers
 except:
     pass
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -19,7 +19,6 @@ from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationTo
 from matplotlib.figure import Figure
 import matplotlib
 import matplotlib.pyplot as plt
-import lmfit
 import numpy as np
 import pandas as pd
 import collections
@@ -281,7 +280,7 @@ class FitResultTable(DataTable):
         return collections.OrderedDict()
 
 
-class PlotData(qutip_enhanced.qtgui.gui_helpers.WithQt):
+class PlotData(pandage.qtgui.gui_helpers.WithQt):
 
     @printexception
     def __init__(self, title=None, parent=None, gui=True, **kwargs):
@@ -832,7 +831,7 @@ class FitResultTableQt(TableQt):
             widget.blockSignals(False)
 
 
-class PlotDataQt(qutip_enhanced.qtgui.gui_helpers.QtGuiClass):
+class PlotDataQt(pandage.qtgui.gui_helpers.QtGuiClass):
     def __init__(self, parent=None, no_qt=None):
         self.observation_list = SelectableListQt(name='observation_list', widget_name='observation_widget', parent=self)
         self.average_parameter_list = SelectableListQt(name='average_parameter_list', widget_name='average_parameter_widget', parent=self)
