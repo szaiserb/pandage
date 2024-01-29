@@ -389,6 +389,8 @@ class Data:
         return os.stat(filepath).st_mtime - time.time()
 
     def save(self, filepath, notify=False):
+        if len(self.df) == 0:
+            raise Exception('Error: Dataframe is empty.')
         if filepath.endswith('.csv'):
             t0 = time.time()
             self.df.to_csv(filepath, index=False)
@@ -403,7 +405,7 @@ class Data:
                 print('Ok.. hdf_lock acquired.')
             t.append(time.time() - t0)
             store = pd.HDFStore(filepath)
-            store.put('df', self.df, table=True)
+            store.put('df', self.df, format='table')
             for key in ["parameter_names", 'observation_names', 'dtypes']:
                 setattr(store.get_storer('df').attrs, key, getattr(self, key))
             store.close()
@@ -454,9 +456,7 @@ class Data:
     def set_observations(self, l, start_idx=None):
         start_idx = len(self.df) - 1 if start_idx is None else start_idx
         l = l_to_df(l)
-        for idx, row in l.iterrows():
-            for obs, val in zip(l.columns, row):
-                self.df.at[start_idx - len(l) + idx + 1, obs] = val
+        self.df.loc[start_idx - len(l) + 1:start_idx, l.columns] = l.values
         self.check_integrity()
 
     def df_access(self, other):
